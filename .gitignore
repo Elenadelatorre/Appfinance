@@ -11,6 +11,9 @@ frontend/.env
 # Python cache
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Node/tooling leftovers
 node_modules/
@@ -19,3 +22,9 @@ node_modules/
 .DS_Store
 Thumbs.db
 .vscode/
+.idea/
+
+# Logs and local build output
+*.log
+build/
+dist/
