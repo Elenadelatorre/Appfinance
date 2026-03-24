@@ -1,0 +1,1878 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Finance App - Sistema de gestión financiera personal seguro y eficiente"
+    />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <!-- Seguridad -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https:; style-src 'self' 'unsafe-inline' https: http: data:; style-src-elem 'self' 'unsafe-inline' https: http: data:; img-src 'self' data: https:; font-src 'self' https: data:; connect-src 'self' http://localhost:8001 http://127.0.0.1:8001 https: http:"
+    />
+    <meta name="finance-api-base" content="" />
+
+    <title>Finance App - Gestión Financiera Personal</title>
+
+    <!-- PWA Meta -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💰</text></svg>"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Estilos mínimos del modal (por si tu style.css no lo tiene aún) -->
+    <style>
+      .modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        justify-content: center;
+        align-items: flex-end;
+        padding: 18px;
+        z-index: 999;
+      }
+
+      .modal .modal-content {
+        width: 100%;
+        max-width: 540px;
+        background: #0d1b2a;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 28px 28px 0 0;
+        padding: 20px 20px 24px;
+        transform: translateY(20px);
+        opacity: 0;
+        transition:
+          transform 0.25s ease,
+          opacity 0.25s ease;
+        box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.4);
+      }
+
+      .modal.active .modal-content {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .modal-title {
+        font-weight: 800;
+        font-size: 16px;
+        margin: 0;
+      }
+
+      .close-modal {
+        background: transparent;
+        border: none;
+        color: rgba(255, 255, 255, 0.85);
+        font-size: 22px;
+        cursor: pointer;
+        padding: 6px 10px;
+        border-radius: 10px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .form-grid.full {
+        grid-template-columns: 1fr;
+      }
+
+      .input,
+      .select,
+      .textarea {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1.5px solid rgba(255, 255, 255, 0.1);
+        background: #172033;
+        color: #f1f5f9;
+        outline: none;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        transition:
+          border-color 0.2s ease,
+          background 0.2s ease;
+      }
+
+      .input:focus,
+      .select:focus,
+      .textarea:focus {
+        border-color: rgba(99, 102, 241, 0.65);
+        background: #1e2d45;
+      }
+
+      /* Opciones del select: fondo sólido oscuro para que el texto sea siempre visible */
+      .select option {
+        background: #172033;
+        color: #f1f5f9;
+        font-weight: 600;
+        padding: 8px;
+      }
+
+      .select option:checked,
+      .select option:hover {
+        background: #4338ca;
+        color: #ffffff;
+      }
+
+      /* Placeholder visible */
+      .input::placeholder,
+      .textarea::placeholder {
+        color: rgba(241, 245, 249, 0.35);
+        font-weight: 500;
+      }
+
+      .textarea {
+        min-height: 80px;
+        resize: vertical;
+      }
+
+      .hint {
+        font-size: 11px;
+        color: rgba(148, 163, 184, 0.8);
+        margin-top: 3px;
+        line-height: 1.4;
+      }
+
+      .actions-row {
+        display: flex;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .btn {
+        width: 100%;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1.5px solid rgba(148, 163, 184, 0.38);
+        background: #1e293b;
+        color: #f8fafc;
+        font-weight: 700;
+        font-family: inherit;
+        font-size: 14px;
+        cursor: pointer;
+        transition:
+          opacity 0.15s ease,
+          transform 0.1s ease;
+      }
+
+      .btn:active {
+        transform: scale(0.97);
+        opacity: 0.85;
+      }
+
+      .btn.primary {
+        background: linear-gradient(140deg, #4338ca 0%, #312e81 100%);
+        border-color: rgba(49, 46, 129, 0.8);
+        color: #f8fafc;
+        box-shadow: 0 8px 20px rgba(79, 70, 229, 0.38);
+      }
+
+      .btn.primary:hover {
+        filter: brightness(1.07);
+      }
+
+      .btn.danger {
+        background: #7f1d1d;
+        border-color: rgba(248, 113, 113, 0.65);
+        color: #fee2e2;
+      }
+
+      /* Para que los inputs se vean bien en iOS */
+      input,
+      select,
+      textarea,
+      button {
+        -webkit-appearance: none;
+        appearance: none;
+      }
+
+      /* Modal centrado en tablet / desktop */
+      @media (min-width: 640px) {
+        .modal {
+          align-items: center;
+          padding: 20px;
+        }
+
+        .modal .modal-content {
+          border-radius: 24px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="app-container">
+      <!-- TOP BAR -->
+      <header class="top-bar">
+        <div class="user-profile">
+          <div class="avatar" id="topAvatar">E</div>
+          <div>
+            <p class="greeting" id="currentDate">Finance</p>
+            <h1 id="viewTitle">Inicio</h1>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center">
+          <button class="icon-btn" id="btnSettings" title="Ajustes">
+            <i class="ph ph-gear-six"></i>
+          </button>
+          <button class="icon-btn" id="btnLogout" title="Salir">
+            <i class="ph ph-sign-out"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- MAIN -->
+      <main id="mainApp">
+        <!-- LOGIN -->
+        <section id="view-login" class="view fade-in" style="display: none">
+          <div class="balance-card login-card">
+            <h2 class="login-title">
+              <span class="login-title-mark" aria-hidden="true">
+                <span>💰</span>
+              </span>
+              <span class="login-title-text">Inicio de sesión</span>
+            </h2>
+            <div id="authForms">
+              <div id="loginForm">
+                <input
+                  id="loginEmail"
+                  class="input"
+                  placeholder="Email"
+                  type="email"
+                />
+                <input
+                  id="loginPassword"
+                  class="input"
+                  placeholder="Contraseña"
+                  type="password"
+                />
+                <button class="btn primary" id="btnLogin">Entrar</button>
+                <div class="auth-switch-copy">
+                  ¿No tienes cuenta?
+                  <a href="#" id="showRegister">Regístrate</a>
+                </div>
+              </div>
+
+              <div id="registerForm" style="display: none">
+                <input
+                  id="registerEmail"
+                  class="input"
+                  placeholder="Email"
+                  type="email"
+                />
+                <input
+                  id="registerPassword"
+                  class="input"
+                  placeholder="Contraseña"
+                  type="password"
+                />
+                <button class="btn" id="btnRegister">Crear cuenta</button>
+                <div class="auth-switch-copy">
+                  ¿Tienes cuenta? <a href="#" id="showLogin">Inicia sesión</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- HOME - Cuenta Principal -->
+        <section id="view-home" class="view active fade-in">
+          <div class="balance-card home-account-card account-detail-card">
+            <div class="home-account-corner-actions">
+              <button
+                id="btnHomeTransfer"
+                class="home-account-transfer-btn home-account-action-btn"
+                type="button"
+                title="Transferir desde esta cuenta"
+                aria-label="Transferir desde esta cuenta"
+              >
+                <i class="ph ph-arrows-left-right"></i>
+              </button>
+              <button
+                id="btnHomeResetAccount"
+                class="home-account-transfer-btn home-account-transfer-btn--reset home-account-action-btn"
+                type="button"
+                title="Reiniciar cuenta principal"
+                aria-label="Reiniciar cuenta principal"
+              >
+                <i class="ph ph-arrow-counter-clockwise"></i>
+              </button>
+            </div>
+            <div class="home-account-header">
+              <div class="home-account-copy">
+                <div
+                  id="homeAccountBadge"
+                  class="account-brand-slot"
+                  aria-hidden="true"
+                ></div>
+                <p id="homeAccountType" style="opacity: 0.7; margin: 0 0 4px 0">
+                  Tipo
+                </p>
+                <h2
+                  id="homeAccountName"
+                  class="home-account-name"
+                  style="margin: 0"
+                >
+                  Santander
+                </h2>
+                <p id="homeAccountSubtitle" class="home-account-subtitle">
+                  Principal
+                </p>
+              </div>
+            </div>
+            <div
+              class="home-account-balance-block account-detail-balance-block"
+            >
+              <p style="margin-top: 12px; opacity: 0.8">Saldo actual</p>
+              <h2
+                id="homeAccountBalance"
+                class="home-account-balance-value"
+                style="margin: 0; color: var(--success)"
+              >
+                0.00€
+              </h2>
+            </div>
+          </div>
+
+          <details class="account-spend-panel">
+            <summary class="account-spend-panel-summary">
+              Ver gasto por categoría de esta cuenta
+            </summary>
+            <div id="homeSpendDistribution"></div>
+          </details>
+
+          <div class="section-header">
+            <h3>Movimientos</h3>
+          </div>
+          <div class="tx-list" id="homeAccountTxList"></div>
+        </section>
+
+        <!-- DASHBOARD - Resumen mensual -->
+        <section id="view-dashboard" class="view fade-in" style="display: none">
+          <div class="balance-card">
+            <p>Resumen del ciclo</p>
+            <div
+              class="dashboard-mode-toggle"
+              role="tablist"
+              aria-label="Modo de resumen"
+            >
+              <button
+                type="button"
+                class="dashboard-mode-btn is-active"
+                data-dashboard-summary-mode="full"
+              >
+                Completo
+              </button>
+              <button
+                type="button"
+                class="dashboard-mode-btn"
+                data-dashboard-summary-mode="compact"
+              >
+                Compacto
+              </button>
+            </div>
+            <h2 id="dashboardBalance">0.00€</h2>
+            <div class="health-badge">
+              <i class="ph ph-sparkle"></i>
+              <span id="dashboardAdvice"
+                >Añade movimientos para ver tu resumen.</span
+              >
+            </div>
+            <div class="dashboard-breakdown-card">
+              <div class="dashboard-breakdown-header">
+                <span>Gasto por categoría</span>
+                <span class="dashboard-breakdown-caption">% e importe</span>
+              </div>
+              <div id="dashboardDetails" class="dashboard-breakdown-list"></div>
+            </div>
+            <div id="dashboardAccountsDistribution"></div>
+          </div>
+        </section>
+
+        <!-- ACCOUNT DETAIL - Vista de una cuenta específica -->
+        <section
+          id="view-account-detail"
+          class="view fade-in"
+          style="display: none"
+        >
+          <div class="balance-card account-detail-card">
+            <div class="account-detail-header">
+              <div class="account-detail-copy">
+                <div
+                  id="accountDetailBadge"
+                  class="account-brand-slot"
+                  aria-hidden="true"
+                ></div>
+                <p id="accountDetailType" class="account-detail-type">Tipo</p>
+                <h2
+                  id="accountDetailName"
+                  class="account-detail-name"
+                  style="margin: 0"
+                >
+                  Cuenta
+                </h2>
+                <p id="accountDetailSubtitle" class="account-detail-subtitle">
+                  Principal
+                </p>
+              </div>
+              <div class="account-detail-actions">
+                <button
+                  class="icon-btn account-detail-action"
+                  onclick="backToAccounts()"
+                  title="Volver"
+                  type="button"
+                >
+                  <i class="ph ph-arrow-left"></i>
+                </button>
+                <button
+                  class="icon-btn account-detail-action"
+                  id="btnEditAccountDetail"
+                  title="Editar cuenta"
+                  type="button"
+                >
+                  <i class="ph ph-pencil-simple"></i>
+                </button>
+                <button
+                  class="icon-btn account-detail-action account-detail-action--transfer"
+                  id="btnTransferAccountDetail"
+                  title="Transferir a otra cuenta"
+                  type="button"
+                >
+                  <i class="ph ph-arrows-left-right"></i>
+                </button>
+                <button
+                  class="icon-btn account-detail-action account-detail-action--reset"
+                  id="btnResetAccountDetail"
+                  title="Reiniciar cuenta"
+                  type="button"
+                >
+                  <i class="ph ph-arrow-counter-clockwise"></i>
+                </button>
+                <button
+                  class="icon-btn account-detail-action account-detail-action--pin"
+                  id="btnPinAccountDetail"
+                  title="Fijar como principal"
+                  type="button"
+                >
+                  <i class="ph ph-push-pin-simple"></i>
+                </button>
+                <button
+                  class="icon-btn account-detail-action"
+                  id="btnExportAccountDetail"
+                  title="Descargar movimientos de esta cuenta"
+                  type="button"
+                >
+                  <i class="ph ph-download-simple"></i>
+                </button>
+                <button
+                  class="icon-btn account-detail-action account-detail-action--danger"
+                  id="btnDeleteAccountDetail"
+                  title="Eliminar cuenta"
+                  type="button"
+                >
+                  <i class="ph ph-trash"></i>
+                </button>
+              </div>
+            </div>
+            <div class="account-detail-balance-block">
+              <p class="account-detail-balance-label">Saldo actual</p>
+              <h2
+                id="accountDetailBalance"
+                class="home-account-balance-value account-detail-balance-value"
+              >
+                0.00€
+              </h2>
+            </div>
+          </div>
+
+          <details class="account-spend-panel">
+            <summary class="account-spend-panel-summary">
+              Ver gasto por categoría de esta cuenta
+            </summary>
+            <div id="accountSpendDistribution"></div>
+          </details>
+
+          <div class="section-header">
+            <h3>Movimientos</h3>
+          </div>
+          <div class="tx-list" id="accountTxList"></div>
+        </section>
+
+        <!-- HISTORY -->
+        <section id="view-history" class="view fade-in" style="display: none">
+          <div class="section-header">
+            <h3>Historial</h3>
+            <input type="month" id="historyMonth" class="input-field-small" />
+          </div>
+          <div class="history-summary-card">
+            <div class="history-summary-grid">
+              <div class="history-summary-stat">
+                <span class="history-summary-label">Balance</span>
+                <strong
+                  id="historySummaryBalance"
+                  class="history-summary-value"
+                >
+                  0.00€
+                </strong>
+              </div>
+              <div class="history-summary-stat">
+                <span class="history-summary-label">Ingresos</span>
+                <strong
+                  id="historySummaryIncome"
+                  class="history-summary-value history-summary-value--income"
+                >
+                  0.00€
+                </strong>
+              </div>
+              <div class="history-summary-stat">
+                <span class="history-summary-label">Gastos</span>
+                <strong
+                  id="historySummaryExpense"
+                  class="history-summary-value history-summary-value--expense"
+                >
+                  0.00€
+                </strong>
+              </div>
+              <div class="history-summary-stat">
+                <span class="history-summary-label">Movimientos</span>
+                <strong id="historySummaryCount" class="history-summary-value">
+                  0
+                </strong>
+              </div>
+            </div>
+          </div>
+          <div class="history-filters">
+            <div id="historyTypeFilters" class="history-filter-group">
+              <button
+                type="button"
+                class="history-filter-btn is-active"
+                data-history-type="all"
+              >
+                Todo
+              </button>
+              <button
+                type="button"
+                class="history-filter-btn"
+                data-history-type="expense"
+              >
+                Gastos
+              </button>
+              <button
+                type="button"
+                class="history-filter-btn"
+                data-history-type="income"
+              >
+                Ingresos
+              </button>
+            </div>
+            <select
+              id="historyAccountFilter"
+              class="input-field-small history-account-filter"
+            >
+              <option value="all">Todas las cuentas</option>
+            </select>
+            <select
+              id="historyCategoryFilter"
+              class="input-field-small history-account-filter"
+            >
+              <option value="all">Todas las categorías</option>
+            </select>
+            <input
+              id="historyMinAmount"
+              class="input-field-small history-amount-input"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Importe mín."
+            />
+            <input
+              id="historyMaxAmount"
+              class="input-field-small history-amount-input"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Importe máx."
+            />
+            <input
+              id="historySearchInput"
+              class="input-field-small history-search-input"
+              type="search"
+              placeholder="Buscar nota, cuenta o categoría"
+            />
+          </div>
+          <div class="history-results-toolbar">
+            <div id="historyResultsMeta" class="history-results-meta"></div>
+            <div class="history-results-actions">
+              <button
+                id="historyClearFiltersBtn"
+                type="button"
+                class="history-results-btn history-results-btn--clear"
+              >
+                Limpiar filtros
+              </button>
+              <button
+                id="historyCollapseAllBtn"
+                type="button"
+                class="history-results-btn"
+              >
+                Plegar todo
+              </button>
+              <button
+                id="historyExpandAllBtn"
+                type="button"
+                class="history-results-btn"
+              >
+                Desplegar todo
+              </button>
+              <button
+                id="historyExportCsvBtn"
+                type="button"
+                class="history-results-btn history-results-btn--export"
+              >
+                Exportar CSV
+              </button>
+            </div>
+          </div>
+          <div class="tx-list" id="txListFull"></div>
+        </section>
+
+        <!-- STATS (placeholder por ahora) -->
+        <section id="view-stats" class="view fade-in" style="display: none">
+          <div class="section-header"><h3>Presupuestos</h3></div>
+
+          <div class="budget-setup-card">
+            <div class="budget-setup-head">
+              <p class="budget-setup-title">Nuevo presupuesto</p>
+              <p id="budgetCycleLabel" class="budget-setup-cycle">
+                Ciclo actual
+              </p>
+            </div>
+
+            <div class="budget-setup-grid">
+              <select
+                id="budgetCategorySelect"
+                class="input-field-small budget-input"
+              >
+                <option value="">Selecciona categoría</option>
+              </select>
+              <input
+                id="budgetLimitInput"
+                class="input-field-small budget-input"
+                type="number"
+                min="0.01"
+                step="0.01"
+                placeholder="Límite (€)"
+              />
+            </div>
+
+            <div class="budget-setup-actions">
+              <button id="budgetSaveBtn" type="button" class="btn primary">
+                Guardar presupuesto
+              </button>
+              <button
+                id="budgetCancelEditBtn"
+                type="button"
+                class="btn"
+                style="display: none; margin-top: 8px"
+              >
+                Cancelar edición
+              </button>
+            </div>
+          </div>
+
+          <div id="budgetStatusSummary" class="budget-summary-meta"></div>
+
+          <div id="budgetStatusFilters" class="budget-filter-group">
+            <button
+              type="button"
+              class="history-filter-btn is-active"
+              data-budget-filter="all"
+            >
+              Todo
+            </button>
+            <button
+              type="button"
+              class="history-filter-btn"
+              data-budget-filter="risk"
+            >
+              En riesgo
+            </button>
+            <button
+              type="button"
+              class="history-filter-btn"
+              data-budget-filter="exceeded"
+            >
+              Excedidos
+            </button>
+          </div>
+
+          <div class="muted" style="opacity: 0.8">
+            Control por categoría del ciclo activo (26 al 25).
+          </div>
+
+          <div
+            id="budgetStatusList"
+            class="grid-stack"
+            style="margin-top: 12px"
+          ></div>
+          <div
+            id="chartContainer"
+            class="card-chart"
+            style="margin-top: 12px"
+          ></div>
+        </section>
+
+        <!-- ACCOUNTS -->
+        <section id="view-accounts" class="view fade-in" style="display: none">
+          <div class="section-header">
+            <div class="section-header-actions">
+              <button class="text-btn" id="btnAccountsTransfer">
+                <i class="ph ph-arrows-left-right"></i> Transferir
+              </button>
+              <button class="text-btn" id="btnAddNewAccount">+ Añadir</button>
+            </div>
+          </div>
+          <div id="accountsList"></div>
+        </section>
+
+        <!-- CONFIG -->
+        <section id="view-config" class="view fade-in" style="display: none">
+          <div class="section-header"><h3>Ajustes</h3></div>
+          <div class="muted" style="opacity: 0.8">
+            Organiza la app por apartados: perfil, categorías y seguridad de
+            datos.
+          </div>
+
+          <div class="settings-stack" id="settingsAccordion">
+            <details class="settings-panel" data-settings-panel="profile" open>
+              <summary class="settings-summary">
+                <span class="settings-summary-main">
+                  <i class="ph ph-user-circle"></i>
+                  <span>Perfil</span>
+                </span>
+                <i class="ph ph-caret-down settings-caret"></i>
+              </summary>
+              <div class="settings-panel-body">
+                <div class="profile-card">
+                  <div class="profile-card-head">
+                    <span class="profile-avatar" id="profileAvatarPreview"
+                      >E</span
+                    >
+                    <div>
+                      <p class="profile-title">Cuenta activa</p>
+                      <p class="profile-email" id="profileEmail">-</p>
+                    </div>
+                  </div>
+                  <div class="settings-field-row" style="margin-top: 12px">
+                    <span class="settings-label">Avatar</span>
+                    <div
+                      class="avatar-choice-grid"
+                      id="profileAvatarChoices"
+                    ></div>
+                  </div>
+                </div>
+
+                <div class="profile-password-block" id="profilePasswordBlock">
+                  <label class="settings-label" for="profileCurrentPassword"
+                    >Cambiar contraseña</label
+                  >
+                  <input
+                    id="profileCurrentPassword"
+                    class="category-input"
+                    type="password"
+                    placeholder="Contraseña actual"
+                    autocomplete="current-password"
+                    autocapitalize="off"
+                    spellcheck="false"
+                    aria-describedby="profileCapsLockHint profilePasswordHint"
+                  />
+                  <input
+                    id="profileNextPassword"
+                    class="category-input"
+                    type="password"
+                    placeholder="Nueva contraseña"
+                    style="margin-top: 8px"
+                    autocomplete="new-password"
+                    autocapitalize="off"
+                    spellcheck="false"
+                    aria-describedby="profilePasswordStrength profileCapsLockHint profilePasswordHint"
+                  />
+                  <input
+                    id="profileConfirmPassword"
+                    class="category-input"
+                    type="password"
+                    placeholder="Confirmar nueva contraseña"
+                    style="margin-top: 8px"
+                    autocomplete="new-password"
+                    autocapitalize="off"
+                    spellcheck="false"
+                    aria-describedby="profileCapsLockHint profilePasswordHint"
+                  />
+                  <label class="settings-toggle" style="margin-top: 8px">
+                    <input id="profileShowPasswords" type="checkbox" />
+                    <span>Mostrar contraseñas</span>
+                  </label>
+                  <p
+                    class="profile-password-strength"
+                    id="profilePasswordStrength"
+                    aria-live="polite"
+                    aria-atomic="true"
+                  >
+                    Seguridad: -
+                  </p>
+                  <p
+                    class="profile-password-capslock"
+                    id="profileCapsLockHint"
+                    aria-live="assertive"
+                    aria-atomic="true"
+                    style="display: none"
+                  >
+                    Bloq Mayus activado
+                  </p>
+                  <p
+                    class="profile-password-hint"
+                    id="profilePasswordHint"
+                    aria-live="polite"
+                    aria-atomic="true"
+                  >
+                    Mínimo 8 caracteres, una mayúscula, un número y que
+                    coincidan.
+                  </p>
+                  <div class="actions-row" style="margin-top: 10px">
+                    <button
+                      class="btn"
+                      id="btnProfileClearPasswords"
+                      type="button"
+                    >
+                      Limpiar
+                    </button>
+                    <button
+                      class="btn"
+                      id="btnProfileChangePassword"
+                      type="button"
+                    >
+                      <i class="ph ph-password"></i> Actualizar contraseña
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            <details class="settings-panel" data-settings-panel="preferences">
+              <summary class="settings-summary">
+                <span class="settings-summary-main">
+                  <i class="ph ph-sliders-horizontal"></i>
+                  <span>Preferencias</span>
+                </span>
+                <i class="ph ph-caret-down settings-caret"></i>
+              </summary>
+              <div class="settings-panel-body">
+                <div class="settings-field-row">
+                  <label class="settings-label" for="settingDefaultView"
+                    >Vista al iniciar sesión</label
+                  >
+                  <select
+                    id="settingDefaultView"
+                    class="input-field-small category-input"
+                  >
+                    <option value="home">Inicio</option>
+                    <option value="dashboard">Resumen</option>
+                    <option value="history">Historial</option>
+                    <option value="stats">Presupuestos</option>
+                    <option value="accounts">Cuentas</option>
+                    <option value="reminders">Recordatorios</option>
+                  </select>
+                </div>
+
+                <label class="settings-toggle" for="settingReduceMotion">
+                  <input id="settingReduceMotion" type="checkbox" />
+                  <span>Reducir animaciones</span>
+                </label>
+              </div>
+            </details>
+
+            <details class="settings-panel" data-settings-panel="categories">
+              <summary class="settings-summary">
+                <span class="settings-summary-main">
+                  <i class="ph ph-folders"></i>
+                  <span>Categorías</span>
+                </span>
+                <i class="ph ph-caret-down settings-caret"></i>
+              </summary>
+              <div class="settings-panel-body">
+                <div class="category-manager-actions" style="margin-top: 4px">
+                  <button class="btn" id="btnNewCategory" type="button">
+                    <i class="ph ph-plus"></i> Categoría
+                  </button>
+                  <button class="btn" id="btnNewSubcategory" type="button">
+                    <i class="ph ph-plus"></i> Subcategoría
+                  </button>
+                </div>
+
+                <div
+                  id="categoryFormCard"
+                  class="category-manager-card"
+                  style="display: none; margin-top: 12px"
+                >
+                  <div class="category-manager-header">
+                    <div>
+                      <h3 id="categoryFormTitle">Nueva categoría</h3>
+                      <p class="category-manager-subtitle">
+                        Puedes crear una categoría principal o una subcategoría.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="category-form-grid">
+                    <select
+                      id="categoryFormSection"
+                      class="input-field-small category-input"
+                    ></select>
+                    <select
+                      id="categoryFormParent"
+                      class="input-field-small category-input"
+                    ></select>
+                  </div>
+
+                  <div class="category-form-grid" style="margin-top: 10px">
+                    <input
+                      id="categoryFormName"
+                      class="category-input"
+                      type="text"
+                      placeholder="Nombre"
+                    />
+                    <input
+                      id="categoryFormIcon"
+                      class="category-input"
+                      type="text"
+                      placeholder="Icono (ej: 🍽️)"
+                      maxlength="8"
+                    />
+                  </div>
+
+                  <div class="icon-picker-wrap" style="margin-top: 10px">
+                    <div class="icon-picker-head">
+                      <span class="icon-picker-title">Selector de iconos</span>
+                      <span class="icon-picker-hint"
+                        >Pulsa uno para usarlo</span
+                      >
+                    </div>
+                    <div id="categoryIconPicker" class="icon-picker-grid"></div>
+                  </div>
+
+                  <div class="visual-upload-card" style="margin-top: 10px">
+                    <div class="visual-upload-head">
+                      <span class="icon-picker-title">Foto o imagen</span>
+                      <span class="icon-picker-hint"
+                        >Opcional, se guarda en la app</span
+                      >
+                    </div>
+                    <div class="visual-upload-row">
+                      <label
+                        class="btn visual-upload-btn"
+                        for="categoryFormImage"
+                      >
+                        <i class="ph ph-image"></i> Elegir imagen
+                      </label>
+                      <input
+                        id="categoryFormImage"
+                        type="file"
+                        accept="image/*"
+                        hidden
+                      />
+                      <button
+                        class="btn"
+                        id="btnClearCategoryImage"
+                        type="button"
+                      >
+                        Quitar imagen
+                      </button>
+                    </div>
+                    <div id="categoryFormPreview" class="visual-preview"></div>
+                  </div>
+
+                  <div
+                    class="category-form-grid category-form-grid--small"
+                    style="margin-top: 10px"
+                  >
+                    <input
+                      id="categoryFormColor"
+                      class="category-input color-input"
+                      type="color"
+                      value="#4f46e5"
+                    />
+                    <div class="hint">
+                      Deja el padre vacío para categoría principal. Si eliges
+                      padre, se crea/edita como subcategoría.
+                    </div>
+                  </div>
+
+                  <div class="category-form-grid" style="margin-top: 10px">
+                    <label class="visual-color-field">
+                      <span>Fondo</span>
+                      <input
+                        id="categoryFormBgColor"
+                        class="category-input color-input"
+                        type="color"
+                        value="#eef2ff"
+                      />
+                    </label>
+                    <label class="visual-color-field">
+                      <span>Borde</span>
+                      <input
+                        id="categoryFormBorderColor"
+                        class="category-input color-input"
+                        type="color"
+                        value="#c7d2fe"
+                      />
+                    </label>
+                  </div>
+
+                  <div class="actions-row">
+                    <button
+                      class="btn primary"
+                      id="btnSaveCategory"
+                      type="button"
+                    >
+                      <i class="ph ph-check"></i> Guardar
+                    </button>
+                    <button class="btn" id="btnCancelCategory" type="button">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  id="categoriesTree"
+                  class="tree-container"
+                  style="margin-top: 12px"
+                ></div>
+
+                <button
+                  class="btn primary"
+                  id="btnSync"
+                  style="margin-top: 16px"
+                >
+                  <i class="ph ph-arrows-clockwise"></i> Recargar categorías
+                </button>
+              </div>
+            </details>
+
+            <details class="settings-panel" data-settings-panel="automation">
+              <summary class="settings-summary">
+                <span class="settings-summary-main">
+                  <i class="ph ph-robot"></i>
+                  <span>Automatizaciones y datos</span>
+                </span>
+                <i class="ph ph-caret-down settings-caret"></i>
+              </summary>
+              <div class="settings-panel-body automation-panel-body">
+                <p class="muted" style="margin-top: 0">
+                  Recurrentes, reglas automáticas, proyección y CSV.
+                </p>
+
+                <div class="automation-block">
+                  <h4 class="automation-title">Movimientos recurrentes</h4>
+                  <div class="automation-grid">
+                    <input
+                      id="recurringName"
+                      class="category-input"
+                      type="text"
+                      placeholder="Nombre (ej: Nómina)"
+                    />
+                    <select
+                      id="recurringType"
+                      class="input-field-small category-input"
+                    >
+                      <option value="expense">Gasto</option>
+                      <option value="income">Ingreso</option>
+                    </select>
+                  </div>
+                  <div class="automation-grid" style="margin-top: 8px">
+                    <input
+                      id="recurringAmount"
+                      class="category-input"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="Importe"
+                    />
+                    <select
+                      id="recurringCadence"
+                      class="input-field-small category-input"
+                    >
+                      <option value="monthly">Mensual</option>
+                      <option value="yearly">Anual</option>
+                    </select>
+                  </div>
+                  <div class="automation-grid" style="margin-top: 8px">
+                    <select
+                      id="recurringCategory"
+                      class="input-field-small category-input"
+                    ></select>
+                    <select
+                      id="recurringSubcategory"
+                      class="input-field-small category-input"
+                    ></select>
+                  </div>
+                  <div class="automation-grid" style="margin-top: 8px">
+                    <select
+                      id="recurringAccount"
+                      class="input-field-small category-input"
+                    ></select>
+                    <input
+                      id="recurringDay"
+                      class="category-input"
+                      type="number"
+                      min="1"
+                      max="31"
+                      value="1"
+                      placeholder="Día del mes"
+                    />
+                  </div>
+                  <div class="automation-grid" style="margin-top: 8px">
+                    <input
+                      id="recurringMonth"
+                      class="category-input"
+                      type="number"
+                      min="1"
+                      max="12"
+                      value="1"
+                      placeholder="Mes (si anual)"
+                    />
+                    <input
+                      id="recurringNote"
+                      class="category-input"
+                      type="text"
+                      maxlength="200"
+                      placeholder="Nota opcional"
+                    />
+                  </div>
+                  <div class="automation-grid" style="margin-top: 8px">
+                    <input
+                      id="recurringStart"
+                      class="category-input"
+                      type="date"
+                    />
+                    <input
+                      id="recurringEnd"
+                      class="category-input"
+                      type="date"
+                    />
+                  </div>
+                  <label class="settings-toggle" style="margin-top: 8px">
+                    <input id="recurringActive" type="checkbox" checked />
+                    <span>Activa</span>
+                  </label>
+                  <div class="actions-row" style="margin-top: 10px">
+                    <button
+                      class="btn primary"
+                      id="btnSaveRecurring"
+                      type="button"
+                    >
+                      <i class="ph ph-check"></i> Guardar recurrente
+                    </button>
+                    <button class="btn" id="btnClearRecurring" type="button">
+                      Limpiar
+                    </button>
+                  </div>
+                  <div
+                    id="recurringList"
+                    class="automation-list"
+                    style="margin-top: 10px"
+                  ></div>
+                </div>
+
+                <div class="automation-block" style="margin-top: 14px">
+                  <h4 class="automation-title">Reglas de autocategorización</h4>
+                  <div class="automation-grid">
+                    <input
+                      id="ruleName"
+                      class="category-input"
+                      type="text"
+                      placeholder="Nombre de la regla"
+                    />
+                    <input
+                      id="ruleKeyword"
+                      class="category-input"
+                      type="text"
+                      placeholder="Palabra clave"
+                    />
+                  </div>
+                  <div class="automation-grid" style="margin-top: 8px">
+                    <select
+                      id="ruleMatchMode"
+                      class="input-field-small category-input"
+                    >
+                      <option value="contains">Contiene</option>
+                      <option value="starts_with">Empieza por</option>
+                      <option value="equals">Coincide exacto</option>
+                    </select>
+                    <select
+                      id="ruleType"
+                      class="input-field-small category-input"
+                    >
+                      <option value="">Sin cambio de tipo</option>
+                      <option value="expense">Gasto</option>
+                      <option value="income">Ingreso</option>
+                    </select>
+                  </div>
+                  <div class="automation-grid" style="margin-top: 8px">
+                    <select
+                      id="ruleCategory"
+                      class="input-field-small category-input"
+                    ></select>
+                    <select
+                      id="ruleSubcategory"
+                      class="input-field-small category-input"
+                    ></select>
+                  </div>
+                  <div class="automation-grid" style="margin-top: 8px">
+                    <select
+                      id="ruleAccount"
+                      class="input-field-small category-input"
+                    ></select>
+                    <input
+                      id="rulePriority"
+                      class="category-input"
+                      type="number"
+                      min="1"
+                      max="999"
+                      value="100"
+                      placeholder="Prioridad"
+                    />
+                  </div>
+                  <div class="automation-grid" style="margin-top: 8px">
+                    <input
+                      id="ruleNotePrefix"
+                      class="category-input"
+                      type="text"
+                      maxlength="120"
+                      placeholder="Prefijo opcional para nota"
+                    />
+                    <label class="settings-toggle" style="margin: 0">
+                      <input id="ruleActive" type="checkbox" checked />
+                      <span>Activa</span>
+                    </label>
+                  </div>
+                  <div class="actions-row" style="margin-top: 10px">
+                    <button class="btn primary" id="btnSaveRule" type="button">
+                      <i class="ph ph-check"></i> Guardar regla
+                    </button>
+                    <button class="btn" id="btnClearRule" type="button">
+                      Limpiar
+                    </button>
+                  </div>
+                  <div
+                    id="ruleList"
+                    class="automation-list"
+                    style="margin-top: 10px"
+                  ></div>
+                </div>
+
+                <div class="automation-block" style="margin-top: 14px">
+                  <h4 class="automation-title">Proyección de saldo</h4>
+                  <div class="automation-grid">
+                    <select
+                      id="forecastDays"
+                      class="input-field-small category-input"
+                    >
+                      <option value="30">30 días</option>
+                      <option value="90">90 días</option>
+                    </select>
+                    <button class="btn" id="btnRefreshForecast" type="button">
+                      <i class="ph ph-chart-line-up"></i> Actualizar
+                    </button>
+                  </div>
+                  <div
+                    id="forecastSummary"
+                    class="automation-list"
+                    style="margin-top: 10px"
+                  ></div>
+                </div>
+
+                <div class="automation-block" style="margin-top: 14px">
+                  <h4 class="automation-title">CSV</h4>
+                  <div class="actions-row" style="margin-top: 6px">
+                    <button class="btn" id="btnExportAllCsv" type="button">
+                      <i class="ph ph-download-simple"></i> Exportar movimientos
+                    </button>
+                  </div>
+                  <div class="automation-grid" style="margin-top: 8px">
+                    <label
+                      class="btn"
+                      for="csvImportFile"
+                      style="text-align: center"
+                    >
+                      <i class="ph ph-upload-simple"></i> Cargar archivo CSV
+                    </label>
+                    <input
+                      id="csvImportFile"
+                      type="file"
+                      accept=".csv,text/csv"
+                      hidden
+                    />
+                    <label class="settings-toggle" style="margin: 0">
+                      <input id="csvImportHasHeader" type="checkbox" checked />
+                      <span>Primera fila con cabeceras</span>
+                    </label>
+                  </div>
+                  <textarea
+                    id="csvImportText"
+                    class="textarea"
+                    style="margin-top: 8px"
+                    placeholder="Pega aquí el CSV o usa el cargador de archivo"
+                  ></textarea>
+                  <div class="actions-row" style="margin-top: 8px">
+                    <button class="btn primary" id="btnImportCsv" type="button">
+                      <i class="ph ph-file-arrow-up"></i> Importar CSV
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            <details class="settings-panel" data-settings-panel="session">
+              <summary class="settings-summary">
+                <span class="settings-summary-main">
+                  <i class="ph ph-user-gear"></i>
+                  <span>Cuenta y sesión</span>
+                </span>
+                <i class="ph ph-caret-down settings-caret"></i>
+              </summary>
+              <div class="settings-panel-body">
+                <p class="muted" style="margin-top: 0">
+                  Gestiona tu sesión de forma rápida sin salir de Ajustes.
+                </p>
+                <button class="btn" id="btnLogoutFromSettings" type="button">
+                  <i class="ph ph-sign-out"></i> Cerrar sesión
+                </button>
+              </div>
+            </details>
+
+            <details
+              class="settings-panel settings-panel-danger"
+              data-settings-panel="danger"
+            >
+              <summary class="settings-summary">
+                <span class="settings-summary-main">
+                  <i class="ph ph-warning-octagon"></i>
+                  <span>Zona Peligrosa</span>
+                </span>
+                <i class="ph ph-caret-down settings-caret"></i>
+              </summary>
+              <div class="settings-panel-body">
+                <p class="muted" style="margin-top: 0; opacity: 0.9">
+                  Se borrarán todos tus movimientos, cuentas y presupuestos.
+                </p>
+                <button
+                  class="btn danger"
+                  onclick="resetUserData()"
+                  style="margin-top: 8px"
+                >
+                  <i class="ph ph-trash"></i> Borrar todo y reiniciar
+                </button>
+              </div>
+            </details>
+          </div>
+        </section>
+
+        <!-- REMINDERS -->
+        <section id="view-reminders" class="view fade-in" style="display: none">
+          <div class="section-header"><h3>Recordatorios</h3></div>
+          <div class="muted" style="opacity: 0.8">
+            Gestiona pagos de seguros, suscripciones y cualquier cobro
+            pendiente.
+          </div>
+
+          <div class="reminder-editor-card" style="margin-top: 12px">
+            <div class="reminders-form-grid">
+              <input
+                id="reminderTitle"
+                class="category-input"
+                type="text"
+                maxlength="80"
+                placeholder="Ej: Seguro coche"
+              />
+              <input
+                id="reminderAmount"
+                class="category-input"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Importe (€ opcional)"
+              />
+            </div>
+
+            <div class="reminders-form-grid" style="margin-top: 10px">
+              <input id="reminderDueDate" class="category-input" type="date" />
+              <select
+                id="reminderType"
+                class="input-field-small category-input"
+              >
+                <option value="insurance">Seguro</option>
+                <option value="subscription">Suscripción</option>
+                <option value="other">Otro</option>
+              </select>
+            </div>
+
+            <div class="reminders-form-grid" style="margin-top: 10px">
+              <select
+                id="reminderRecurrence"
+                class="input-field-small category-input"
+              >
+                <option value="none">Sin repetición</option>
+                <option value="monthly">Cada mes</option>
+                <option value="yearly">Cada año</option>
+              </select>
+              <label class="settings-toggle reminder-inline-toggle">
+                <input id="reminderAutoAdvance" type="checkbox" checked />
+                <span>Crear siguiente automáticamente</span>
+              </label>
+            </div>
+
+            <textarea
+              id="reminderNote"
+              class="category-input"
+              rows="2"
+              maxlength="240"
+              style="margin-top: 10px"
+              placeholder="Nota opcional"
+            ></textarea>
+
+            <label class="settings-toggle" style="margin-top: 10px">
+              <input id="reminderCompleted" type="checkbox" />
+              <span>Ya está pagado</span>
+            </label>
+
+            <div class="actions-row" style="margin-top: 10px">
+              <button class="btn primary" id="btnSaveReminder" type="button">
+                <i class="ph ph-check"></i> Guardar recordatorio
+              </button>
+              <button class="btn" id="btnClearReminderForm" type="button">
+                Limpiar
+              </button>
+            </div>
+          </div>
+
+          <div
+            class="history-filter-group reminder-filter-group"
+            id="reminderFilters"
+          >
+            <button
+              type="button"
+              class="history-filter-btn is-active"
+              data-reminder-filter="all"
+            >
+              Todos
+            </button>
+            <button
+              type="button"
+              class="history-filter-btn"
+              data-reminder-filter="pending"
+            >
+              Pendientes
+            </button>
+            <button
+              type="button"
+              class="history-filter-btn"
+              data-reminder-filter="overdue"
+            >
+              Vencidos
+            </button>
+          </div>
+
+          <div
+            id="remindersList"
+            class="reminders-list"
+            style="margin-top: 12px"
+          ></div>
+        </section>
+      </main>
+
+      <!-- TAB BAR -->
+      <nav class="tab-bar">
+        <button
+          type="button"
+          class="tab-brand"
+          onclick="switchView('home', 'Inicio', event)"
+          title="Ir a Inicio"
+        >
+          <span aria-hidden="true">💰</span>
+          <span>FinanceApp</span>
+        </button>
+
+        <button
+          class="tab-item active"
+          onclick="switchView('home', 'Inicio', event)"
+        >
+          <i class="ph ph-house"></i><span>Inicio</span>
+        </button>
+
+        <button
+          class="tab-item"
+          onclick="switchView('accounts', 'Cuentas', event)"
+        >
+          <i class="ph ph-wallet"></i><span>Cuentas</span>
+        </button>
+
+        <button
+          class="tab-item"
+          onclick="switchView('dashboard', 'Resumen', event)"
+        >
+          <i class="ph ph-chart-line"></i><span>Resumen</span>
+        </button>
+
+        <button
+          class="tab-item"
+          onclick="switchView('history', 'Historial', event)"
+        >
+          <i class="ph ph-clock-counter-clockwise"></i><span>Historial</span>
+        </button>
+
+        <div class="tab-fab-space"></div>
+
+        <button
+          class="tab-item"
+          onclick="switchView('stats', 'Presupuestos', event)"
+        >
+          <i class="ph ph-coins"></i><span>Presupuestos</span>
+        </button>
+
+        <button
+          class="tab-item"
+          onclick="switchView('reminders', 'Recordatorios', event)"
+        >
+          <i class="ph ph-bell-ringing"></i>
+          <span>Recordatorios</span>
+          <span id="remindersTabBadge" class="tab-badge" style="display: none"
+            >0</span
+          >
+        </button>
+
+        <button
+          class="tab-item"
+          onclick="switchView('config', 'Ajustes', event)"
+        >
+          <i class="ph ph-nut"></i><span>Ajustes</span>
+        </button>
+      </nav>
+
+      <!-- FAB -->
+      <button class="fab-center" id="openAddModal" aria-label="Añadir">
+        <i class="ph ph-plus"></i>
+      </button>
+    </div>
+
+    <!-- MODAL ADD TX -->
+    <div class="modal" id="modalAddTx" aria-hidden="true">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Añadir movimiento</h3>
+          <button class="close-modal" aria-label="Cerrar">✕</button>
+        </div>
+
+        <form id="txForm" onsubmit="return false;">
+          <div class="form-grid">
+            <select id="txType" class="select" onchange="onTypeChange()">
+              <option value="expense">Gasto</option>
+              <option value="income">Ingreso</option>
+            </select>
+
+            <input
+              id="txAmount"
+              class="input"
+              type="number"
+              step="0.01"
+              placeholder="Importe (€)"
+            />
+          </div>
+
+          <div class="form-grid" style="margin-top: 10px">
+            <select id="txCategory" class="select">
+              <option value="">Cargando categorías…</option>
+            </select>
+
+            <select id="txSubcategory" class="select" disabled>
+              <option value="">(Opcional) Subcategoría</option>
+            </select>
+          </div>
+
+          <div class="form-grid" style="margin-top: 10px">
+            <select id="txAccount" class="select">
+              <option value="">(Opcional) Cuenta</option>
+            </select>
+            <input id="txDate" class="input" type="date" />
+          </div>
+
+          <div class="form-grid full" style="margin-top: 10px">
+            <textarea
+              id="txDesc"
+              class="textarea"
+              placeholder="Nota (opcional)"
+            ></textarea>
+            <div class="hint">
+              El título será la categoría (y subcategoría). La nota se verá
+              debajo.
+            </div>
+          </div>
+
+          <div class="actions-row">
+            <button
+              class="btn"
+              type="button"
+              onclick="document.querySelector('.close-modal').click()"
+            >
+              Cancelar
+            </button>
+            <button class="btn primary" type="button" id="btnSaveTx">
+              <i class="ph ph-check"></i> Guardar
+            </button>
+            <button
+              class="btn"
+              type="button"
+              id="btnEditTx"
+              style="display: none"
+            >
+              <i class="ph ph-pencil"></i> Editar
+            </button>
+            <button
+              class="btn danger"
+              type="button"
+              id="btnDeleteTx"
+              style="display: none"
+            >
+              <i class="ph ph-trash"></i> Eliminar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL ADD/EDIT ACCOUNT -->
+    <div class="modal" id="modalAddAccount" aria-hidden="true">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Añadir cuenta</h3>
+          <button class="close-modal" aria-label="Cerrar">✕</button>
+        </div>
+
+        <form id="accountForm" onsubmit="return false;">
+          <div class="form-grid full" style="margin-top: 10px">
+            <input
+              id="accountName"
+              class="input"
+              type="text"
+              placeholder="Nombre (ej: Santander, Efectivo)"
+            />
+          </div>
+
+          <div class="form-grid" style="margin-top: 10px">
+            <select id="accountType" class="select">
+              <option value="bank">Banco</option>
+              <option value="cash">Efectivo</option>
+              <option value="credit">Tarjeta crédito</option>
+            </select>
+
+            <input
+              id="accountBalance"
+              class="input"
+              type="number"
+              step="0.01"
+              placeholder="Saldo inicial (€)"
+            />
+          </div>
+
+          <div class="form-grid" style="margin-top: 10px">
+            <input
+              id="accountIcon"
+              class="input"
+              type="text"
+              placeholder="Icono (ej: 🏦)"
+              maxlength="8"
+            />
+            <label
+              class="btn visual-upload-btn"
+              for="accountImage"
+              style="margin: 0"
+            >
+              <i class="ph ph-image"></i> Foto del dispositivo
+            </label>
+            <input id="accountImage" type="file" accept="image/*" hidden />
+          </div>
+
+          <div
+            id="accountImagePreview"
+            class="visual-preview"
+            style="margin-top: 10px"
+          ></div>
+
+          <div class="form-grid" style="margin-top: 10px">
+            <label class="visual-color-field visual-color-field--modal">
+              <span>Fondo</span>
+              <input
+                id="accountBgColor"
+                class="input color-input"
+                type="color"
+                value="#eef2ff"
+              />
+            </label>
+            <label class="visual-color-field visual-color-field--modal">
+              <span>Borde</span>
+              <input
+                id="accountBorderColor"
+                class="input color-input"
+                type="color"
+                value="#c7d2fe"
+              />
+            </label>
+          </div>
+
+          <div class="actions-row" style="margin-top: 10px">
+            <button class="btn" type="button" id="btnClearAccountImage">
+              Quitar imagen
+            </button>
+          </div>
+
+          <div class="actions-row">
+            <button
+              class="btn"
+              type="button"
+              onclick="
+                document.querySelector('#modalAddAccount .close-modal').click()
+              "
+            >
+              Cancelar
+            </button>
+            <button class="btn primary" type="button" id="btnSaveAccount">
+              <i class="ph ph-check"></i> Guardar
+            </button>
+            <button
+              class="btn danger"
+              type="button"
+              id="btnDeleteAccount"
+              style="display: none"
+            >
+              <i class="ph ph-trash"></i> Eliminar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL TRANSFER -->
+    <div class="modal" id="modalTransfer" aria-hidden="true">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Transferir entre cuentas</h3>
+          <button class="close-modal" aria-label="Cerrar">✕</button>
+        </div>
+
+        <form id="transferForm" onsubmit="return false;">
+          <div class="form-grid" style="margin-top: 10px">
+            <select id="transferSourceAccount" class="select">
+              <option value="">Cuenta origen</option>
+            </select>
+
+            <select id="transferDestinationAccount" class="select">
+              <option value="">Cuenta destino</option>
+            </select>
+          </div>
+
+          <div class="transfer-form-tools">
+            <button
+              class="btn"
+              type="button"
+              id="btnSwapTransferAccounts"
+              title="Intercambiar origen y destino"
+            >
+              <i class="ph ph-arrows-left-right"></i> Intercambiar cuentas
+            </button>
+            <span id="transferValidationHint" class="hint" aria-live="polite"
+              >Selecciona origen, destino e importe.</span
+            >
+          </div>
+
+          <div class="form-grid" style="margin-top: 10px">
+            <input
+              id="transferAmount"
+              class="input"
+              type="number"
+              step="0.01"
+              min="0.01"
+              placeholder="Importe (€)"
+            />
+
+            <input
+              id="transferDescription"
+              class="input"
+              type="text"
+              placeholder="Concepto (opcional)"
+            />
+          </div>
+
+          <div class="hint" style="margin-top: 10px">
+            El traspaso crea una salida en la cuenta origen y una entrada en la
+            cuenta destino sin distorsionar el resumen mensual.
+          </div>
+
+          <div class="actions-row">
+            <button
+              class="btn"
+              type="button"
+              onclick="
+                document.querySelector('#modalTransfer .close-modal').click()
+              "
+            >
+              Cancelar
+            </button>
+            <button
+              class="btn primary"
+              type="button"
+              id="btnSaveTransfer"
+              disabled
+            >
+              <i class="ph ph-arrows-left-right"></i> Transferir
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+    <section
+      id="toastContainer"
+      class="toast-container"
+      aria-live="assertive"
+      aria-atomic="false"
+      aria-label="Notificaciones"
+    ></section>
+  </body>
+</html>

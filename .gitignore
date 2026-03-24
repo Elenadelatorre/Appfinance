@@ -1,0 +1,21 @@
+# Python environments
+.venv/
+backend/.venv/
+backend/venv/
+
+# Environment files with secrets
+.env
+backend/.env
+frontend/.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Node/tooling leftovers
+node_modules/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/

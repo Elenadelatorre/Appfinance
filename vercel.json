@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "routes": [
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "^/(?!frontend/)(.*\\.(?:css|js|mjs|png|jpg|jpeg|gif|svg|webp|ico|json|webmanifest|map|txt|woff|woff2|ttf|eot))$",
+      "dest": "/frontend/$1"
+    },
+    {
+      "src": "^/$",
+      "dest": "/frontend/index.html"
+    },
+    {
+      "src": "^/(.*)$",
+      "dest": "/frontend/index.html"
+    }
+  ]
+}
