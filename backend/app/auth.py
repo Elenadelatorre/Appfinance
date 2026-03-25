@@ -28,23 +28,35 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 # --- FUNCIONES DE CONTRASEÑA ---
 
 
+def _normalize_bcrypt_secret(p: str) -> str:
+    """Normaliza contraseñas para bcrypt (máximo 72 bytes)."""
+    b = p.encode("utf-8")
+    if len(b) <= 72:
+        return p
+    # Recorte por bytes para respetar el límite real de bcrypt.
+    return b[:72].decode("utf-8", errors="ignore")
+
+
 def hash_password(p: str) -> str:
     """Hashea la contraseña limitándola a 72 bytes para evitar errores de bcrypt"""
     if not p or not isinstance(p, str):
         raise ValueError("Contraseña inválida")
-    b = p.encode("utf-8")
-    if len(b) > 72:
-        p = b[:72].decode("utf-8", errors="ignore")
-    return pwd_context.hash(p)
+    p = _normalize_bcrypt_secret(p)
+    try:
+        return pwd_context.hash(p)
+    except ValueError as e:
+        if "72 bytes" in str(e):
+            raise ValueError(
+                "Contraseña demasiado larga para el cifrado. Reduce longitud o emojis."
+            ) from e
+        raise
 
 
 def verify_password(p: str, hashed: str) -> bool:
     """Verifica si la contraseña coincide con el hash"""
     if not p or not isinstance(p, str):
         return False
-    b = p.encode("utf-8")
-    if len(b) > 72:
-        p = b[:72].decode("utf-8", errors="ignore")
+    p = _normalize_bcrypt_secret(p)
     try:
         return pwd_context.verify(p, hashed)
     except Exception as e:
