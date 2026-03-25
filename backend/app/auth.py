@@ -44,12 +44,9 @@ def hash_password(p: str) -> str:
     p = _normalize_bcrypt_secret(p)
     try:
         return pwd_context.hash(p)
-    except ValueError as e:
-        if "72 bytes" in str(e):
-            raise ValueError(
-                "Contraseña demasiado larga para el cifrado. Reduce longitud o emojis."
-            ) from e
-        raise
+    except Exception as e:
+        logger.error("Error hashing password: %s", e)
+        raise ValueError("Error al procesar la contraseña") from e
 
 
 def verify_password(p: str, hashed: str) -> bool:
