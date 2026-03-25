@@ -2,7 +2,7 @@ import os
 import logging
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
-from passlib.context import CryptContext
+import bcrypt
 from fastapi import HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer
 from typing import Optional
@@ -22,7 +22,6 @@ if not SECRET_KEY or SECRET_KEY.startswith("dev-key"):
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = int(os.getenv("ACCESS_TOKEN_EXPIRE_DAYS", "30"))
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
 # --- FUNCIONES DE CONTRASEÑA ---
@@ -38,24 +37,25 @@ def _normalize_bcrypt_secret(p: str) -> str:
 
 
 def hash_password(p: str) -> str:
-    """Hashea la contraseña limitándola a 72 bytes para evitar errores de bcrypt"""
+    """Hashea la contraseña con bcrypt directo para evitar incompatibilidades de passlib."""
     if not p or not isinstance(p, str):
         raise ValueError("Contraseña inválida")
-    p = _normalize_bcrypt_secret(p)
+    normalized = _normalize_bcrypt_secret(p).encode("utf-8")
     try:
-        return pwd_context.hash(p)
+        hashed = bcrypt.hashpw(normalized, bcrypt.gensalt())
+        return hashed.decode("utf-8")
     except Exception as e:
-        logger.error("Error hashing password: %s", e)
+        logger.exception("Error hashing password")
         raise ValueError("Error al procesar la contraseña") from e
 
 
 def verify_password(p: str, hashed: str) -> bool:
-    """Verifica si la contraseña coincide con el hash"""
+    """Verifica si la contraseña coincide con el hash."""
     if not p or not isinstance(p, str):
         return False
-    p = _normalize_bcrypt_secret(p)
+    normalized = _normalize_bcrypt_secret(p).encode("utf-8")
     try:
-        return pwd_context.verify(p, hashed)
+        return bcrypt.checkpw(normalized, hashed.encode("utf-8"))
     except Exception as e:
         logger.error("Error verificando contraseña: %s", e)
         return False
@@ -118,4 +118,3 @@ def get_current_user_id_optional(token: str = Depends(oauth2_scheme)) -> Optiona
         # Silently ignore invalid tokens
         return None
 
-# v2
