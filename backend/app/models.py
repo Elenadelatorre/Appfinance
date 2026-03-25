@@ -10,14 +10,17 @@ AccType = Literal["cash", "bank", "credit"]
 
 
 def _validate_password_strength(v: str) -> str:
-    if len(v.encode("utf-8")) > 72:
-        raise ValueError(
-            "Contraseña demasiado larga para el cifrado. Usa menos de 72 bytes (evita textos muy largos o muchos emojis)."
-        )
+    # Validación de fortaleza (mayúscula + dígito)
     if not any(char.isupper() for char in v):
-        raise ValueError("Contraseña debe contener al menos una mayúscula")
+        raise ValueError("Contraseña debe contener al menos una mayúscula (A-Z)")
     if not any(char.isdigit() for char in v):
-        raise ValueError("Contraseña debe contener al menos un número")
+        raise ValueError("Contraseña debe contener al menos un dígito (0-9)")
+    # Validación de longitud en bytes (bcrypt límite es 72)
+    byte_length = len(v.encode("utf-8"))
+    if byte_length > 72:
+        raise ValueError(
+            f"Contraseña demasiado larga ({byte_length} bytes). Bcrypt permite máximo 72. Evita textos muy largos o muchos emojis."
+        )
     return v
 
 
