@@ -2,7 +2,7 @@
 FROM python:3.12.9-slim-bookworm AS builder
 WORKDIR /app
 
-# Instalar dependencias de compilación
+# Instalar dependencias de compilación (rebuild v3)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc && \
     rm -rf /var/lib/apt/lists/*
