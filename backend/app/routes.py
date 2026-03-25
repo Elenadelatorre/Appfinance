@@ -4,6 +4,7 @@ from fastapi.responses import Response
 from bson import ObjectId
 from datetime import datetime, UTC, timedelta
 import calendar
+import logging
 import csv
 import io
 from typing import Optional, List, Any, Dict, Annotated
@@ -59,6 +60,7 @@ from .logic import (
 from .logic import seed_default_accounts_for_user, check_budgets_logic
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 CurrentUserId = Annotated[str, Depends(get_current_user_id)]
 OptionalCurrentUserId = Annotated[Optional[str], Depends(get_current_user_id_optional)]
@@ -726,9 +728,12 @@ async def register(payload: UserCreate):
     try:
         res = await users_col().insert_one(doc)
         user_id = str(res.inserted_id)
-        # Seed de cuentas por usuario para que la app sea utilizable al instante.
-        await seed_default_accounts_for_user(user_id)
-        await seed_categories_for_user(user_id)
+        # El seed no debe romper el registro: solo dejamos warning en logs.
+        try:
+            await seed_default_accounts_for_user(user_id)
+            await seed_categories_for_user(user_id)
+        except Exception as exc:
+            logger.warning("seed post-register failed for user %s: %s", user_id, exc)
         token = create_access_token(str(res.inserted_id))
         return {"access_token": token, "token_type": "bearer"}
     except DuplicateKeyError:
@@ -742,8 +747,12 @@ async def login(form: LoginForm):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
 
     # Seed idempotente por usuario al iniciar sesión (si aún no existían).
-    await seed_default_accounts_for_user(str(user["_id"]))
-    await seed_categories_for_user(str(user["_id"]))
+    # Nunca debe bloquear el login.
+    try:
+        await seed_default_accounts_for_user(str(user["_id"]))
+        await seed_categories_for_user(str(user["_id"]))
+    except Exception as exc:
+        logger.warning("seed post-login failed for user %s: %s", user.get("_id"), exc)
 
     token = create_access_token(str(user["_id"]))
     return {"access_token": token, "token_type": "bearer"}
