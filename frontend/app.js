@@ -6536,6 +6536,18 @@ function initCategoryListeners() {
   if (catSel) catSel.addEventListener('change', onCategoryChange);
 }
 
+function toggleAuthForm(isRegister) {
+  const loginContainer = $('loginFormContainer');
+  const registerContainer = $('registerFormContainer');
+  if (isRegister) {
+    loginContainer.style.display = 'none';
+    registerContainer.style.display = 'block';
+  } else {
+    loginContainer.style.display = 'block';
+    registerContainer.style.display = 'none';
+  }
+}
+
 function initAuthListeners() {
   const btnLogin = $('btnLogin');
   const btnRegister = $('btnRegister');
@@ -6546,14 +6558,12 @@ function initAuthListeners() {
   if (showRegister)
     showRegister.addEventListener('click', (e) => {
       e.preventDefault();
-      $('loginForm').style.display = 'none';
-      $('registerForm').style.display = 'block';
+      toggleAuthForm(true);
     });
   if (showLogin)
     showLogin.addEventListener('click', (e) => {
       e.preventDefault();
-      $('loginForm').style.display = 'block';
-      $('registerForm').style.display = 'none';
+      toggleAuthForm(false);
     });
 }
 

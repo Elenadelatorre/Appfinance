@@ -264,51 +264,59 @@
       <main id="mainApp">
         <!-- LOGIN -->
         <section id="view-login" class="view fade-in" style="display: none">
-          <div class="balance-card login-card">
+          <!-- Login Form -->
+          <div id="loginFormContainer" class="balance-card login-card">
             <h2 class="login-title">
               <span class="login-title-mark" aria-hidden="true">
                 <span>💰</span>
               </span>
               <span class="login-title-text">Inicio de sesión</span>
             </h2>
-            <div id="authForms">
-              <div id="loginForm">
-                <input
-                  id="loginEmail"
-                  class="input"
-                  placeholder="Email"
-                  type="email"
-                />
-                <input
-                  id="loginPassword"
-                  class="input"
-                  placeholder="Contraseña"
-                  type="password"
-                />
-                <button class="btn primary" id="btnLogin">Entrar</button>
-                <div class="auth-switch-copy">
-                  ¿No tienes cuenta?
-                  <a href="#" id="showRegister">Regístrate</a>
-                </div>
+            <div id="loginForm">
+              <input
+                id="loginEmail"
+                class="input"
+                placeholder="Email"
+                type="email"
+              />
+              <input
+                id="loginPassword"
+                class="input"
+                placeholder="Contraseña"
+                type="password"
+              />
+              <button class="btn primary" id="btnLogin">Entrar</button>
+              <div class="auth-switch-copy">
+                ¿No tienes cuenta?
+                <a href="#" id="showRegister">Regístrate</a>
               </div>
+            </div>
+          </div>
 
-              <div id="registerForm" style="display: none">
-                <input
-                  id="registerEmail"
-                  class="input"
-                  placeholder="Email"
-                  type="email"
-                />
-                <input
-                  id="registerPassword"
-                  class="input"
-                  placeholder="Contraseña"
-                  type="password"
-                />
-                <button class="btn" id="btnRegister">Crear cuenta</button>
-                <div class="auth-switch-copy">
-                  ¿Tienes cuenta? <a href="#" id="showLogin">Inicia sesión</a>
-                </div>
+          <!-- Register Form -->
+          <div id="registerFormContainer" class="balance-card login-card" style="display: none">
+            <h2 class="login-title">
+              <span class="login-title-mark" aria-hidden="true">
+                <span>🚀</span>
+              </span>
+              <span class="login-title-text">Crear nueva cuenta</span>
+            </h2>
+            <div id="registerForm">
+              <input
+                id="registerEmail"
+                class="input"
+                placeholder="Email"
+                type="email"
+              />
+              <input
+                id="registerPassword"
+                class="input"
+                placeholder="Contraseña (mín 6 caracteres)"
+                type="password"
+              />
+              <button class="btn" id="btnRegister">Crear cuenta</button>
+              <div class="auth-switch-copy">
+                ¿Tienes cuenta? <a href="#" id="showLogin">Inicia sesión</a>
               </div>
             </div>
           </div>
