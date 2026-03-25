@@ -1523,6 +1523,20 @@ function readImageFileAsDataUrl(file) {
   });
 }
 
+function normalizeRemoteImageUrl(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      throw new Error('La URL de la imagen debe empezar por http o https');
+    }
+    return parsed.toString();
+  } catch {
+    throw new Error('Introduce una URL de imagen válida');
+  }
+}
+
 function buildVisualPreviewMarkup(imageData, icon, fallbackIcon = '🧾') {
   if (imageData) {
     return `<div class="visual-preview-card"><img class="visual-preview-image" src="${escapeHtml(imageData)}" alt="Vista previa" /></div>`;
@@ -5380,6 +5394,12 @@ async function openEditAccountModal(accountId) {
     $('accountBgColor').value = account.bg_color || '#eef2ff';
     $('accountBorderColor').value = account.border_color || '#c7d2fe';
     accountFormImageData = account.image_data || null;
+    if ($('accountImageUrl')) {
+      $('accountImageUrl').value =
+        account.image_data && /^https?:\/\//i.test(account.image_data)
+          ? account.image_data
+          : '';
+    }
     clearFileInput('accountImage');
     syncAccountFormPreview();
 
@@ -5428,6 +5448,7 @@ function openAddAccountModal() {
   }
   accountFormImageData = null;
   if ($('accountIcon')) $('accountIcon').value = '';
+  if ($('accountImageUrl')) $('accountImageUrl').value = '';
   if ($('accountBgColor')) $('accountBgColor').value = '#eef2ff';
   if ($('accountBorderColor')) $('accountBorderColor').value = '#c7d2fe';
   clearFileInput('accountImage');
@@ -5802,6 +5823,7 @@ async function saveAccount() {
   const type = $('accountType')?.value || 'bank';
   const balance = Number.parseFloat($('accountBalance').value || '0');
   const icon = ($('accountIcon')?.value || '').trim();
+  const imageUrlInput = $('accountImageUrl')?.value || '';
   const bg_color = $('accountBgColor')?.value || '#eef2ff';
   const border_color = $('accountBorderColor')?.value || '#c7d2fe';
 
@@ -5811,12 +5833,13 @@ async function saveAccount() {
   }
 
   try {
+    const remoteImageUrl = normalizeRemoteImageUrl(imageUrlInput);
     const payload = {
       name,
       type,
       balance_inicial: balance,
       icon: icon || null,
-      image_data: accountFormImageData,
+      image_data: remoteImageUrl || accountFormImageData,
       bg_color,
       border_color
     };
@@ -6076,6 +6099,7 @@ function initAccountListeners() {
   const btnDeleteAccount = $('btnDeleteAccount');
   const accountIcon = $('accountIcon');
   const accountImage = $('accountImage');
+  const accountImageUrl = $('accountImageUrl');
   const btnClearAccountImage = $('btnClearAccountImage');
   const btnCloseAccount = document.querySelector(
     '#modalAddAccount .close-modal'
@@ -6129,9 +6153,28 @@ function initAccountListeners() {
       if (accountFormImageData && accountIcon.value.trim()) {
         accountFormImageData = null;
         clearFileInput('accountImage');
+        if (accountImageUrl) accountImageUrl.value = '';
       }
       syncAccountFormPreview();
     });
+  }
+  if (accountImageUrl) {
+    const syncRemotePreview = () => {
+      if (!accountImageUrl.value.trim()) {
+        if (!accountFormImageData) syncAccountFormPreview();
+        return;
+      }
+      try {
+        accountFormImageData = normalizeRemoteImageUrl(accountImageUrl.value);
+        if (accountIcon) accountIcon.value = '';
+        clearFileInput('accountImage');
+        syncAccountFormPreview();
+      } catch {
+        // No interrumpimos mientras escribe; validamos definitivamente al guardar.
+      }
+    };
+    accountImageUrl.addEventListener('input', syncRemotePreview);
+    accountImageUrl.addEventListener('blur', syncRemotePreview);
   }
   if (accountImage) {
     accountImage.addEventListener('change', async (event) => {
@@ -6145,6 +6188,7 @@ function initAccountListeners() {
       try {
         accountFormImageData = await readImageFileAsDataUrl(file);
         if (accountIcon) accountIcon.value = '';
+        if (accountImageUrl) accountImageUrl.value = '';
         syncAccountFormPreview();
       } catch (err) {
         showAlert(err?.message || 'No se pudo cargar la imagen', 'error');
@@ -6158,6 +6202,7 @@ function initAccountListeners() {
     btnClearAccountImage.addEventListener('click', () => {
       accountFormImageData = null;
       clearFileInput('accountImage');
+      if (accountImageUrl) accountImageUrl.value = '';
       syncAccountFormPreview();
     });
   }

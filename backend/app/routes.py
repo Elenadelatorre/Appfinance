@@ -57,7 +57,7 @@ from .logic import (
     get_billing_cycle_bounds,
     get_category_scope_query,
 )
-from .logic import seed_default_accounts_for_user, check_budgets_logic
+from .logic import check_budgets_logic
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -728,9 +728,8 @@ async def register(payload: UserCreate):
     try:
         res = await users_col().insert_one(doc)
         user_id = str(res.inserted_id)
-        # El seed no debe romper el registro: solo dejamos warning en logs.
+        # Cada usuario nuevo empieza sin cuentas; solo clonamos categorías base.
         try:
-            await seed_default_accounts_for_user(user_id)
             await seed_categories_for_user(user_id)
         except Exception as exc:
             logger.warning("seed post-register failed for user %s: %s", user_id, exc)
@@ -757,10 +756,8 @@ async def login(form: LoginForm):
     if (not user) or (not verify_password(form.password, user["password"])):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
 
-    # Seed idempotente por usuario al iniciar sesión (si aún no existían).
-    # Nunca debe bloquear el login.
+    # Asegura solo las categorías del usuario. Las cuentas las crea cada usuario.
     try:
-        await seed_default_accounts_for_user(str(user["_id"]))
         await seed_categories_for_user(str(user["_id"]))
     except Exception as exc:
         logger.warning("seed post-login failed for user %s: %s", user.get("_id"), exc)
@@ -858,10 +855,6 @@ async def create_account(payload: AccountCreate, user_id: CurrentUserId):
 @router.get("/accounts")
 async def list_accounts(user_id: CurrentUserId):
     """Lista todas las cuentas del usuario."""
-    # Asegura que existan las 4 cuentas por defecto incluso si el usuario
-    # ya tenía un token guardado y no volvió a loguearse.
-    await seed_default_accounts_for_user(str(user_id))
-
     cursor = accounts_col().find({"user_id": str(user_id)})
     accounts = await cursor.to_list(100)
 
@@ -1843,7 +1836,4 @@ async def reset_user_data(user_id: CurrentUserId):
     # Eliminar todos los presupuestos del usuario
     await budgets_col().delete_many({"user_id": str(user_id)})
 
-    # Reiniciar las 4 cuentas por defecto
-    await seed_default_accounts_for_user(str(user_id))
-
-    return {"status": "ok", "message": "Datos del usuario eliminados y reinicializados"}
+    return {"status": "ok", "message": "Datos del usuario eliminados"}

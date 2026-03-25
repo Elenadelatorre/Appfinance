@@ -294,7 +294,11 @@
           </div>
 
           <!-- Register Form -->
-          <div id="registerFormContainer" class="balance-card login-card" style="display: none">
+          <div
+            id="registerFormContainer"
+            class="balance-card login-card"
+            style="display: none"
+          >
             <h2 class="login-title">
               <span class="login-title-mark" aria-hidden="true">
                 <span>🚀</span>
@@ -1738,6 +1742,15 @@
               placeholder="Icono (ej: 🏦)"
               maxlength="8"
             />
+            <input
+              id="accountImageUrl"
+              class="input"
+              type="url"
+              placeholder="URL de imagen (https://...)"
+            />
+          </div>
+
+          <div class="form-grid" style="margin-top: 10px">
             <label
               class="btn visual-upload-btn"
               for="accountImage"
@@ -1777,7 +1790,7 @@
 
           <div class="actions-row" style="margin-top: 10px">
             <button class="btn" type="button" id="btnClearAccountImage">
-              Quitar imagen
+              Quitar imagen / URL
             </button>
           </div>
 
