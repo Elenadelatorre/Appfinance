@@ -5286,7 +5286,7 @@ async function loadAccounts() {
               <div class="account-card-top-main">
                 ${getAccountBadgeMarkup(acc, 'account-brand-badge--small')}
                 <div class="account-card-copy">
-                  <p class="account-card-title">${mainName || acc.name}</p>
+                  <h2 class="account-card-title">${mainName || acc.name}</h2>
                   <p class="${subtitleClass}">${subtitle}</p>
                 </div>
               </div>
