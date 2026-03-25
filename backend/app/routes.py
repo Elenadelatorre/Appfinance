@@ -738,6 +738,17 @@ async def register(payload: UserCreate):
         return {"access_token": token, "token_type": "bearer"}
     except DuplicateKeyError:
         raise HTTPException(status_code=409, detail="Ese email ya existe")
+    except ValueError as exc:
+        # Errores de validación/hashing que no deben caer como 500 genérico.
+        raise HTTPException(status_code=400, detail=str(exc))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("register failed for email %s", email)
+        raise HTTPException(
+            status_code=500,
+            detail=f"No se pudo crear el usuario: {str(exc)}",
+        )
 
 
 @router.post("/auth/login", responses=R401)
