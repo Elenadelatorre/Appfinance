@@ -3507,6 +3507,20 @@ select.input-field option {
     padding: 32px 36px 120px;
   }
 
+  .section-header-actions {
+    flex-wrap: nowrap;
+  }
+
+  .account-card-top {
+    align-items: flex-start;
+  }
+
+  .account-card-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 210px;
+  }
+
   .section-header,
   .balance-card,
   .tx-list,
@@ -3546,9 +3560,32 @@ select.input-field option {
     padding-bottom: 170px;
   }
 
+  .section-header {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
   .tab-bar {
     height: 88px;
+    justify-content: space-between;
     padding: 0 8px calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .tab-item {
+    min-width: 0;
+    padding: 6px 2px;
+  }
+
+  .tab-item i {
+    font-size: 20px;
+  }
+
+  .tab-item span {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 9px;
   }
 
   .tab-fab-space {
@@ -3560,7 +3597,7 @@ select.input-field option {
     /* Evita tapar ítems del menú inferior en móvil */
     left: auto;
     right: 14px;
-    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(104px + env(safe-area-inset-bottom, 0px));
     transform: none;
     width: 56px;
     height: 56px;
@@ -3602,6 +3639,7 @@ select.input-field option {
   }
 
   .account-card-top {
+    flex-direction: column;
     align-items: flex-start;
     gap: 10px;
   }
@@ -3615,6 +3653,15 @@ select.input-field option {
     flex-wrap: wrap;
     gap: 8px;
     justify-content: flex-start;
+  }
+
+  .account-card-order-btn,
+  .account-card-pin-btn,
+  .account-card-reset-btn,
+  .account-card-transfer-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
   }
 
   .account-detail-copy .account-brand-slot {
@@ -3653,6 +3700,23 @@ select.input-field option {
   .account-spend-select-wrap {
     align-items: stretch;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 420px) {
+  .tab-item span {
+    display: none;
+  }
+
+  .tab-item {
+    padding: 8px 2px;
+  }
+
+  .fab-center {
+    width: 52px;
+    height: 52px;
+    font-size: 22px;
+    right: 12px;
   }
 }
 
@@ -3717,6 +3781,11 @@ select.input-field option {
     border-radius: 14px;
     justify-content: flex-start;
     width: 100%;
+  }
+
+  .account-card-actions {
+    flex-wrap: nowrap;
+    max-width: none;
   }
 
   .tab-item i {
