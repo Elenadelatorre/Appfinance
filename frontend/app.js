@@ -5387,7 +5387,14 @@ async function openEditAccountModal(accountId) {
     const form = $('accountForm');
     if (form) form.reset();
 
-    $('accountName').value = account.name || '';
+    const accountNameParts = String(account.name || '')
+      .split('·')
+      .map((part) => part.trim());
+    const accountMainName = accountNameParts[0] || account.name || '';
+    const accountSubtitle = accountNameParts.slice(1).join(' · ');
+
+    $('accountName').value = accountMainName;
+    if ($('accountSubtitle')) $('accountSubtitle').value = accountSubtitle;
     $('accountType').value = account.type || 'bank';
     $('accountBalance').value = String(account.balance_inicial ?? 0);
     $('accountIcon').value = account.icon || '';
@@ -5443,6 +5450,7 @@ function openAddAccountModal() {
   if (form) {
     form.reset();
     $('accountName').value = '';
+    if ($('accountSubtitle')) $('accountSubtitle').value = 'Principal';
     $('accountType').value = 'bank';
     $('accountBalance').value = '0.00';
   }
@@ -5820,6 +5828,7 @@ async function loadAccountTransactions(accountId) {
 }
 async function saveAccount() {
   const name = ($('accountName').value || '').trim();
+  const subtitle = ($('accountSubtitle')?.value || '').trim();
   const type = $('accountType')?.value || 'bank';
   const balance = Number.parseFloat($('accountBalance').value || '0');
   const icon = ($('accountIcon')?.value || '').trim();
@@ -5833,9 +5842,10 @@ async function saveAccount() {
   }
 
   try {
+    const composedName = subtitle ? `${name} · ${subtitle}` : name;
     const remoteImageUrl = normalizeRemoteImageUrl(imageUrlInput);
     const payload = {
-      name,
+      name: composedName,
       type,
       balance_inicial: balance,
       icon: icon || null,

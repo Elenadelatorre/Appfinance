@@ -1707,15 +1707,20 @@
           <h3 class="modal-title">Añadir cuenta</h3>
           <button class="close-modal" aria-label="Cerrar">✕</button>
         </div>
-        <p style="margin: 0 0 15px 0; opacity: 0.8; font-size: 13px;">Completa los datos de tu cuenta</p>
 
         <form id="accountForm" onsubmit="return false;">
-          <div class="form-grid full" style="margin-top: 10px">
+          <div class="form-grid" style="margin-top: 10px">
             <input
               id="accountName"
               class="input"
               type="text"
               placeholder="Nombre (ej: Santander, Efectivo)"
+            />
+            <input
+              id="accountSubtitle"
+              class="input"
+              type="text"
+              placeholder="Subtítulo (ej: Principal)"
             />
           </div>
 
