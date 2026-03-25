@@ -68,6 +68,7 @@ def _format_validation_errors(errors):
         messages.append(f"{loc}: {msg}" if loc else msg)
     return messages
 
+
 # --- CORS MEJORADO ---
 default_cors = (
     "http://localhost:3000,"
