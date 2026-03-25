@@ -118,3 +118,4 @@ def get_current_user_id_optional(token: str = Depends(oauth2_scheme)) -> Optiona
         # Silently ignore invalid tokens
         return None
 
+# v2
