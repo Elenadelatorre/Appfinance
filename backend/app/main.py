@@ -55,6 +55,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+def _format_validation_errors(errors):
+    messages = []
+    for err in errors or []:
+        if not isinstance(err, dict):
+            continue
+        raw_loc = err.get("loc") or []
+        loc_parts = [str(part) for part in raw_loc if str(part) != "body"]
+        loc = ".".join(loc_parts)
+        msg = str(err.get("msg") or "Dato inválido")
+        messages.append(f"{loc}: {msg}" if loc else msg)
+    return messages
+
 # --- CORS MEJORADO ---
 default_cors = (
     "http://localhost:3000,"
@@ -91,10 +104,12 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    logger.error("Validation error on %s: %s", request.url.path, exc.errors())
+    details = _format_validation_errors(exc.errors())
+    logger.error("Validation error on %s: %s", request.url.path, details)
+    detail_text = " | ".join(details) if details else "Invalid request data"
     return JSONResponse(
         status_code=422,
-        content={"detail": "Invalid request data"},
+        content={"detail": detail_text, "errors": details},
     )
 
 

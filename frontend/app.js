@@ -3076,7 +3076,7 @@ async function api(path, opts = {}) {
     }
 
     if (!res.ok) {
-      const errorMsg = data?.detail || `Error ${res.status}`;
+      const errorMsg = extractApiErrorMessage(data, `Error ${res.status}`);
       console.error(`❌ API ${res.status}:`, errorMsg);
       throw new Error(errorMsg);
     }
@@ -3091,6 +3091,56 @@ async function api(path, opts = {}) {
     console.error('❌ API Error:', error.message);
     showAlert(error.message, 'error');
     throw error;
+  }
+}
+
+function extractApiErrorMessage(payload, fallback = 'Error en la petición') {
+  if (!payload) return fallback;
+
+  const details = payload.detail;
+  if (typeof details === 'string' && details.trim()) return details.trim();
+
+  if (Array.isArray(details)) {
+    const lines = details
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (!item || typeof item !== 'object') return '';
+        const loc = Array.isArray(item.loc)
+          ? item.loc.filter((p) => String(p) !== 'body').join('.')
+          : '';
+        const msg = item.msg || item.message || '';
+        if (!msg) return '';
+        return loc ? `${loc}: ${msg}` : msg;
+      })
+      .filter(Boolean);
+    if (lines.length) return lines.join(' | ');
+  }
+
+  const extraErrors = payload.errors;
+  if (Array.isArray(extraErrors) && extraErrors.length) {
+    return extraErrors
+      .map((item) => (typeof item === 'string' ? item : JSON.stringify(item)))
+      .join(' | ');
+  }
+
+  if (details && typeof details === 'object') {
+    if (typeof details.message === 'string') return details.message;
+    if (typeof details.msg === 'string') return details.msg;
+    return JSON.stringify(details);
+  }
+
+  return fallback;
+}
+
+async function readErrorMessage(response, fallback) {
+  const text = await response.text();
+  if (!text) return fallback;
+
+  try {
+    const payload = JSON.parse(text);
+    return extractApiErrorMessage(payload, fallback);
+  } catch {
+    return text;
   }
 }
 
@@ -3993,10 +4043,8 @@ async function login() {
       body: new URLSearchParams({ username: email, password })
     });
 
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(txt || 'Error al autenticar');
-    }
+    if (!res.ok)
+      throw new Error(await readErrorMessage(res, 'Error al autenticar'));
 
     const data = await res.json();
     token = data.access_token;
@@ -4043,10 +4091,8 @@ async function register() {
       body: JSON.stringify({ email, password })
     });
 
-    if (!res.ok) {
-      const data = await res.json().catch(() => null);
-      throw new Error(data?.detail || 'Registro fallido');
-    }
+    if (!res.ok)
+      throw new Error(await readErrorMessage(res, 'Registro fallido'));
 
     // El endpoint de registro ya devuelve access_token.
     const data = await res.json();
