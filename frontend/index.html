@@ -20,6 +20,15 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https:; style-src 'self' 'unsafe-inline' https: http: data:; style-src-elem 'self' 'unsafe-inline' https: http: data:; img-src 'self' data: https:; font-src 'self' https: data:; connect-src 'self' http://localhost:8001 http://127.0.0.1:8001 https: http:"
     />
+    <!-- 
+      Finance API Base URL
+      Set to your production backend URL when deploying
+      Examples:
+        - Local dev: http://127.0.0.1:8001
+        - Render: https://finance-app-api.onrender.com
+        - Railway: https://your-api.up.railway.app
+      Can also be set via query param: ?api=https://your-api.com
+    -->
     <meta name="finance-api-base" content="" />
 
     <title>Finance App - Gestión Financiera Personal</title>

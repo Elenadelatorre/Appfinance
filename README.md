@@ -40,10 +40,16 @@ Una aplicación moderna de gestión financiera personal con interfaz web progres
 
 ### Requisitos
 
-- Docker y Docker Compose
+- Docker y Docker Compose (para despliegue local con contenedores)
 - O bien: Python 3.12+, Node.js (para desarrollo local)
 
-### Con Docker (Recomendado)
+### Despliegue en Producción (Recomendado)
+
+**Frontend**: Vercel | **Backend**: Render | **Base de datos**: MongoDB Atlas
+
+Ver guía completa: [DEPLOYMENT.md](./DEPLOYMENT.md)
+
+### Con Docker (Local)
 
 ```bash
 # 1. Clonar y entrar al directorio
@@ -67,19 +73,27 @@ docker-compose up -d
 ### Desarrollo Local
 
 ```bash
-# Backend
+# Backend (Terminal 1)
 cd backend
 python -m venv .venv
 source .venv/bin/activate  # En Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 export JWT_SECRET="dev-key-change-in-production"
 export MONGO_URL="mongodb://localhost:27017"
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
 
-# Frontend
-# Abrir frontend/index.html en un navegador
-# Cambiar API_URL en app.js a http://localhost:8000
+# Frontend (Terminal 2)
+cd frontend
+python -m http.server 4173
 ```
+
+Luego abre: http://localhost:4173
+
+El frontend auto-detecta que está en localhost y usa `http://127.0.0.1:8001` como API.
+
+### Configurar API en Producción
+
+Ver: [frontend/FRONTEND-CONFIG.md](./frontend/FRONTEND-CONFIG.md)
 
 ## 📚 API Endpoints
 
