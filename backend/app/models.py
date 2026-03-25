@@ -38,7 +38,10 @@ class ChangePasswordRequest(BaseModel):
         ..., min_length=1, max_length=128, description="Contraseña actual"
     )
     new_password: str = Field(
-        ..., min_length=6, max_length=128, description="Nueva contraseña (mín 6 caracteres)"
+        ...,
+        min_length=6,
+        max_length=128,
+        description="Nueva contraseña (mín 6 caracteres)",
     )
 
     @field_validator("new_password")
