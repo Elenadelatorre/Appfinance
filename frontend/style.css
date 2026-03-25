@@ -3541,6 +3541,39 @@ select.input-field option {
 }
 
 @media (max-width: 639px) {
+  .app-container {
+    /* Extra espacio para que el contenido no quede bajo la barra inferior */
+    padding-bottom: 170px;
+  }
+
+  .tab-bar {
+    height: 88px;
+    padding: 0 8px calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .tab-fab-space {
+    display: none;
+    width: 0;
+  }
+
+  .fab-center {
+    /* Evita tapar ítems del menú inferior en móvil */
+    left: auto;
+    right: 14px;
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+    transform: none;
+    width: 56px;
+    height: 56px;
+    border-radius: 18px;
+    font-size: 24px;
+  }
+
+  .section-header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 8px;
+  }
+
   .account-detail-header,
   .category-manager-header,
   .category-form-grid,
@@ -3566,6 +3599,22 @@ select.input-field option {
   .account-detail-balance-block {
     align-items: center;
     text-align: center;
+  }
+
+  .account-card-top {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .account-card-top-main {
+    width: 100%;
+  }
+
+  .account-card-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-start;
   }
 
   .account-detail-copy .account-brand-slot {
