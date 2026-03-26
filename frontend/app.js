@@ -4801,12 +4801,18 @@ async function populateTxAccountSelect(selectedAccountId = null) {
   const sel = $('txAccount');
   if (!sel) return;
   try {
-    const accounts = await api('/accounts');
-    // limpiar
+    // Use cached accounts from state instead of API call
+    let accounts = state.accounts || [];
+    if (!accounts.length) {
+      // Only call API if cache is empty
+      accounts = await api('/accounts');
+      state.accounts = accounts;
+    }
+
     sel.innerHTML = '<option value="">(Opcional) Cuenta</option>';
     accounts.forEach((a) => {
       const opt = document.createElement('option');
-      opt.value = a.id; // usar id real
+      opt.value = a.id;
       opt.textContent = `${a.name}`;
       sel.appendChild(opt);
     });
@@ -4815,7 +4821,6 @@ async function populateTxAccountSelect(selectedAccountId = null) {
       sel.value = String(selectedAccountId);
     }
   } catch (err) {
-    // si error (ej: no token), dejamos el selector vacío
     console.debug('populateTxAccountSelect error:', err);
     sel.innerHTML = '<option value="">(Opcional) Cuenta</option>';
   }
@@ -4967,7 +4972,15 @@ async function populateTransferAccountSelects(sourceAccountId = null) {
   if (!sourceSel || !destinationSel) return;
 
   try {
-    const accounts = getSortedAccounts(await api('/accounts'));
+    // Use cached accounts from state instead of API call
+    let accounts = state.accounts || [];
+    if (!accounts.length) {
+      // Only call API if cache is empty
+      accounts = await api('/accounts');
+      state.accounts = accounts;
+    }
+    accounts = getSortedAccounts(accounts);
+
     const currentSourceId = String(sourceAccountId || sourceSel.value || '');
     sourceSel.innerHTML = '<option value="">Cuenta origen</option>';
     destinationSel.innerHTML = '<option value="">Cuenta destino</option>';
@@ -5837,13 +5850,13 @@ function applyAccountTheme(element, account) {
 
 async function loadAccountTransactions(accountId) {
   try {
-    // Load account info (to support older transactions that stored account name)
+    // Get account name from cache (state.accounts) instead of extra API call
     let accountName = null;
-    try {
-      const accInfo = await api(`/accounts/${accountId}`);
-      accountName = accInfo.name || null;
-    } catch (e) {
-      console.debug('No se pudo obtener info de cuenta:', e);
+    const cachedAccount = (state.accounts || []).find(
+      (acc) => String(acc.id) === String(accountId)
+    );
+    if (cachedAccount) {
+      accountName = cachedAccount.name || null;
     }
 
     // Load all transactions for this user and filter client-side
