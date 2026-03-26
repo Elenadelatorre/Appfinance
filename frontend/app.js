@@ -4750,9 +4750,27 @@ function setModalMode(mode, txId = null) {
   }
 }
 
+async function resolveDefaultTxAccountId() {
+  if (state.currentViewId === 'account-detail' && state.currentAccountId) {
+    return state.currentAccountId;
+  }
+
+  if (state.currentViewId === 'home') {
+    let accounts = getSortedAccounts(state.accounts || []);
+    if (!accounts.length) {
+      accounts = getSortedAccounts(await api('/accounts'));
+      state.accounts = accounts;
+    }
+    return accounts[0]?.id || null;
+  }
+
+  return null;
+}
+
 async function openCreateTxModal(preselectedAccountId = null) {
   setModalMode('create');
-  await populateTxAccountSelect(preselectedAccountId);
+  const defaultAccountId = preselectedAccountId || (await resolveDefaultTxAccountId());
+  await populateTxAccountSelect(defaultAccountId);
   openModal('modalAddTx');
 }
 
@@ -6110,15 +6128,11 @@ function initModalListeners() {
     );
   if (btnAdd)
     btnAdd.addEventListener('click', async () => {
-      await openCreateTxModal(
-        state.currentViewId === 'account-detail' ? state.currentAccountId : null
-      );
+      await openCreateTxModal();
     });
   if (btnFab)
     btnFab.addEventListener('click', async () => {
-      await openCreateTxModal(
-        state.currentViewId === 'account-detail' ? state.currentAccountId : null
-      );
+      await openCreateTxModal();
     });
   document.querySelectorAll('.close-modal').forEach((button) => {
     button.addEventListener('click', () => {
