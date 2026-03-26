@@ -3036,7 +3036,7 @@ function showAlert(message, type = 'info') {
 
     if (hasAnimation) {
       toast.addEventListener('animationend', removeToast, { once: true });
-      // Respaldo por si el evento no llega en algunos navegadores/estados.
+      // Fallback in case visibilitychange event fails to fire in some browsers
       setTimeout(removeToast, 450);
       return;
     }
@@ -3300,7 +3300,7 @@ async function loadCategoryTree() {
   updateCategoriesForType();
   renderCategoryManager();
 
-  // Rellena selector de subcategorías si existe
+  // Populate subcategories selector if it exists
   const subSel = $('txSubcategory');
   if (subSel) {
     subSel.innerHTML = `<option value="">(Opcional) Subcategoría</option>`;
@@ -3358,7 +3358,7 @@ function onCategoryChange() {
     return;
   }
 
-  // Obtenemos la categoría padre del mapa plano
+  // Get the parent category from the flat map
   const parent = state.catsById.get(catId);
   const subs = parent?.subcategories || [];
 
@@ -4104,7 +4104,7 @@ async function login() {
     if ($('loginPassword')) $('loginPassword').value = '';
     await hasValidStoredSession();
 
-    // hasValidStoredSession puede borrar el token si /me falla
+    // hasValidStoredSession may clear token if /me fails
     if (!token) {
       showAlert('No se pudo verificar la sesión. Intenta de nuevo.', 'error');
       return;
@@ -4236,7 +4236,7 @@ async function loadHomeAccount() {
         buildAccountSpendDistributionCard(filtered);
     }
 
-    // Mostrar todos los movimientos, igual que en el detalle de cuenta
+    // Render home account transactions sorted by most recent
     const sortedTransactions = sortTransactionsByMostRecent(filtered);
     const html = sortedTransactions.map((t) => renderTxItem(t, true)).join('');
 
