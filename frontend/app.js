@@ -4053,8 +4053,8 @@ async function saveTx() {
 }
 
 async function refreshAfterTransactionChange(accountId = null) {
-  await loadAccounts();
-  await loadHomeAccount();
+  // Load accounts and home in parallel, not sequentially
+  await Promise.all([loadAccounts(), loadHomeAccount()]);
 
   if (state.currentViewId === 'account-detail') {
     const targetAccountId = state.currentAccountId || accountId;
@@ -5026,8 +5026,8 @@ async function saveTransfer() {
     });
 
     closeModal('modalTransfer');
-    await loadAccounts();
-    await loadHomeAccount();
+    // Load accounts and home in parallel, not sequentially
+    await Promise.all([loadAccounts(), loadHomeAccount()]);
     if (state.currentViewId === 'account-detail' && state.currentAccountId) {
       await openViewAccount(state.currentAccountId);
     } else {
@@ -5176,8 +5176,7 @@ async function moveAccountByDirection(accountId, direction) {
 
   try {
     await persistAccountsOrder(sortedAccounts);
-    await loadAccounts();
-    await loadHomeAccount();
+    await Promise.all([loadAccounts(), loadHomeAccount()]);
     showAlert('Orden de cuentas actualizado', 'info');
   } catch (err) {
     showAlert(err?.message || 'No se pudo actualizar el orden', 'error');
@@ -5196,8 +5195,7 @@ async function setAccountAsPrincipal(accountId) {
 
   try {
     await persistAccountsOrder(sortedAccounts);
-    await loadAccounts();
-    await loadHomeAccount();
+    await Promise.all([loadAccounts(), loadHomeAccount()]);
     showAlert('Cuenta principal actualizada', 'info');
   } catch (err) {
     showAlert(err?.message || 'No se pudo fijar la cuenta principal', 'error');
@@ -5259,8 +5257,7 @@ function attachAccountCardsInteractions(container) {
       await persistAccountsOrder(reorderedAccounts);
       state.accounts = reorderedAccounts;
       initialOrder = nextOrder;
-      await loadAccounts();
-      await loadHomeAccount();
+      await Promise.all([loadAccounts(), loadHomeAccount()]);
       showAlert('Orden de cuentas actualizado', 'info');
     } catch (err) {
       showAlert(err?.message || 'No se pudo actualizar el orden', 'error');
@@ -5937,8 +5934,7 @@ async function saveAccount() {
     }
 
     closeModal('modalAddAccount');
-    await loadAccounts();
-    await loadHomeAccount();
+    await Promise.all([loadAccounts(), loadHomeAccount()]);
     if (
       state.editingAccountId &&
       state.currentAccountId === state.editingAccountId
