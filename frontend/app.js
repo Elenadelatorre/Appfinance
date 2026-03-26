@@ -3072,12 +3072,12 @@ async function api(path, opts = {}) {
     const res = await fetch(`${API}${path}`, {
       ...opts,
       headers,
-      // Seguridad CORS
+      // CORS security
       credentials: 'include',
       mode: 'cors'
     });
 
-    // Si expira token
+    // Check if token expired
     if (res.status === 401) {
       if (requestToken && requestToken !== token) {
         const staleAuthError = new Error('Petición antigua ignorada');
@@ -3095,7 +3095,7 @@ async function api(path, opts = {}) {
         throw expiredErr;
       }
 
-      // Sin token activo: no mostrar "caducada", silenciar
+      // No active token: silently reject without showing "expired" message
       const noAuthErr = new Error('No autenticado');
       noAuthErr.code = 'NO_AUTH';
       throw noAuthErr;
@@ -3192,7 +3192,7 @@ function logout() {
   token = '';
   state.user = null;
   renderProfileIdentity();
-  // Mostrar pantalla de login
+  // Show login screen
   switchView('login', 'Inicio de sesión');
 }
 
@@ -3217,7 +3217,7 @@ async function hasValidStoredSession() {
       return true;
     }
 
-    // Token inválido/caducado: limpiamos sin ensuciar consola al arrancar.
+    // Invalid/expired token: clean up silently during startup
     if (res.status === 401) {
       localStorage.removeItem('token');
       token = '';
@@ -3259,7 +3259,7 @@ function closeModal(modalId = 'modalAddTx', skipHistoryBack = false) {
   }, 250);
 }
 
-// Cierra al hacer click fuera
+// Close modal when clicking outside
 function attachModalOutsideClose() {
   globalThis.addEventListener('click', (ev) => {
     const txModal = $('modalAddTx');
@@ -3273,7 +3273,7 @@ function attachModalOutsideClose() {
   });
 }
 
-// Botón atrás del navegador cuando modal está abierto
+// Handle browser back button when modal is open
 globalThis.addEventListener('popstate', () => {
   if (modal?.style.display === 'flex') {
     closeModal(modal.id, true);
