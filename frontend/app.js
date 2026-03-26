@@ -1646,8 +1646,31 @@ function sortTransactionsByMostRecent(transactions = []) {
   return [...transactions].sort((left, right) => {
     const leftTime = new Date(left?.date || 0).getTime();
     const rightTime = new Date(right?.date || 0).getTime();
-    return rightTime - leftTime;
+    if (rightTime !== leftTime) {
+      return rightTime - leftTime;
+    }
+
+    const rightId = String(right?._id || right?.id || '');
+    const leftId = String(left?._id || left?.id || '');
+    return rightId.localeCompare(leftId);
   });
+}
+
+function buildTransactionIsoDate(dateValue) {
+  if (!dateValue) return new Date().toISOString();
+
+  const now = new Date();
+  const [year, month, day] = String(dateValue)
+    .split('-')
+    .map((value) => Number.parseInt(value, 10));
+
+  if (!year || !month || !day) {
+    return new Date().toISOString();
+  }
+
+  const composedDate = new Date(now);
+  composedDate.setFullYear(year, month - 1, day);
+  return composedDate.toISOString();
 }
 
 function renderTxAccountMeta(tx) {
@@ -4009,9 +4032,7 @@ async function saveTx() {
     subcategory_id: subcategory_id || null,
     note,
     account_id,
-    date: dateValue
-      ? new Date(dateValue + 'T12:00:00').toISOString()
-      : new Date().toISOString()
+    date: buildTransactionIsoDate(dateValue)
   };
 
   try {
