@@ -1661,7 +1661,12 @@ function buildTransactionIsoDate(dateValue) {
   }
 
   const now = new Date();
-  selectedDate.setUTCHours(now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds(), now.getUTCMilliseconds());
+  selectedDate.setUTCHours(
+    now.getUTCHours(),
+    now.getUTCMinutes(),
+    now.getUTCSeconds(),
+    now.getUTCMilliseconds()
+  );
   return selectedDate.toISOString();
 }
 

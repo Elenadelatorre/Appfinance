@@ -5,22 +5,7 @@ services:
     startCommand: cd backend && pip install -r requirements.txt && uvicorn app.main:app --host 0.0.0.0 --port 8000
     plan: free
     region: ohio
-    env:
-      - key: PYTHON_VERSION
-        value: '3.12'
-      - key: LOG_LEVEL
-        value: INFO
-      - key: JWT_SECRET
-        scope: build
-        sync: false
-    envGroups:
-      - name: secrets
-        sync: false
     autoDeploy: true
-    headers:
-      - path: /docs
-        name: X-API-Docs
-        value: 'true'
 
 databases:
   - name: finance-mongo
