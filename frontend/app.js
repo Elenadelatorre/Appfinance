@@ -1642,6 +1642,14 @@ function findAccountForTransaction(tx) {
   );
 }
 
+function sortTransactionsByMostRecent(transactions = []) {
+  return [...transactions].sort((left, right) => {
+    const leftTime = new Date(left?.date || 0).getTime();
+    const rightTime = new Date(right?.date || 0).getTime();
+    return rightTime - leftTime;
+  });
+}
+
 function renderTxAccountMeta(tx) {
   const account = findAccountForTransaction(tx);
   if (account) {
@@ -2330,9 +2338,9 @@ async function loadHistoryView() {
     searchTerm,
     accountLookup
   };
-  const filtered = allTransactions
-    .filter((tx) => matchesHistoryFilters(tx, filters))
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  const filtered = sortTransactionsByMostRecent(
+    allTransactions.filter((tx) => matchesHistoryFilters(tx, filters))
+  );
 
   updateHistorySummary(filtered);
   updateHistoryResultsMeta(filtered, selectedMonth);
@@ -4219,8 +4227,8 @@ async function loadHomeAccount() {
     }
 
     // Mostrar todos los movimientos, igual que en el detalle de cuenta
-    filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-    const html = filtered.map((t) => renderTxItem(t, true)).join('');
+    const sortedTransactions = sortTransactionsByMostRecent(filtered);
+    const html = sortedTransactions.map((t) => renderTxItem(t, true)).join('');
 
     const txList = $('homeAccountTxList');
     if (txList) {
@@ -4769,7 +4777,8 @@ async function resolveDefaultTxAccountId() {
 
 async function openCreateTxModal(preselectedAccountId = null) {
   setModalMode('create');
-  const defaultAccountId = preselectedAccountId || (await resolveDefaultTxAccountId());
+  const defaultAccountId =
+    preselectedAccountId || (await resolveDefaultTxAccountId());
   await populateTxAccountSelect(defaultAccountId);
   openModal('modalAddTx');
 }
@@ -5845,7 +5854,7 @@ async function loadAccountTransactions(accountId) {
       spendDistribution.innerHTML = buildAccountSpendDistributionCard(filtered);
     }
 
-    state.currentAccountTransactions = filtered;
+    state.currentAccountTransactions = sortTransactionsByMostRecent(filtered);
 
     if (filtered.length === 0) {
       txList.innerHTML =
@@ -5853,10 +5862,9 @@ async function loadAccountTransactions(accountId) {
       return;
     }
 
-    // sort transactions by date desc
-    filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    const html = filtered.map((t) => renderTxItem(t, true)).join('');
+    const html = state.currentAccountTransactions
+      .map((t) => renderTxItem(t, true))
+      .join('');
 
     txList.innerHTML = html;
 
