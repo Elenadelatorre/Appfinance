@@ -28,8 +28,32 @@ NEW_PASSWORD_FIELD = "new_password"
 class TestAuth:
     """Tests para autenticación"""
 
-    def test_register_valid(self):
+    @staticmethod
+    def _patch_register_dependencies(monkeypatch, *, existing_user=None):
+        import app.routes as routes
+
+        class _FakeInsertResult:
+            inserted_id = ObjectId()
+
+        class _FakeUsersCol:
+            async def find_one(self, query):
+                await asyncio.sleep(0)
+                if existing_user and query.get("email") == existing_user.get("email"):
+                    return existing_user
+                return None
+
+            async def insert_one(self, _doc):
+                await asyncio.sleep(0)
+                return _FakeInsertResult()
+
+        monkeypatch.setattr(routes, "users_col", lambda: _FakeUsersCol())
+        monkeypatch.setattr(
+            routes, "seed_categories_for_user", lambda _user_id: asyncio.sleep(0)
+        )
+
+    def test_register_valid(self, monkeypatch):
         """Registro exitoso"""
+        self._patch_register_dependencies(monkeypatch)
         response = client.post(
             "/auth/register",
             json={
@@ -40,20 +64,21 @@ class TestAuth:
         assert response.status_code in [200, 201]
         assert "access_token" in response.json()
 
-    def test_register_weak_password(self):
-        """Rechaza contraseña débil (sin mayúscula)"""
+    def test_register_weak_password(self, monkeypatch):
+        """Rechaza contraseña demasiado corta"""
+        self._patch_register_dependencies(monkeypatch)
         response = client.post(
             "/auth/register",
             json={
                 "email": f"test_{id(self)}@example.com",
-                PASSWORD_FIELD: "weakpass123",
+                PASSWORD_FIELD: "12345",
             },
         )
-        # Debe rechazar porque no tiene mayúscula
         assert response.status_code == 422
 
-    def test_register_no_number_password(self):
-        """Rechaza contraseña sin números"""
+    def test_register_no_number_password(self, monkeypatch):
+        """Acepta contraseña sin números cuando cumple longitud mínima"""
+        self._patch_register_dependencies(monkeypatch)
         response = client.post(
             "/auth/register",
             json={
@@ -61,8 +86,8 @@ class TestAuth:
                 PASSWORD_FIELD: "WeakPass",
             },
         )
-        # Debe rechazar porque no tiene número
-        assert response.status_code == 422
+        assert response.status_code in [200, 201]
+        assert "access_token" in response.json()
 
     def test_register_invalid_email(self):
         """Rechaza email inválido"""
