@@ -152,7 +152,7 @@ async function detectBackendCapabilities() {
         : {};
     applyBackendCapabilities(paths);
   } catch (err) {
-    console.debug('No se pudieron detectar capacidades del backend:', err);
+    // Backend capabilities detection failed - continue with defaults
   }
 }
 
@@ -189,7 +189,7 @@ async function fetchJsonSilent(path, opts = {}) {
   try {
     data = text ? JSON.parse(text) : null;
   } catch (err) {
-    console.debug('Respuesta no JSON en petición silenciosa:', err);
+    // Non-JSON response in silent request - continue with null
     data = null;
   }
 
@@ -356,7 +356,7 @@ async function fetchRemoteAppSettings() {
     applyAppSettings();
     return true;
   } catch (err) {
-    console.debug('No se pudieron sincronizar ajustes remotos:', err);
+    // Settings sync failed - continuing with local settings
     return false;
   }
 }
@@ -380,7 +380,7 @@ async function persistRemoteAppSettings() {
     }
     return res.ok;
   } catch (err) {
-    console.debug('No se pudieron guardar ajustes remotos:', err);
+    // Remote save failed - falling back to local
     return false;
   }
 }
@@ -3086,8 +3086,7 @@ async function api(path, opts = {}) {
       }
 
       if (requestToken) {
-        // Había sesión activa pero el servidor la rechazó
-        console.warn('⚠️ Token expirado o inválido');
+        // Token was valid but server rejected it - likely expired
         logout();
         const expiredErr = new Error(
           'Sesión caducada. Vuelve a iniciar sesión.'
@@ -3121,7 +3120,7 @@ async function api(path, opts = {}) {
     return data;
   } catch (error) {
     if (error?.code === 'STALE_AUTH_REQUEST' || error?.code === 'NO_AUTH') {
-      console.debug('ℹ️ Respuesta 401 ignorada de una sesión anterior');
+      // Ignoring stale auth response from previous session
       throw error;
     }
 
@@ -3185,7 +3184,6 @@ async function readErrorMessage(response, fallback) {
  * Cerrar sesión del usuario
  */
 function logout() {
-  console.log('🚪 Cerrando sesión...');
   localStorage.removeItem('token');
   if (appSettingsSyncTimer) {
     clearTimeout(appSettingsSyncTimer);
@@ -3230,8 +3228,7 @@ async function hasValidStoredSession() {
 
     return false;
   } catch (err) {
-    // Backend no disponible: no forzamos errores de sesión en login.
-    console.debug('hasValidStoredSession error:', err);
+    // Backend unavailable: don't force session errors on login
     renderProfileIdentity();
     return false;
   }
@@ -3661,7 +3658,7 @@ async function runAutomationNow() {
       applyAutomationApiAvailability();
     }
   } catch (err) {
-    console.debug('No se pudo ejecutar automatización:', err);
+    // Automation execution failed - continuing normally
   }
 }
 
@@ -4821,7 +4818,7 @@ async function populateTxAccountSelect(selectedAccountId = null) {
       sel.value = String(selectedAccountId);
     }
   } catch (err) {
-    console.debug('populateTxAccountSelect error:', err);
+    // Account select population failed - using empty options
     sel.innerHTML = '<option value="">(Opcional) Cuenta</option>';
   }
 }
@@ -5003,7 +5000,7 @@ async function populateTransferAccountSelects(sourceAccountId = null) {
     }
     syncTransferFormState();
   } catch (err) {
-    console.debug('populateTransferAccountSelects error:', err);
+    // Transfer selects population failed - continuing
   }
 }
 
@@ -6033,7 +6030,7 @@ function loadViewContent(viewId) {
   loadAccounts()
     .then(() => loadAutomationWorkspace())
     .catch((err) => {
-      console.debug('No se pudo cargar automatizaciones:', err);
+      // Failed to load automations - continuing
     });
 }
 
