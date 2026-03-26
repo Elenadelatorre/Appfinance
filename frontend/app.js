@@ -4025,17 +4025,37 @@ async function saveTx() {
     if (form) form.reset();
     editingTxId = null;
     closeModal();
-    loadViewContent(state.currentViewId);
+    await refreshAfterTransactionChange(account_id);
   } catch (err) {
     showAlert('Error al guardar: ' + (err?.message || String(err)), 'error');
   }
 }
 
+async function refreshAfterTransactionChange(accountId = null) {
+  await loadAccounts();
+  await loadHomeAccount();
+
+  if (state.currentViewId === 'account-detail') {
+    const targetAccountId = state.currentAccountId || accountId;
+    if (targetAccountId) {
+      await openViewAccount(targetAccountId);
+      return;
+    }
+  }
+
+  if (state.currentViewId === 'accounts' || state.currentViewId === 'home') {
+    return;
+  }
+
+  loadViewContent(state.currentViewId);
+}
+
 async function deleteTx(txId) {
   if (!confirm('¿Eliminar este movimiento?')) return;
   try {
+    const currentAccountId = ($('txAccount')?.value || '').trim() || null;
     await api(`/transactions/${txId}`, { method: 'DELETE' });
-    loadViewContent(state.currentViewId);
+    await refreshAfterTransactionChange(currentAccountId);
   } catch (err) {
     showAlert('Error al eliminar: ' + (err?.message || String(err)), 'error');
   }
@@ -4692,7 +4712,6 @@ function applyCreateModalMode() {
   if (txDate) txDate.value = new Date().toISOString().slice(0, 10);
   editingTxId = null;
   updateCategoriesForType();
-  populateTxAccountSelect();
 }
 
 function applyViewModalMode(txId) {
@@ -4731,8 +4750,14 @@ function setModalMode(mode, txId = null) {
   }
 }
 
+async function openCreateTxModal(preselectedAccountId = null) {
+  setModalMode('create');
+  await populateTxAccountSelect(preselectedAccountId);
+  openModal('modalAddTx');
+}
+
 // Cargar cuentas en el selector del modal de transacción
-async function populateTxAccountSelect() {
+async function populateTxAccountSelect(selectedAccountId = null) {
   const sel = $('txAccount');
   if (!sel) return;
   try {
@@ -4745,6 +4770,10 @@ async function populateTxAccountSelect() {
       opt.textContent = `${a.name}`;
       sel.appendChild(opt);
     });
+
+    if (selectedAccountId) {
+      sel.value = String(selectedAccountId);
+    }
   } catch (err) {
     // si error (ej: no token), dejamos el selector vacío
     console.debug('populateTxAccountSelect error:', err);
@@ -6080,14 +6109,16 @@ function initModalListeners() {
       switchView('config', 'Ajustes')
     );
   if (btnAdd)
-    btnAdd.addEventListener('click', () => {
-      setModalMode('create');
-      openModal();
+    btnAdd.addEventListener('click', async () => {
+      await openCreateTxModal(
+        state.currentViewId === 'account-detail' ? state.currentAccountId : null
+      );
     });
   if (btnFab)
-    btnFab.addEventListener('click', () => {
-      setModalMode('create');
-      openModal();
+    btnFab.addEventListener('click', async () => {
+      await openCreateTxModal(
+        state.currentViewId === 'account-detail' ? state.currentAccountId : null
+      );
     });
   document.querySelectorAll('.close-modal').forEach((button) => {
     button.addEventListener('click', () => {
