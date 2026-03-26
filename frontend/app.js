@@ -1651,20 +1651,18 @@ function sortTransactionsByMostRecent(transactions = []) {
 }
 
 function buildTransactionIsoDate(dateValue) {
+  // Always use current server time for precise ordering
+  // The date input only specifies the date (YYYY-MM-DD), time is always NOW
   if (!dateValue) return new Date().toISOString();
 
-  const now = new Date();
-  const [year, month, day] = String(dateValue)
-    .split('-')
-    .map((value) => Number.parseInt(value, 10));
-
-  if (!year || !month || !day) {
+  const selectedDate = new Date(dateValue + 'T00:00:00Z');
+  if (!selectedDate || Number.isNaN(selectedDate.getTime())) {
     return new Date().toISOString();
   }
 
-  const composedDate = new Date(now);
-  composedDate.setFullYear(year, month - 1, day);
-  return composedDate.toISOString();
+  const now = new Date();
+  selectedDate.setUTCHours(now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds(), now.getUTCMilliseconds());
+  return selectedDate.toISOString();
 }
 
 function renderTxAccountMeta(tx) {
