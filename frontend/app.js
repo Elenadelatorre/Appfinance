@@ -1646,13 +1646,7 @@ function sortTransactionsByMostRecent(transactions = []) {
   return [...transactions].sort((left, right) => {
     const leftTime = new Date(left?.date || 0).getTime();
     const rightTime = new Date(right?.date || 0).getTime();
-    if (rightTime !== leftTime) {
-      return rightTime - leftTime;
-    }
-
-    const rightId = String(right?._id || right?.id || '');
-    const leftId = String(left?._id || left?.id || '');
-    return rightId.localeCompare(leftId);
+    return rightTime - leftTime;
   });
 }
 
