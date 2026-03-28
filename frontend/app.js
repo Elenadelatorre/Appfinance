@@ -396,6 +396,15 @@ function scheduleRemoteSettingsSync() {
   }, 250);
 }
 
+function flushRemoteSettingsSync() {
+  if (!token || !supportsRemoteSettingsApi) return;
+  if (appSettingsSyncTimer) {
+    clearTimeout(appSettingsSyncTimer);
+    appSettingsSyncTimer = null;
+  }
+  persistRemoteAppSettings();
+}
+
 function applyAppSettings() {
   document.body.classList.toggle(
     'reduced-motion',
@@ -3189,6 +3198,7 @@ async function readErrorMessage(response, fallback) {
  * Cerrar sesión del usuario
  */
 function logout() {
+  flushRemoteSettingsSync();
   localStorage.removeItem('token');
   if (appSettingsSyncTimer) {
     clearTimeout(appSettingsSyncTimer);
@@ -3200,6 +3210,10 @@ function logout() {
   // Show login screen
   switchView('login', 'Inicio de sesión');
 }
+
+window.addEventListener('pagehide', () => {
+  flushRemoteSettingsSync();
+});
 
 async function hasValidStoredSession() {
   if (!token) return false;
