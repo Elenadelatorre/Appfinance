@@ -6729,13 +6729,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   const startupView = getConfiguredStartView();
   switchView(startupView.id, startupView.title);
 
-  Promise.all([loadCategoryTree(), loadAccounts()]).then(() => {
-    resetCategoryForm({});
-    renderCategoryIconPicker();
-  }).catch(err => {
-    console.error('Error cargando categorías:', err);
-    showAlert('No se pudieron cargar categorías al iniciar', 'error');
-  });
+  Promise.all([loadCategoryTree(), loadAccounts()])
+    .then(() => {
+      resetCategoryForm({});
+      renderCategoryIconPicker();
+    })
+    .catch((err) => {
+      console.error('Error cargando categorías:', err);
+      showAlert('No se pudieron cargar categorías al iniciar', 'error');
+    });
 });
 
 // ---------- RESET USER DATA ----------
