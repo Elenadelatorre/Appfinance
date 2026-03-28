@@ -1,5 +1,6 @@
 from __future__ import annotations
 from datetime import datetime
+import re
 from pydantic import BaseModel, Field, EmailStr, field_validator
 from typing import Optional, Literal
 from app.logic import get_billing_cycle_period
@@ -59,6 +60,7 @@ class UserSettingsUpdate(BaseModel):
     default_view: Optional[UserDefaultView] = None
     reduce_motion: Optional[bool] = None
     profile_avatar: Optional[str] = Field(default=None, max_length=16)
+    accent_color: Optional[str] = Field(default=None, max_length=7)
 
     @field_validator("profile_avatar")
     @classmethod
@@ -69,6 +71,15 @@ class UserSettingsUpdate(BaseModel):
         if v not in allowed:
             raise ValueError("Avatar no permitido")
         return v
+
+    @field_validator("accent_color")
+    @classmethod
+    def validate_accent_color(cls, v):
+        if v is None:
+            return v
+        if not re.fullmatch(r"#[0-9a-fA-F]{6}", v):
+            raise ValueError("Color de acento no permitido")
+        return v.lower()
 
 
 # --- CUENTAS ---

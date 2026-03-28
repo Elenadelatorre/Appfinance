@@ -7,6 +7,7 @@ import calendar
 import logging
 import csv
 import io
+import re
 from typing import Optional, List, Any, Dict, Annotated
 from pymongo.errors import DuplicateKeyError
 
@@ -84,6 +85,7 @@ DEFAULT_USER_SETTINGS = {
     "default_view": "home",
     "reduce_motion": False,
     "profile_avatar": "auto",
+    "accent_color": "#6366f1",
 }
 
 
@@ -108,6 +110,10 @@ def normalize_user_settings(raw: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     avatar = str(raw.get("profile_avatar") or "").strip()
     if avatar in {"auto", "🙂", "😎", "🧠", "💼", "💸", "🚀"}:
         settings["profile_avatar"] = avatar
+
+    accent = str(raw.get("accent_color") or "").strip()
+    if re.fullmatch(r"#[0-9a-fA-F]{6}", accent):
+        settings["accent_color"] = accent.lower()
 
     return settings
 

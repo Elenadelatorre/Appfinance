@@ -41,10 +41,12 @@ const SETTINGS_DEFAULT_VIEW_KEY = 'financeApp.settings.defaultView';
 const SETTINGS_REDUCE_MOTION_KEY = 'financeApp.settings.reduceMotion';
 const SETTINGS_OPEN_PANEL_KEY = 'financeApp.settings.openPanel';
 const SETTINGS_PROFILE_AVATAR_KEY = 'financeApp.settings.profileAvatar';
+const SETTINGS_ACCENT_COLOR_KEY = 'financeApp.settings.accentColor';
 const DEFAULT_APP_SETTINGS = {
   defaultView: 'home',
   reduceMotion: false,
-  profileAvatar: 'auto'
+  profileAvatar: 'auto',
+  accentColor: '#6366f1'
 };
 const PROFILE_AVATAR_CHOICES = ['auto', '🙂', '😎', '🧠', '💼', '💸', '🚀'];
 const START_VIEW_CONFIG = {
@@ -272,6 +274,9 @@ function normalizeAppSettings(rawSettings = {}) {
   const profileAvatarCandidate = String(
     source.profileAvatar || source.profile_avatar || ''
   ).trim();
+  const accentColorCandidate = String(
+    source.accentColor || source.accent_color || ''
+  ).trim();
 
   return {
     defaultView: START_VIEW_CONFIG[defaultViewCandidate]
@@ -284,7 +289,37 @@ function normalizeAppSettings(rawSettings = {}) {
     ),
     profileAvatar: PROFILE_AVATAR_CHOICES.includes(profileAvatarCandidate)
       ? profileAvatarCandidate
-      : DEFAULT_APP_SETTINGS.profileAvatar
+      : DEFAULT_APP_SETTINGS.profileAvatar,
+    accentColor: normalizeAccentColor(
+      accentColorCandidate,
+      DEFAULT_APP_SETTINGS.accentColor
+    )
+  };
+}
+
+function normalizeAccentColor(value, fallback = DEFAULT_APP_SETTINGS.accentColor) {
+  const input = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(input) ? input.toLowerCase() : fallback;
+}
+
+function getAccentCssTokens(color) {
+  const accent = normalizeAccentColor(color, DEFAULT_APP_SETTINGS.accentColor);
+  const r = Number.parseInt(accent.slice(1, 3), 16);
+  const g = Number.parseInt(accent.slice(3, 5), 16);
+  const b = Number.parseInt(accent.slice(5, 7), 16);
+
+  const dark = `#${[r, g, b]
+    .map((channel) =>
+      Math.max(0, Math.min(255, Math.round(channel * 0.78)))
+        .toString(16)
+        .padStart(2, '0')
+    )
+    .join('')}`;
+
+  return {
+    accent,
+    dark,
+    glow: `rgba(${r}, ${g}, ${b}, 0.32)`
   };
 }
 
@@ -292,7 +327,8 @@ function loadAppSettings() {
   const stored = {
     defaultView: localStorage.getItem(SETTINGS_DEFAULT_VIEW_KEY),
     reduceMotion: localStorage.getItem(SETTINGS_REDUCE_MOTION_KEY) === '1',
-    profileAvatar: localStorage.getItem(SETTINGS_PROFILE_AVATAR_KEY)
+    profileAvatar: localStorage.getItem(SETTINGS_PROFILE_AVATAR_KEY),
+    accentColor: localStorage.getItem(SETTINGS_ACCENT_COLOR_KEY)
   };
 
   state.settings = normalizeAppSettings(stored);
@@ -311,6 +347,13 @@ function saveAppSettings() {
     SETTINGS_PROFILE_AVATAR_KEY,
     state.settings.profileAvatar || DEFAULT_APP_SETTINGS.profileAvatar
   );
+  localStorage.setItem(
+    SETTINGS_ACCENT_COLOR_KEY,
+    normalizeAccentColor(
+      state.settings.accentColor,
+      DEFAULT_APP_SETTINGS.accentColor
+    )
+  );
 }
 
 function updateAppSetting(key, value) {
@@ -328,7 +371,8 @@ function getSettingsPayloadForApi() {
   return {
     default_view: normalized.defaultView,
     reduce_motion: normalized.reduceMotion,
-    profile_avatar: normalized.profileAvatar
+    profile_avatar: normalized.profileAvatar,
+    accent_color: normalized.accentColor
   };
 }
 
@@ -406,6 +450,16 @@ function flushRemoteSettingsSync() {
 }
 
 function applyAppSettings() {
+  const root = document.documentElement;
+  const accentTokens = getAccentCssTokens(state.settings.accentColor);
+  root.style.setProperty('--accent', accentTokens.accent);
+  root.style.setProperty('--accent-dark', accentTokens.dark);
+  root.style.setProperty('--accent-glow', accentTokens.glow);
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) {
+    themeMeta.setAttribute('content', accentTokens.accent);
+  }
+
   document.body.classList.toggle(
     'reduced-motion',
     Boolean(state.settings.reduceMotion)
@@ -418,6 +472,7 @@ function applyAppSettings() {
 function syncAppSettingsControls() {
   const defaultView = $('settingDefaultView');
   const reduceMotion = $('settingReduceMotion');
+  const accentColor = $('settingAccentColor');
 
   if (defaultView) {
     defaultView.value = START_VIEW_CONFIG[state.settings.defaultView]
@@ -427,6 +482,13 @@ function syncAppSettingsControls() {
 
   if (reduceMotion) {
     reduceMotion.checked = Boolean(state.settings.reduceMotion);
+  }
+
+  if (accentColor) {
+    accentColor.value = normalizeAccentColor(
+      state.settings.accentColor,
+      DEFAULT_APP_SETTINGS.accentColor
+    );
   }
 }
 
@@ -6416,6 +6478,7 @@ function initProfileListeners() {
   const profileAvatarChoices = $('profileAvatarChoices');
   const settingDefaultView = $('settingDefaultView');
   const settingReduceMotion = $('settingReduceMotion');
+  const settingAccentColor = $('settingAccentColor');
   const btnLogoutFromSettings = $('btnLogoutFromSettings');
 
   if (profileAvatarChoices)
@@ -6500,6 +6563,14 @@ function initProfileListeners() {
   if (settingReduceMotion)
     settingReduceMotion.addEventListener('change', () => {
       updateAppSetting('reduceMotion', settingReduceMotion.checked);
+    });
+  if (settingAccentColor)
+    settingAccentColor.addEventListener('change', () => {
+      updateAppSetting(
+        'accentColor',
+        normalizeAccentColor(settingAccentColor.value)
+      );
+      showAlert('Color de la app guardado', 'info');
     });
   if (btnLogoutFromSettings)
     btnLogoutFromSettings.addEventListener('click', () => {
