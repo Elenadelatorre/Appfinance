@@ -4115,10 +4115,10 @@ async function login() {
       return;
     }
 
-    // Cargar datos de la app y mostrar home
-    await loadCategoryTree();
+    // Show app immediately; load data in parallel background
     const startupView = getConfiguredStartView();
     switchView(startupView.id, startupView.title);
+    Promise.all([loadCategoryTree(), loadAccounts()]).catch(() => {});
   } catch (err) {
     // SESSION_EXPIRED y NO_AUTH ya fueron manejados por api() — no mostrar segundo toast
     if (err?.code === 'SESSION_EXPIRED' || err?.code === 'NO_AUTH') return;
@@ -4163,9 +4163,10 @@ async function register() {
       return;
     }
 
-    await loadCategoryTree();
+    // Show app immediately; load data in parallel background
     const startupView = getConfiguredStartView();
     switchView(startupView.id, startupView.title);
+    Promise.all([loadCategoryTree(), loadAccounts()]).catch(() => {});
   } catch (err) {
     if (err?.code === 'SESSION_EXPIRED' || err?.code === 'NO_AUTH') return;
     showAlert('Registro fallido: ' + (err?.message ?? String(err)), 'error');
@@ -6724,19 +6725,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  // Cargar categorías sólo cuando hay sesión para evitar errores de arranque.
-  try {
-    await loadCategoryTree();
-    await loadAccounts();
-    resetCategoryForm({});
-    renderCategoryIconPicker();
-  } catch (err) {
-    console.error('Error cargando categorías:', err);
-    showAlert('No se pudieron cargar categorías al iniciar', 'error');
-  }
-
+  // Show app immediately; load categories + accounts in parallel background
   const startupView = getConfiguredStartView();
   switchView(startupView.id, startupView.title);
+
+  Promise.all([loadCategoryTree(), loadAccounts()]).then(() => {
+    resetCategoryForm({});
+    renderCategoryIconPicker();
+  }).catch(err => {
+    console.error('Error cargando categorías:', err);
+    showAlert('No se pudieron cargar categorías al iniciar', 'error');
+  });
 });
 
 // ---------- RESET USER DATA ----------
