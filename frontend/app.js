@@ -297,7 +297,10 @@ function normalizeAppSettings(rawSettings = {}) {
   };
 }
 
-function normalizeAccentColor(value, fallback = DEFAULT_APP_SETTINGS.accentColor) {
+function normalizeAccentColor(
+  value,
+  fallback = DEFAULT_APP_SETTINGS.accentColor
+) {
   const input = String(value || '').trim();
   return /^#[0-9a-f]{6}$/i.test(input) ? input.toLowerCase() : fallback;
 }
@@ -1760,13 +1763,14 @@ function renderTxAccountMeta(tx) {
 function renderTxItem(tx, includeNote = true) {
   const cat = state.catsById.get(tx.category_id);
   const sub = tx.subcategory_id ? state.catsById.get(tx.subcategory_id) : null;
-  const visual = getTransferVisual(tx.category_id) || getCategoryVisual(cat);
+  const transferVisual = getTransferVisual(tx.category_id);
+  const visual = transferVisual || getCategoryVisual(sub || cat);
   const date = new Date(tx.date).toLocaleDateString();
   const accountMeta = renderTxAccountMeta(tx);
   const note = (tx.note || '').trim();
   const sign = tx.type === 'expense' ? '-' : '+';
   const amount = Number(tx.amount || 0).toFixed(2);
-  const title = visual.name;
+  const title = transferVisual ? visual.name : cat?.name || visual.name;
 
   return `
     <div class="tx-item" data-id="${tx._id}">
