@@ -1807,8 +1807,7 @@ function renderTxItem(tx, includeNote = true) {
   const amount = Number(tx.amount || 0).toFixed(2);
   const title = transferVisual ? visual.name : cat?.name || visual.name;
   const runningBalanceAfter = Number(tx?.running_balance_after);
-  const showRunningBalance =
-    tx.type === 'expense' && Number.isFinite(runningBalanceAfter);
+  const showRunningBalance = Number.isFinite(runningBalanceAfter);
 
   return `
     <div class="tx-item" data-id="${tx._id}">
