@@ -1668,9 +1668,22 @@ body {
   flex-shrink: 0;
   min-width: 88px;
   text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
   font-weight: 800;
   font-size: 15px;
   letter-spacing: -0.02em;
+}
+
+.tx-running-balance {
+  font-size: 9px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--text-muted) 72%, white);
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+  opacity: 0.78;
 }
 
 .tx-money.is-expense {

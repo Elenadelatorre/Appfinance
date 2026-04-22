@@ -1724,6 +1724,41 @@ function sortTransactionsByMostRecent(transactions = []) {
   });
 }
 
+function getTransactionSignedAmount(tx) {
+  const amount = Math.abs(Number(tx?.amount || 0));
+  return tx?.type === 'income' ? amount : -amount;
+}
+
+function annotateTransactionsWithRunningBalances(transactions = []) {
+  const balanceByAccount = new Map();
+
+  return transactions.map((tx) => {
+    const account = findAccountForTransaction(tx);
+    const accountKey = String(account?.id || tx?.account_id || '').trim();
+
+    if (!account || !accountKey) {
+      return { ...tx, running_balance_after: null };
+    }
+
+    if (!balanceByAccount.has(accountKey)) {
+      balanceByAccount.set(accountKey, Number(account.current_balance || 0));
+    }
+
+    const runningBalanceAfter = balanceByAccount.get(accountKey);
+    balanceByAccount.set(
+      accountKey,
+      runningBalanceAfter - getTransactionSignedAmount(tx)
+    );
+
+    return {
+      ...tx,
+      running_balance_after: Number.isFinite(runningBalanceAfter)
+        ? runningBalanceAfter
+        : null
+    };
+  });
+}
+
 function buildTransactionIsoDate(dateValue) {
   // Always use current server time for precise ordering
   // The date input only specifies the date (YYYY-MM-DD), time is always NOW
@@ -1771,6 +1806,9 @@ function renderTxItem(tx, includeNote = true) {
   const sign = tx.type === 'expense' ? '-' : '+';
   const amount = Number(tx.amount || 0).toFixed(2);
   const title = transferVisual ? visual.name : cat?.name || visual.name;
+  const runningBalanceAfter = Number(tx?.running_balance_after);
+  const showRunningBalance =
+    tx.type === 'expense' && Number.isFinite(runningBalanceAfter);
 
   return `
     <div class="tx-item" data-id="${tx._id}">
@@ -1789,7 +1827,8 @@ function renderTxItem(tx, includeNote = true) {
         </div>
       </div>
       <div class="tx-money ${tx.type === 'expense' ? 'is-expense' : 'is-income'}">
-        ${sign}${amount}<span class="euro-symbol">€</span>
+        <div>${sign}${amount}<span class="euro-symbol">€</span></div>
+        ${showRunningBalance ? `<div class="tx-running-balance">${runningBalanceAfter.toFixed(2)}€</div>` : ''}
       </div>
     </div>
   `;
@@ -2433,8 +2472,10 @@ async function loadHistoryView() {
     searchTerm,
     accountLookup
   };
-  const filtered = sortTransactionsByMostRecent(
-    allTransactions.filter((tx) => matchesHistoryFilters(tx, filters))
+  const filtered = annotateTransactionsWithRunningBalances(
+    sortTransactionsByMostRecent(
+      allTransactions.filter((tx) => matchesHistoryFilters(tx, filters))
+    )
   );
 
   updateHistorySummary(filtered);
@@ -4323,7 +4364,9 @@ async function loadHomeAccount() {
     }
 
     // Render home account transactions sorted by most recent
-    const sortedTransactions = sortTransactionsByMostRecent(filtered);
+    const sortedTransactions = annotateTransactionsWithRunningBalances(
+      sortTransactionsByMostRecent(filtered)
+    );
     const html = sortedTransactions.map((t) => renderTxItem(t, true)).join('');
 
     const txList = $('homeAccountTxList');
@@ -5960,7 +6003,9 @@ async function loadAccountTransactions(accountId) {
       spendDistribution.innerHTML = buildAccountSpendDistributionCard(filtered);
     }
 
-    state.currentAccountTransactions = sortTransactionsByMostRecent(filtered);
+    state.currentAccountTransactions = annotateTransactionsWithRunningBalances(
+      sortTransactionsByMostRecent(filtered)
+    );
 
     if (filtered.length === 0) {
       txList.innerHTML =
