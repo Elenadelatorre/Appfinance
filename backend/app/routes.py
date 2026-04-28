@@ -52,11 +52,12 @@ from .models import (
 )
 from .logic import (
     fix_id,
-    get_accounts_balances,
+    get_accounts_balances as get_accounts_balances_logic,
     seed_initial_categories,
     seed_categories_for_user,
     get_billing_cycle_bounds,
     get_category_scope_query,
+    parse_date_only,
 )
 from .logic import check_budgets_logic
 
@@ -866,7 +867,7 @@ async def list_accounts(user_id: CurrentUserId):
 
     # Acompañar las cuentas con el balance calculado (ingresos - gastos),
     # para que la UI no muestre 0.00€.
-    balances = await get_accounts_balances(user_id)
+    balances = await get_accounts_balances_logic(user_id)
     balance_map = {
         b["account_id"]: b["current_balance"] for b in balances if b.get("account_id")
     }
@@ -1100,25 +1101,49 @@ async def create_transfer(payload: TransferCreate, user_id: CurrentUserId):
     }
 
 
-@router.get("/transactions")
+@router.get("/transactions", responses=R400)
 async def list_transactions(
     user_id: CurrentUserId,
     limit: int = 50,
+    skip: int = 0,
     month: Optional[str] = None,
     cycle: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
 ):
     """Lista transacciones. Permite filtrar por mes natural o por ciclo activo."""
     await generate_due_recurring_transactions(str(user_id))
     query: Dict[str, Any] = {"user_id": str(user_id)}
 
-    if cycle == "current":
+    if limit < 1 or limit > 1000:
+        raise BadRequestError("El parámetro limit debe estar entre 1 y 1000")
+    if skip < 0:
+        raise BadRequestError("El parámetro skip no puede ser negativo")
+
+    if bool(start_date) != bool(end_date):
+        raise BadRequestError("Debes indicar start_date y end_date juntos")
+
+    if start_date and end_date:
+        try:
+            start = parse_date_only(start_date)
+            end_inclusive = parse_date_only(end_date)
+        except ValueError as exc:
+            raise BadRequestError(str(exc)) from exc
+
+        if end_inclusive < start:
+            raise BadRequestError(
+                "La fecha final no puede ser anterior a la fecha inicial"
+            )
+
+        query["date"] = {"$gte": start, "$lt": end_inclusive + timedelta(days=1)}
+    elif cycle == "current":
         start, end = get_billing_cycle_bounds()
         query["date"] = {"$gte": start, "$lt": end}
     elif month:
         start, end = month_range(month)
         query["date"] = {"$gte": start, "$lt": end}
 
-    cursor = tx_col().find(query).sort("date", -1).limit(limit)
+    cursor = tx_col().find(query).sort("date", -1).skip(skip).limit(limit)
     transactions = await cursor.to_list(length=limit)
     return [fix_id(t) for t in transactions]
 
@@ -1362,7 +1387,7 @@ async def get_forecast(user_id: CurrentUserId, days: int = 30):
     await generate_due_recurring_transactions(str(user_id), until=now)
 
     accounts = await accounts_col().find({"user_id": str(user_id)}).to_list(300)
-    balances = await get_accounts_balances(str(user_id))
+    balances = await get_accounts_balances_logic(str(user_id))
     balance_map = {
         item.get("account_id"): float(item.get("current_balance") or 0)
         for item in balances

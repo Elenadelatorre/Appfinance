@@ -36,6 +36,7 @@ function resolveApiBase() {
 }
 
 const API = resolveApiBase();
+const TRANSACTIONS_PAGE_SIZE = 500;
 const BUDGET_FILTER_STORAGE_KEY = 'budgetStatusFilter';
 const SETTINGS_DEFAULT_VIEW_KEY = 'financeApp.settings.defaultView';
 const SETTINGS_REDUCE_MOTION_KEY = 'financeApp.settings.reduceMotion';
@@ -83,6 +84,9 @@ const state = {
   dashboardSelectedAccountId: null,
   dashboardAccountSpendMode: 'all',
   dashboardSummaryMode: 'full',
+  dashboardDateStart: '',
+  dashboardDateEnd: '',
+  dashboardUseCustomRange: false,
   budgetStatusFilter: localStorage.getItem(BUDGET_FILTER_STORAGE_KEY) || 'all',
   editingBudgetId: null,
   editingAccountId: null,
@@ -2048,6 +2052,106 @@ function formatDashboardCycle(summary = {}) {
   return `${start.toLocaleDateString('es-ES', options)} - ${end.toLocaleDateString('es-ES', options)}`;
 }
 
+function getDashboardDateInputValue(isoValue = '') {
+  return String(isoValue || '').slice(0, 10);
+}
+
+function buildDashboardSummaryPath() {
+  const params = new URLSearchParams();
+
+  if (
+    state.dashboardUseCustomRange &&
+    state.dashboardDateStart &&
+    state.dashboardDateEnd
+  ) {
+    params.set('start_date', state.dashboardDateStart);
+    params.set('end_date', state.dashboardDateEnd);
+  }
+
+  const query = params.toString();
+  return query ? `/summary/monthly?${query}` : '/summary/monthly';
+}
+
+async function fetchAllTransactions(filters = {}) {
+  const allTransactions = [];
+  const maxPages = 200;
+  let skip = 0;
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const params = new URLSearchParams({
+      limit: String(TRANSACTIONS_PAGE_SIZE),
+      skip: String(skip)
+    });
+
+    Object.entries(filters || {}).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === '') return;
+      params.set(key, String(value));
+    });
+
+    const chunk = await api(`/transactions?${params.toString()}`);
+    if (!Array.isArray(chunk) || chunk.length === 0) break;
+
+    allTransactions.push(...chunk);
+    if (chunk.length < TRANSACTIONS_PAGE_SIZE) break;
+    skip += TRANSACTIONS_PAGE_SIZE;
+  }
+
+  return allTransactions;
+}
+
+function getDashboardTransactionFilters() {
+  const filters = {};
+
+  if (
+    state.dashboardUseCustomRange &&
+    state.dashboardDateStart &&
+    state.dashboardDateEnd
+  ) {
+    filters.start_date = state.dashboardDateStart;
+    filters.end_date = state.dashboardDateEnd;
+  } else {
+    filters.cycle = 'current';
+  }
+
+  return filters;
+}
+
+function syncDashboardRangeInputs(summary = {}) {
+  const startValue = getDashboardDateInputValue(summary.period_start);
+  const endValue = getDashboardDateInputValue(summary.period_end);
+  const startInput = $('dashboardDateStart');
+  const endInput = $('dashboardDateEnd');
+
+  state.dashboardDateStart = startValue;
+  state.dashboardDateEnd = endValue;
+
+  if (startInput) startInput.value = startValue;
+  if (endInput) endInput.value = endValue;
+}
+
+function filterTransactionsByDashboardCycle(transactions = [], summary = {}) {
+  const start = summary.period_start ? new Date(summary.period_start) : null;
+  const end = summary.period_end ? new Date(summary.period_end) : null;
+
+  if (
+    !start ||
+    Number.isNaN(start.getTime()) ||
+    !end ||
+    Number.isNaN(end.getTime())
+  ) {
+    return transactions;
+  }
+
+  const inclusiveEnd = new Date(end);
+  inclusiveEnd.setDate(inclusiveEnd.getDate() + 1);
+
+  return (transactions || []).filter((tx) => {
+    const txDate = tx?.date ? new Date(tx.date) : null;
+    if (!txDate || Number.isNaN(txDate.getTime())) return false;
+    return txDate >= start && txDate < inclusiveEnd;
+  });
+}
+
 function getSectionOptions() {
   return (state.tree || [])
     .map(
@@ -2454,9 +2558,7 @@ async function loadHistoryView() {
   const selectedAccount = accounts.find(
     (account) => account.id === selectedAccountId
   );
-  const allTransactions = await api(
-    `/transactions?limit=500&month=${selectedMonth}`
-  );
+  const allTransactions = await fetchAllTransactions({ month: selectedMonth });
   const filters = {
     selectedMonth,
     selectedType,
@@ -4205,6 +4307,39 @@ async function deleteTx(txId) {
 }
 
 // ---------- Auth (frontend) ----------
+function setAuthSubmitLoading(mode = 'login', isLoading = false) {
+  const loginBtn = $('btnLogin');
+  const registerBtn = $('btnRegister');
+
+  if (loginBtn) {
+    if (!loginBtn.dataset.defaultLabel) {
+      loginBtn.dataset.defaultLabel = loginBtn.textContent || 'Entrar';
+    }
+    loginBtn.disabled = isLoading;
+    loginBtn.classList.toggle('is-loading', isLoading && mode === 'login');
+    loginBtn.textContent =
+      isLoading && mode === 'login'
+        ? 'Entrando...'
+        : loginBtn.dataset.defaultLabel;
+  }
+
+  if (registerBtn) {
+    if (!registerBtn.dataset.defaultLabel) {
+      registerBtn.dataset.defaultLabel =
+        registerBtn.textContent || 'Crear cuenta';
+    }
+    registerBtn.disabled = isLoading;
+    registerBtn.classList.toggle(
+      'is-loading',
+      isLoading && mode === 'register'
+    );
+    registerBtn.textContent =
+      isLoading && mode === 'register'
+        ? 'Creando cuenta...'
+        : registerBtn.dataset.defaultLabel;
+  }
+}
+
 async function login() {
   const email = $('loginEmail')?.value?.trim();
   const password = $('loginPassword')?.value || '';
@@ -4212,6 +4347,8 @@ async function login() {
     showAlert('Introduce email y contraseña', 'error');
     return;
   }
+
+  setAuthSubmitLoading('login', true);
 
   try {
     const res = await fetch(`${API}/auth/login`, {
@@ -4251,6 +4388,8 @@ async function login() {
       return;
     }
     showAlert('Login fallido: ' + msg, 'error');
+  } finally {
+    setAuthSubmitLoading('login', false);
   }
 }
 
@@ -4261,6 +4400,8 @@ async function register() {
     showAlert('Introduce email y contraseña', 'error');
     return;
   }
+
+  setAuthSubmitLoading('register', true);
   try {
     const res = await fetch(`${API}/auth/register`, {
       method: 'POST',
@@ -4290,6 +4431,8 @@ async function register() {
   } catch (err) {
     if (err?.code === 'SESSION_EXPIRED' || err?.code === 'NO_AUTH') return;
     showAlert('Registro fallido: ' + (err?.message ?? String(err)), 'error');
+  } finally {
+    setAuthSubmitLoading('register', false);
   }
 }
 
@@ -4351,7 +4494,7 @@ async function loadHomeAccount() {
     syncHomeResetButton(homeResetBtn, principalAccount);
 
     // Cargar movimientos de esta cuenta
-    const list = await api('/transactions?limit=500');
+    const list = await fetchAllTransactions();
     const filtered = list.filter((t) => {
       const acc_id = t.account_id || null;
       return acc_id === principalAccount.id || acc_id === principalAccount.name;
@@ -4395,13 +4538,20 @@ async function loadHomeAccount() {
 
 async function loadDashboardView() {
   try {
-    const data = await api('/dashboard');
-    const accounts = await api('/accounts');
-    const transactions = await api('/transactions?limit=500');
-    const ms = data.monthly_summary || {};
+    const [ms, accounts, transactions] = await Promise.all([
+      api(buildDashboardSummaryPath()),
+      api('/accounts'),
+      fetchAllTransactions(getDashboardTransactionFilters())
+    ]);
+    syncDashboardRangeInputs(ms || {});
+    const rangeTransactions = filterTransactionsByDashboardCycle(
+      transactions || [],
+      ms
+    );
     const cycleLabel = formatDashboardCycle(ms);
     const summaryMode =
       state.dashboardSummaryMode === 'compact' ? 'compact' : 'full';
+    const periodLabel = state.dashboardUseCustomRange ? 'rango' : 'ciclo';
 
     // Mostrar balance del mes
     const dashEl = $('dashboardBalance');
@@ -4409,7 +4559,7 @@ async function loadDashboardView() {
 
     const adviceEl = $('dashboardAdvice');
     if (adviceEl) {
-      adviceEl.textContent = `${cycleLabel} · Ingresos: ${ms.total_income || 0}€ · Gastos: ${ms.total_expense || 0}€`;
+      adviceEl.textContent = `${cycleLabel} · Ingresos: ${Number(ms.total_income || 0).toFixed(2)}€ · Gastos: ${Number(ms.total_expense || 0).toFixed(2)}€`;
     }
 
     document
@@ -4444,8 +4594,7 @@ async function loadDashboardView() {
         .join('');
       details.innerHTML = breakdown;
     } else if (details) {
-      details.innerHTML =
-        '<div class="muted" style="text-align:center; margin: 16px 0;">Aún no hay gastos en este ciclo.</div>';
+      details.innerHTML = `<div class="muted" style="text-align:center; margin: 16px 0;">Aún no hay gastos en este ${periodLabel}.</div>`;
     }
 
     const accountsDistribution = $('dashboardAccountsDistribution');
@@ -4454,7 +4603,7 @@ async function loadDashboardView() {
         summaryMode === 'compact' ? 'none' : '';
       accountsDistribution.innerHTML = buildDashboardAccountSpendCard(
         accounts || [],
-        transactions || []
+        rangeTransactions
       );
 
       accountsDistribution
@@ -4472,6 +4621,58 @@ async function loadDashboardView() {
   } catch (err) {
     console.error('Error cargando dashboard:', err);
   }
+}
+
+function initDashboardListeners() {
+  const startInput = $('dashboardDateStart');
+  const endInput = $('dashboardDateEnd');
+  const applyBtn = $('dashboardApplyRangeBtn');
+  const resetBtn = $('dashboardResetRangeBtn');
+
+  const submitRange = async () => {
+    const startValue = (startInput?.value || '').trim();
+    const endValue = (endInput?.value || '').trim();
+
+    if (!startValue || !endValue) {
+      showAlert('Selecciona una fecha inicial y otra final', 'error');
+      return;
+    }
+
+    if (endValue < startValue) {
+      showAlert('La fecha final no puede ser anterior a la inicial', 'error');
+      return;
+    }
+
+    state.dashboardDateStart = startValue;
+    state.dashboardDateEnd = endValue;
+    state.dashboardUseCustomRange = true;
+    await loadDashboardView();
+  };
+
+  if (applyBtn) {
+    applyBtn.addEventListener('click', () => {
+      submitRange();
+    });
+  }
+
+  if (resetBtn) {
+    resetBtn.addEventListener('click', async () => {
+      state.dashboardDateStart = '';
+      state.dashboardDateEnd = '';
+      state.dashboardUseCustomRange = false;
+      await loadDashboardView();
+    });
+  }
+
+  [startInput, endInput].forEach((input) => {
+    if (!input) return;
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        submitRange();
+      }
+    });
+  });
 }
 
 function getBudgetParentCategories() {
@@ -5985,7 +6186,7 @@ async function loadAccountTransactions(accountId) {
     }
 
     // Load all transactions for this user and filter client-side
-    const list = await api(`/transactions?limit=500`);
+    const list = await fetchAllTransactions();
 
     // Filter by account_id (match by id OR by account name for legacy txs)
     const filtered = list.filter((t) => {
@@ -6839,6 +7040,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   attachModalOutsideClose();
   initModalListeners();
   initAccountListeners();
+  initDashboardListeners();
   initHistoryListeners();
   initBudgetListeners();
   initProfileListeners();

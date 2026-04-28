@@ -15,6 +15,7 @@ from app.auth import create_access_token
 from app.logic import (
     get_billing_cycle_bounds,
     get_billing_cycle_period,
+    get_summary_for_period,
     seed_categories_for_user,
 )
 
@@ -257,6 +258,7 @@ class TestAPI:
             "default_view": "home",
             "reduce_motion": False,
             "profile_avatar": "auto",
+            "accent_color": "#6366f1",
         }
 
     def test_update_me_settings_persists_changes(self, monkeypatch):
@@ -305,6 +307,7 @@ class TestAPI:
             "default_view": "accounts",
             "reduce_motion": True,
             "profile_avatar": "😎",
+            "accent_color": "#6366f1",
         }
         assert fake_col.user["settings"]["default_view"] == "accounts"
 
@@ -582,6 +585,88 @@ class TestBillingCycle:
 
         assert budget.month == 2
         assert budget.year == 2026
+
+    def test_summary_for_period_uses_custom_date_range(self, monkeypatch):
+        import app.logic as logic
+
+        docs = [
+            {
+                "user_id": "user-1",
+                "date": datetime(2026, 4, 1, 8, 0, 0),
+                "type": "expense",
+                "amount": 40,
+                "category_id": "food",
+            },
+            {
+                "user_id": "user-1",
+                "date": datetime(2026, 4, 12, 9, 0, 0),
+                "type": "income",
+                "amount": 300,
+                "category_id": "salary",
+            },
+            {
+                "user_id": "user-1",
+                "date": datetime(2026, 4, 30, 21, 0, 0),
+                "type": "expense",
+                "amount": 60,
+                "category_id": "transport",
+            },
+            {
+                "user_id": "user-1",
+                "date": datetime(2026, 4, 18, 10, 0, 0),
+                "type": "expense",
+                "amount": 500,
+                "category_id": "transfer_out",
+            },
+            {
+                "user_id": "user-1",
+                "date": datetime(2026, 5, 1, 8, 0, 0),
+                "type": "expense",
+                "amount": 999,
+                "category_id": "other",
+            },
+        ]
+
+        class _FakeCursor:
+            def __init__(self, items):
+                self.items = items
+
+            async def to_list(self, length=None):
+                await asyncio.sleep(0)
+                return list(self.items)
+
+        class _FakeTxCol:
+            def find(self, query):
+                date_query = query.get("date", {})
+                allowed_categories = set(query.get("category_id", {}).get("$nin", []))
+                items = []
+                for doc in docs:
+                    if doc.get("user_id") != query.get("user_id"):
+                        continue
+                    if doc.get("category_id") in allowed_categories:
+                        continue
+                    doc_date = doc.get("date")
+                    if doc_date < date_query.get("$gte") or doc_date >= date_query.get(
+                        "$lt"
+                    ):
+                        continue
+                    items.append(doc)
+                return _FakeCursor(items)
+
+        monkeypatch.setattr(logic, "tx_col", lambda: _FakeTxCol())
+
+        summary = asyncio.run(
+            get_summary_for_period(
+                datetime(2026, 4, 1), datetime(2026, 5, 1), user_id="user-1"
+            )
+        )
+
+        assert summary["total_income"] == 300
+        assert summary["total_expense"] == 100
+        assert summary["balance"] == 200
+        assert summary["category_breakdown"] == {"food": 40, "transport": 60}
+        assert summary["period_start"].startswith("2026-04-01")
+        assert summary["period_end"].startswith("2026-04-30")
 
 
 if __name__ == "__main__":

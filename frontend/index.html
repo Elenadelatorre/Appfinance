@@ -327,11 +327,7 @@
         </section>
 
         <!-- HOME - Cuenta Principal -->
-        <section
-          id="view-home"
-          class="view fade-in"
-          style="display: none"
-        >
+        <section id="view-home" class="view fade-in" style="display: none">
           <div class="balance-card home-account-card account-detail-card">
             <div class="home-account-corner-actions">
               <button
@@ -405,7 +401,7 @@
         <!-- DASHBOARD - Resumen mensual -->
         <section id="view-dashboard" class="view fade-in" style="display: none">
           <div class="balance-card">
-            <p>Resumen del ciclo</p>
+            <p>Resumen de gastos</p>
             <div
               class="dashboard-mode-toggle"
               role="tablist"
@@ -425,6 +421,40 @@
               >
                 Compacto
               </button>
+            </div>
+            <div class="dashboard-range-toolbar">
+              <label class="dashboard-date-field" for="dashboardDateStart">
+                <span class="dashboard-date-label">Desde</span>
+                <input
+                  type="date"
+                  id="dashboardDateStart"
+                  class="dashboard-date-input"
+                />
+              </label>
+              <label class="dashboard-date-field" for="dashboardDateEnd">
+                <span class="dashboard-date-label">Hasta</span>
+                <input
+                  type="date"
+                  id="dashboardDateEnd"
+                  class="dashboard-date-input"
+                />
+              </label>
+              <div class="dashboard-range-actions">
+                <button
+                  type="button"
+                  id="dashboardApplyRangeBtn"
+                  class="dashboard-range-btn"
+                >
+                  Aplicar fechas
+                </button>
+                <button
+                  type="button"
+                  id="dashboardResetRangeBtn"
+                  class="dashboard-range-btn dashboard-range-btn--ghost"
+                >
+                  Ciclo actual
+                </button>
+              </div>
             </div>
             <h2 id="dashboardBalance">0.00€</h2>
             <div class="health-badge">

@@ -1,6 +1,7 @@
 import os
 import logging
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from typing import Annotated
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,8 +15,10 @@ from .auth import get_current_user_id
 from .logic import (
     seed_initial_categories,
     get_monthly_summary,
+    get_summary_for_period,
     get_accounts_balances,
     check_budgets_logic,
+    parse_date_only,
 )
 
 # Configurar logging
@@ -165,8 +168,31 @@ async def get_dashboard(user_id: CurrentUserId):
 
 
 @app.get("/summary/monthly")
-async def monthly_summary(user_id: CurrentUserId):
-    """Resumen del ciclo actual (del día 26 al 25, con desglose por categoría)."""
+async def monthly_summary(
+    user_id: CurrentUserId,
+    start_date: str | None = None,
+    end_date: str | None = None,
+):
+    """Resumen del ciclo actual o de un rango personalizado con desglose por categoría."""
+    if bool(start_date) != bool(end_date):
+        raise BadRequestError("Debes indicar start_date y end_date juntos")
+
+    if start_date and end_date:
+        try:
+            start = parse_date_only(start_date)
+            end_inclusive = parse_date_only(end_date)
+        except ValueError as exc:
+            raise BadRequestError(str(exc)) from exc
+
+        if end_inclusive < start:
+            raise BadRequestError(
+                "La fecha final no puede ser anterior a la fecha inicial"
+            )
+
+        return await get_summary_for_period(
+            start, end_inclusive + timedelta(days=1), user_id
+        )
+
     return await get_monthly_summary(user_id)
 
 

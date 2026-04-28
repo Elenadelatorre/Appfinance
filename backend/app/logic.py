@@ -14,6 +14,17 @@ GLOBAL_CATEGORY_QUERY: Dict[str, Any] = {
 }
 
 
+def parse_date_only(value: str) -> datetime:
+    cleaned = str(value or "").strip()
+    if not cleaned:
+        raise ValueError("La fecha no puede estar vacía")
+
+    try:
+        return datetime.fromisoformat(f"{cleaned}T00:00:00")
+    except ValueError as exc:
+        raise ValueError("Formato de fecha inválido (usa YYYY-MM-DD)") from exc
+
+
 # --- FUNCIONES AUXILIARES ---
 def fix_id(obj):
     if obj is None:
@@ -36,10 +47,13 @@ def fix_id(obj):
     return obj
 
 
-async def get_monthly_summary(user_id: Optional[str] = None):
-    start_of_cycle, end_of_cycle = get_billing_cycle_bounds()
+async def get_summary_for_period(
+    start_date: datetime,
+    end_date_exclusive: datetime,
+    user_id: Optional[str] = None,
+):
     query: Dict[str, Any] = {
-        "date": {"$gte": start_of_cycle, "$lt": end_of_cycle},
+        "date": {"$gte": start_date, "$lt": end_date_exclusive},
         "category_id": {"$nin": ["transfer_out", "transfer_in"]},
     }
     if user_id:
@@ -59,17 +73,22 @@ async def get_monthly_summary(user_id: Optional[str] = None):
             total_expense += amount
             category_breakdown[cat_id] = category_breakdown.get(cat_id, 0) + amount
 
-    period_end = end_of_cycle - timedelta(days=1)
+    period_end = end_date_exclusive - timedelta(days=1)
     return {
-        "month": start_of_cycle.strftime("%B"),
+        "month": start_date.strftime("%B"),
         "total_income": round(total_income, 2),
         "total_expense": round(total_expense, 2),
         "balance": round(total_income - total_expense, 2),
         "category_breakdown": category_breakdown,
-        "period_start": start_of_cycle.isoformat(),
+        "period_start": start_date.isoformat(),
         "period_end": period_end.isoformat(),
         "cycle_start_day": BILLING_CYCLE_START_DAY,
     }
+
+
+async def get_monthly_summary(user_id: Optional[str] = None):
+    start_of_cycle, end_of_cycle = get_billing_cycle_bounds()
+    return await get_summary_for_period(start_of_cycle, end_of_cycle, user_id)
 
 
 async def get_accounts_balances(user_id: Optional[str] = None):
