@@ -686,7 +686,14 @@
             />
           </div>
           <div class="history-results-toolbar">
-            <div id="historyResultsMeta" class="history-results-meta"></div>
+            <div class="history-results-meta-wrap">
+              <div id="historyResultsMeta" class="history-results-meta"></div>
+              <div
+                id="historyRangeContext"
+                class="history-range-context"
+                style="display: none"
+              ></div>
+            </div>
             <div class="history-results-actions">
               <button
                 id="historyClearFiltersBtn"
@@ -694,6 +701,22 @@
                 class="history-results-btn history-results-btn--clear"
               >
                 Limpiar filtros
+              </button>
+              <button
+                id="historyResetRangeBtn"
+                type="button"
+                class="history-results-btn history-results-btn--range"
+                style="display: none"
+              >
+                Ver por mes
+              </button>
+              <button
+                id="historyBackDashboardBtn"
+                type="button"
+                class="history-results-btn history-results-btn--back"
+                style="display: none"
+              >
+                Volver al resumen
               </button>
               <button
                 id="historyCollapseAllBtn"

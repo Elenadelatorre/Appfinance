@@ -96,6 +96,10 @@ const state = {
   currentViewId: 'home',
   reminders: [],
   reminderFilter: 'all',
+  historyRangeStart: '',
+  historyRangeEnd: '',
+  historyRangeSource: '',
+  historyPendingCategoryId: '',
   user: null,
   settings: { ...DEFAULT_APP_SETTINGS }
 };
@@ -1728,7 +1732,9 @@ function sortTransactionsByMostRecent(transactions = []) {
     // Same date: use _id as tiebreaker (MongoDB ObjectId is time-ordered)
     const leftId = String(left?._id || '');
     const rightId = String(right?._id || '');
-    return rightId > leftId ? 1 : rightId < leftId ? -1 : 0;
+    if (rightId > leftId) return 1;
+    if (rightId < leftId) return -1;
+    return 0;
   });
 }
 
@@ -2190,6 +2196,80 @@ function getCurrentMonthValue() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function isHistoryRangeActive() {
+  return Boolean(state.historyRangeStart && state.historyRangeEnd);
+}
+
+function formatHistoryRangeLabel(startValue = '', endValue = '') {
+  const start = new Date(`${startValue}T12:00:00`);
+  const end = new Date(`${endValue}T12:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return '';
+  }
+  const fmt = new Intl.DateTimeFormat('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+  return `${fmt.format(start)} - ${fmt.format(end)}`;
+}
+
+function syncHistoryRangeMonthInput(monthInput, active) {
+  if (!monthInput) return;
+  monthInput.disabled = active;
+  monthInput.title = active ? 'Desactiva el rango para filtrar por mes' : '';
+}
+
+function syncHistoryRangeContextChip(context, active) {
+  if (!context) return;
+  const sourceLabel =
+    state.historyRangeSource === 'dashboard' ? 'desde Resumen' : 'rango';
+  const label = formatHistoryRangeLabel(
+    state.historyRangeStart,
+    state.historyRangeEnd
+  );
+  const fallbackLabel = `${state.historyRangeStart} - ${state.historyRangeEnd}`;
+
+  context.style.display = active ? 'inline-flex' : 'none';
+  if (!active) {
+    context.textContent = '';
+    return;
+  }
+  context.textContent = `${sourceLabel}: ${label || fallbackLabel}`;
+}
+
+function syncHistoryRangeButtons(resetRangeBtn, backBtn, active) {
+  if (resetRangeBtn) {
+    resetRangeBtn.style.display = active ? '' : 'none';
+  }
+  if (backBtn) {
+    backBtn.style.display = active ? '' : 'none';
+  }
+}
+
+function syncHistoryRangeUi() {
+  const monthInput = $('historyMonth');
+  const context = $('historyRangeContext');
+  const resetRangeBtn = $('historyResetRangeBtn');
+  const backBtn = $('historyBackDashboardBtn');
+  const active = isHistoryRangeActive();
+  syncHistoryRangeMonthInput(monthInput, active);
+  syncHistoryRangeContextChip(context, active);
+  syncHistoryRangeButtons(resetRangeBtn, backBtn, active);
+}
+
+function openHistoryFromDashboardCategory(categoryId, summary = {}) {
+  const rangeStart = getDashboardDateInputValue(summary?.period_start || '');
+  const rangeEnd = getDashboardDateInputValue(summary?.period_end || '');
+
+  state.historyPendingCategoryId = String(categoryId || '').trim();
+  state.historyRangeStart = rangeStart;
+  state.historyRangeEnd = rangeEnd;
+  state.historyRangeSource = 'dashboard';
+
+  switchView('history', 'Historial');
+}
+
 function formatHistoryDayLabel(date) {
   return new Intl.DateTimeFormat('es-ES', {
     weekday: 'long',
@@ -2457,8 +2537,15 @@ function matchesHistoryFilters(tx, filters) {
   const date = new Date(tx.date);
   if (Number.isNaN(date.getTime())) return false;
 
-  const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-  if (yearMonth !== filters.selectedMonth) return false;
+  if (filters.rangeStart && filters.rangeEndExclusive) {
+    if (date < filters.rangeStart || date >= filters.rangeEndExclusive) {
+      return false;
+    }
+  } else {
+    const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    if (yearMonth !== filters.selectedMonth) return false;
+  }
+
   if (filters.selectedType !== 'all' && tx.type !== filters.selectedType) {
     return false;
   }
@@ -2488,13 +2575,20 @@ function updateHistoryResultsMeta(transactions = [], selectedMonth = '') {
   const monthDate = selectedMonth
     ? new Date(`${selectedMonth}-01T12:00:00`)
     : null;
-  const monthLabel =
+  let monthLabel =
     monthDate && !Number.isNaN(monthDate.getTime())
       ? monthDate.toLocaleDateString('es-ES', {
           month: 'long',
           year: 'numeric'
         })
       : 'este periodo';
+
+  if (isHistoryRangeActive()) {
+    monthLabel = formatHistoryRangeLabel(
+      state.historyRangeStart,
+      state.historyRangeEnd
+    );
+  }
 
   meta.textContent = `${transactions.length} movimientos · ${categoryCount} categorías · ${monthLabel}`;
 }
@@ -2536,7 +2630,29 @@ async function loadHistoryView() {
     populateHistoryCategoryFilter()
   ]);
 
+  if (categoryFilter && state.historyPendingCategoryId) {
+    const pending = state.historyPendingCategoryId;
+    const hasOption = categoryFilter.querySelector(
+      `option[value="${CSS.escape(pending)}"]`
+    );
+    categoryFilter.value = hasOption ? pending : 'all';
+    state.historyPendingCategoryId = '';
+  }
+
+  syncHistoryRangeUi();
+
   const selectedMonth = monthInput?.value || getCurrentMonthValue();
+  const rangeActive = isHistoryRangeActive();
+  const rangeStart = rangeActive
+    ? new Date(`${state.historyRangeStart}T00:00:00`)
+    : null;
+  const rangeEndExclusive = rangeActive
+    ? new Date(`${state.historyRangeEnd}T00:00:00`)
+    : null;
+  if (rangeEndExclusive && !Number.isNaN(rangeEndExclusive.getTime())) {
+    rangeEndExclusive.setDate(rangeEndExclusive.getDate() + 1);
+  }
+
   const selectedType = getSelectedHistoryType();
   const selectedAccountId = accountFilter?.value || 'all';
   const selectedCategoryId = categoryFilter?.value || 'all';
@@ -2562,9 +2678,19 @@ async function loadHistoryView() {
   const selectedAccount = accounts.find(
     (account) => account.id === selectedAccountId
   );
-  const allTransactions = await fetchAllTransactions({ month: selectedMonth });
+  const allTransactions = await fetchAllTransactions(
+    rangeActive
+      ? {
+          start_date: state.historyRangeStart,
+          end_date: state.historyRangeEnd
+        }
+      : { month: selectedMonth }
+  );
+
   const filters = {
     selectedMonth,
+    rangeStart,
+    rangeEndExclusive,
     selectedType,
     selectedAccountId,
     selectedAccountName: selectedAccount?.name || '',
@@ -2594,7 +2720,26 @@ async function loadHistoryView() {
       minAmount !== null ||
       maxAmount !== null ||
       Boolean(searchTerm);
-    txListFull.innerHTML = `<div class="muted" style="text-align:center; margin: 22px 0;">${hasExtraFilters ? 'No hay movimientos con esos filtros.' : 'No hay movimientos para ese mes.'}</div>`;
+    let emptyMessage = 'No hay movimientos para ese mes.';
+    if (hasExtraFilters) {
+      emptyMessage = 'No hay movimientos con esos filtros.';
+    } else if (rangeActive) {
+      emptyMessage = 'No hay movimientos en este rango.';
+    }
+
+    let emptyActions = '';
+    if (hasExtraFilters) {
+      emptyActions = '<button type="button" class="history-empty-action" data-history-empty-clear="1">Quitar filtros</button>';
+    } else if (rangeActive) {
+      emptyActions = '<button type="button" class="history-empty-action" data-history-reset-range="1">Ver por mes</button>';
+    }
+
+    txListFull.innerHTML = `
+      <div class="history-empty-state">
+        <div class="muted" style="text-align:center;">${emptyMessage}</div>
+        ${emptyActions}
+      </div>
+    `;
     historyFilteredTxns = [];
     return;
   }
@@ -2628,27 +2773,6 @@ function renderHistoryPage() {
       : '';
 
   txListFull.innerHTML = groupsHtml + loadMoreHtml;
-
-  const loadMoreBtn = $('historyLoadMoreBtn');
-  if (loadMoreBtn) {
-    loadMoreBtn.addEventListener('click', () => {
-      historyVisibleCount += HISTORY_PAGE_SIZE;
-      renderHistoryPage();
-    });
-  }
-
-  txListFull.querySelectorAll('[data-history-toggle]').forEach((button) => {
-    button.addEventListener('click', () => {
-      toggleHistoryGroup(button.dataset.historyToggle || '');
-    });
-  });
-
-  txListFull.querySelectorAll('.tx-item').forEach((el) => {
-    el.addEventListener('click', () => {
-      const id = el.dataset.id;
-      openViewTx(id);
-    });
-  });
 }
 
 function renderCategoryManager() {
@@ -4601,14 +4725,7 @@ async function loadDashboardView() {
         const handler = () => {
           const catId = row.dataset.catId || '';
           if (!catId) return;
-          switchView('history', 'Historial');
-          requestAnimationFrame(() => {
-            const catFilter = $('historyCategoryFilter');
-            if (catFilter) {
-              catFilter.value = catId;
-              loadHistoryView();
-            }
-          });
+          openHistoryFromDashboardCategory(catId, ms);
         };
         row.addEventListener('click', handler);
         row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); } });
@@ -6642,6 +6759,7 @@ function initAccountListeners() {
 }
 
 function initHistoryListeners() {
+  const txListFull = $('txListFull');
   const historyMonth = $('historyMonth');
   const historyAccountFilter = $('historyAccountFilter');
   const historyCategoryFilter = $('historyCategoryFilter');
@@ -6650,10 +6768,16 @@ function initHistoryListeners() {
   const historySearchInput = $('historySearchInput');
   const historyTypeFilters = $('historyTypeFilters');
   const historyClearFiltersBtn = $('historyClearFiltersBtn');
+  const historyResetRangeBtn = $('historyResetRangeBtn');
+  const historyBackDashboardBtn = $('historyBackDashboardBtn');
   const historyCollapseAllBtn = $('historyCollapseAllBtn');
   const historyExpandAllBtn = $('historyExpandAllBtn');
+  syncHistoryRangeUi();
   if (historyMonth)
     historyMonth.addEventListener('change', () => {
+      if (isHistoryRangeActive()) {
+        return;
+      }
       loadHistoryView();
     });
   if (historyAccountFilter)
@@ -6680,6 +6804,18 @@ function initHistoryListeners() {
     historyClearFiltersBtn.addEventListener('click', () => {
       resetHistoryFilters();
     });
+  if (historyResetRangeBtn)
+    historyResetRangeBtn.addEventListener('click', () => {
+      state.historyRangeStart = '';
+      state.historyRangeEnd = '';
+      state.historyRangeSource = '';
+      syncHistoryRangeUi();
+      loadHistoryView();
+    });
+  if (historyBackDashboardBtn)
+    historyBackDashboardBtn.addEventListener('click', () => {
+      switchView('dashboard', 'Resumen');
+    });
   if (historyCollapseAllBtn)
     historyCollapseAllBtn.addEventListener('click', () => {
       setAllHistoryGroupsCollapsed(true);
@@ -6704,6 +6840,43 @@ function initHistoryListeners() {
         .forEach((item) => item.classList.remove('is-active'));
       button.classList.add('is-active');
       loadHistoryView();
+    });
+  if (txListFull)
+    txListFull.addEventListener('click', (event) => {
+      const loadMoreBtn = event.target.closest('#historyLoadMoreBtn');
+      if (loadMoreBtn) {
+        historyVisibleCount += HISTORY_PAGE_SIZE;
+        renderHistoryPage();
+        return;
+      }
+
+      const clearEmptyBtn = event.target.closest('[data-history-empty-clear]');
+      if (clearEmptyBtn) {
+        resetHistoryFilters();
+        return;
+      }
+
+      const resetRangeEmptyBtn = event.target.closest('[data-history-reset-range]');
+      if (resetRangeEmptyBtn) {
+        state.historyRangeStart = '';
+        state.historyRangeEnd = '';
+        state.historyRangeSource = '';
+        syncHistoryRangeUi();
+        loadHistoryView();
+        return;
+      }
+
+      const toggleBtn = event.target.closest('[data-history-toggle]');
+      if (toggleBtn) {
+        toggleHistoryGroup(toggleBtn.dataset.historyToggle || '');
+        return;
+      }
+
+      const txItem = event.target.closest('.tx-item');
+      if (txItem) {
+        const id = txItem.dataset.id;
+        openViewTx(id);
+      }
     });
 }
 

@@ -217,6 +217,46 @@ class TestAPI:
         assert response.status_code == 200
         assert response.json()["ok"] is True
 
+    def test_list_transactions_uses_stable_sort_for_same_date(self, monkeypatch):
+        """Las transacciones deben ordenarse por fecha y _id para desempate estable."""
+        import app.routes as routes
+
+        captured = {"sort": None}
+
+        class _FakeCursor:
+            def sort(self, sort_spec):
+                captured["sort"] = sort_spec
+                return self
+
+            def skip(self, _skip):
+                return self
+
+            def limit(self, _limit):
+                return self
+
+            async def to_list(self, length=None):
+                await asyncio.sleep(0)
+                return []
+
+        class _FakeTxCol:
+            def find(self, _query):
+                return _FakeCursor()
+
+        async def _noop_generate_due(_user_id):
+            await asyncio.sleep(0)
+
+        monkeypatch.setattr(routes, "tx_col", lambda: _FakeTxCol())
+        monkeypatch.setattr(
+            routes, "generate_due_recurring_transactions", _noop_generate_due
+        )
+
+        result = asyncio.run(
+            routes.list_transactions(user_id="user-1", month="2026-04")
+        )
+
+        assert result == []
+        assert captured["sort"] == [("date", -1), ("_id", -1)]
+
     def test_me_without_token(self):
         """Acceso a /me sin token debe fallar"""
         response = client.get("/me")
