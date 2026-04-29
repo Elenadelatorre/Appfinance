@@ -4247,3 +4247,118 @@ select.input-field option {
     transform: none;
   }
 }
+
+/* =====================================================
+   SECTION-BY-SECTION UI POLISH
+   ===================================================== */
+
+#view-home .section-header,
+#view-dashboard .section-header,
+#view-history .section-header,
+#view-stats .section-header,
+#view-accounts .section-header,
+#view-config .section-header,
+#view-reminders .section-header {
+  position: sticky;
+  top: -4px;
+  z-index: 10;
+  margin: -4px -6px 12px;
+  padding: 10px 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+#view-home .section-header h3,
+#view-dashboard .section-header h3,
+#view-history .section-header h3,
+#view-stats .section-header h3,
+#view-accounts .section-header h3,
+#view-config .section-header h3,
+#view-reminders .section-header h3 {
+  letter-spacing: -0.01em;
+}
+
+#view-home .balance-card,
+#view-dashboard .summary-mode-wrap,
+#view-dashboard .dashboard-summary,
+#view-stats .budget-setup-card,
+#view-reminders .reminder-list {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow:
+    0 10px 26px rgba(15, 23, 42, 0.08),
+    0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+#view-history .history-filters,
+#view-history .history-results-toolbar {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  padding: 10px;
+}
+
+#view-history .history-results-actions {
+  gap: 7px;
+}
+
+#view-history .history-results-btn {
+  border-color: rgba(99, 102, 241, 0.2);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), #f8fafc);
+}
+
+#view-history .history-results-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(99, 102, 241, 0.42);
+}
+
+#view-history .tx-list,
+#view-home .tx-list,
+#view-account-detail .tx-list {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 16px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+#view-accounts .accounts-grid {
+  gap: 14px;
+}
+
+#view-accounts .account-card {
+  border-width: 1px;
+}
+
+#view-config .settings-panel,
+#view-stats .budget-card,
+#view-reminders .reminder-item {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+}
+
+.modal .modal-content {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow:
+    0 16px 36px rgba(15, 23, 42, 0.14),
+    0 2px 10px rgba(15, 23, 42, 0.07);
+}
+
+@media (max-width: 640px) {
+  #view-history .history-results-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  #view-history .history-results-actions .history-results-btn,
+  #view-history .history-results-actions .history-preset-select {
+    width: 100%;
+    max-width: none;
+  }
+
+  #view-home .balance-card h2 {
+    font-size: 38px;
+  }
+}
