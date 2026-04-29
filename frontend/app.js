@@ -2729,6 +2729,52 @@ function deleteSelectedHistoryPreset() {
   showAlert('Filtro borrado', 'success');
 }
 
+function renameSelectedHistoryPreset() {
+  const select = $('historyPresetSelect');
+  if (!select) return;
+
+  const selectedName = String(select.value || '').trim();
+  if (!selectedName) {
+    showAlert('Selecciona un filtro guardado', 'error');
+    return;
+  }
+
+  const newName = String(
+    prompt('Nuevo nombre para el filtro:', selectedName) || ''
+  ).trim();
+  if (!newName || newName === selectedName) return;
+
+  const duplicate = historyFilterPresets.some(
+    (item) =>
+      item.name.toLowerCase() === newName.toLowerCase() && item.name !== selectedName
+  );
+  if (duplicate) {
+    showAlert('Ya existe un filtro con ese nombre', 'error');
+    return;
+  }
+
+  historyFilterPresets = historyFilterPresets.map((item) => {
+    if (item.name !== selectedName) return item;
+    return {
+      name: newName,
+      filters: item.filters
+    };
+  });
+  historyFilterPresets.sort((left, right) =>
+    left.name.localeCompare(right.name, 'es-ES')
+  );
+
+  historyRecentPresetNames = historyRecentPresetNames.map((item) =>
+    item === selectedName ? newName : item
+  );
+
+  persistHistoryFilterPresets();
+  persistHistoryRecentPresetNames();
+  renderHistoryPresetSelect(newName);
+  renderHistoryPresetChips();
+  showAlert('Filtro renombrado', 'success');
+}
+
 function applyHistoryPresetByName(name) {
   const select = $('historyPresetSelect');
   const normalizedName = String(name || '').trim();
@@ -7358,6 +7404,7 @@ function initHistoryListeners() {
   const historySavePresetBtn = $('historySavePresetBtn');
   const historyQuickSavePresetBtn = $('historyQuickSavePresetBtn');
   const historyDeletePresetBtn = $('historyDeletePresetBtn');
+  const historyRenamePresetBtn = $('historyRenamePresetBtn');
   const historyClearFiltersBtn = $('historyClearFiltersBtn');
   const historyResetRangeBtn = $('historyResetRangeBtn');
   const historyBackDashboardBtn = $('historyBackDashboardBtn');
@@ -7418,6 +7465,10 @@ function initHistoryListeners() {
   if (historyDeletePresetBtn)
     historyDeletePresetBtn.addEventListener('click', () => {
       deleteSelectedHistoryPreset();
+    });
+  if (historyRenamePresetBtn)
+    historyRenamePresetBtn.addEventListener('click', () => {
+      renameSelectedHistoryPreset();
     });
   if (historyPresetChips)
     historyPresetChips.addEventListener('click', (event) => {
