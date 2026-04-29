@@ -3268,6 +3268,21 @@ body {
   border-bottom-color: rgba(148, 163, 184, 0.2);
 }
 
+.summary-row--clickable {
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+.summary-row--clickable:hover,
+.summary-row--clickable:focus-visible {
+  background: rgba(148, 163, 184, 0.1);
+  outline: none;
+  padding-left: 6px;
+  padding-right: 6px;
+  margin-left: -6px;
+  margin-right: -6px;
+}
+
 .dashboard-breakdown-list .summary-name,
 .dashboard-breakdown-list .summary-value,
 .dashboard-breakdown-list .summary-percent {

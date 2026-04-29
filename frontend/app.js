@@ -1724,7 +1724,11 @@ function sortTransactionsByMostRecent(transactions = []) {
   return [...transactions].sort((left, right) => {
     const leftTime = new Date(left?.date || 0).getTime();
     const rightTime = new Date(right?.date || 0).getTime();
-    return rightTime - leftTime;
+    if (rightTime !== leftTime) return rightTime - leftTime;
+    // Same date: use _id as tiebreaker (MongoDB ObjectId is time-ordered)
+    const leftId = String(left?._id || '');
+    const rightId = String(right?._id || '');
+    return rightId > leftId ? 1 : rightId < leftId ? -1 : 0;
   });
 }
 
@@ -1844,7 +1848,7 @@ function renderBreakdownItem(categoryId, amount, totalExpense = 0) {
     totalExpense > 0 ? (Number(amount || 0) / totalExpense) * 100 : 0;
   const width = Math.max(0, Math.min(percentage, 100));
   return `
-    <div class="summary-row">
+    <div class="summary-row summary-row--clickable" role="button" tabindex="0" data-cat-id="${escapeHtml(categoryId)}" title="Ver gastos de ${escapeHtml(visual.name)}">
       <div class="summary-main summary-main--stacked">
         <div class="summary-main-top">
           <div class="summary-icon" style="${buildCategoryVisualStyle(visual)}">${renderCategoryVisualContent(visual, 'visual-token-image visual-token-image--summary')}</div>
@@ -4593,6 +4597,22 @@ async function loadDashboardView() {
         )
         .join('');
       details.innerHTML = breakdown;
+      details.querySelectorAll('.summary-row--clickable').forEach((row) => {
+        const handler = () => {
+          const catId = row.dataset.catId || '';
+          if (!catId) return;
+          switchView('history', 'Historial');
+          requestAnimationFrame(() => {
+            const catFilter = $('historyCategoryFilter');
+            if (catFilter) {
+              catFilter.value = catId;
+              loadHistoryView();
+            }
+          });
+        };
+        row.addEventListener('click', handler);
+        row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); } });
+      });
     } else if (details) {
       details.innerHTML = `<div class="muted" style="text-align:center; margin: 16px 0;">Aún no hay gastos en este ${periodLabel}.</div>`;
     }
