@@ -905,7 +905,14 @@
 
         <!-- STATS (placeholder por ahora) -->
         <section id="view-stats" class="view fade-in" style="display: none">
-          <div class="section-header"><h3>Presupuestos</h3></div>
+          <div class="section-header">
+            <div class="section-head-block">
+              <h3>Presupuestos</h3>
+              <p class="section-intro">
+                Control por categoría del ciclo activo (26 al 25).
+              </p>
+            </div>
+          </div>
 
           <div class="budget-setup-card">
             <div class="budget-setup-head">
@@ -973,8 +980,8 @@
             </button>
           </div>
 
-          <div class="muted" style="opacity: 0.8">
-            Control por categoría del ciclo activo (26 al 25).
+          <div class="section-tip-chip">
+            Puedes filtrar por riesgo y revisar avance en tiempo real.
           </div>
 
           <div
@@ -992,6 +999,12 @@
         <!-- ACCOUNTS -->
         <section id="view-accounts" class="view fade-in" style="display: none">
           <div class="section-header">
+            <div class="section-head-block">
+              <h3>Cuentas</h3>
+              <p class="section-intro">
+                Gestiona tus cuentas, orden y acciones rápidas.
+              </p>
+            </div>
             <div class="section-header-actions">
               <button class="text-btn" id="btnAccountsTransfer">
                 <i class="ph ph-arrows-left-right"></i> Transferir
@@ -999,15 +1012,18 @@
               <button class="text-btn" id="btnAddNewAccount">+ Añadir</button>
             </div>
           </div>
-          <div id="accountsList"></div>
+          <div id="accountsList" class="accounts-list-shell"></div>
         </section>
 
         <!-- CONFIG -->
         <section id="view-config" class="view fade-in" style="display: none">
-          <div class="section-header"><h3>Ajustes</h3></div>
-          <div class="muted" style="opacity: 0.8">
-            Organiza la app por apartados: perfil, categorías y seguridad de
-            datos.
+          <div class="section-header">
+            <div class="section-head-block">
+              <h3>Ajustes</h3>
+              <p class="section-intro">
+                Organiza perfil, preferencias, categorías y seguridad.
+              </p>
+            </div>
           </div>
 
           <div class="settings-stack" id="settingsAccordion">
