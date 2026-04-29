@@ -3326,6 +3326,16 @@ function buildHistoryFilterSummary(snapshot = {}, presetName = '') {
   return [...baseLines, ...minLine, ...maxLine, ...searchLine].join('\n');
 }
 
+function buildSuggestedPastedPresetName() {
+  const now = new Date();
+  const datePart = now.toLocaleDateString('es-ES');
+  const timePart = now.toLocaleTimeString('es-ES', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  return `Filtro pegado ${datePart} ${timePart}`;
+}
+
 async function copyCurrentOrSelectedHistoryFilter() {
   await Promise.all([ensureAccountsLoaded(), ensureCategoriesLoaded()]);
 
@@ -3411,6 +3421,33 @@ async function pasteHistoryFilterFromText() {
   persistCurrentHistoryState();
   syncHistoryFilterActivityUi(parsed.snapshot);
   loadHistoryView();
+
+  const shouldSaveAsPreset = confirm(
+    '¿Quieres guardar este filtro pegado como preset?'
+  );
+  if (shouldSaveAsPreset) {
+    const suggestedName =
+      parsed.presetName || presetMatch?.name || buildSuggestedPastedPresetName();
+    const chosenName = String(
+      prompt('Nombre del preset:', suggestedName) || ''
+    ).trim();
+    if (chosenName) {
+      const existingPreset = historyFilterPresets.find(
+        (item) => item.name.toLocaleLowerCase('es-ES') === chosenName.toLocaleLowerCase('es-ES')
+      );
+      if (existingPreset) {
+        const overwrite = confirm(
+          `Ya existe el preset "${existingPreset.name}". ¿Quieres sobrescribirlo?`
+        );
+        if (overwrite) {
+          saveHistoryPresetWithName(chosenName, 'Preset guardado desde pegado');
+        }
+      } else {
+        saveHistoryPresetWithName(chosenName, 'Preset guardado desde pegado');
+      }
+    }
+  }
+
   showAlert('Filtro pegado', 'success');
 }
 
