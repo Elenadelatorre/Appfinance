@@ -131,6 +131,7 @@ const historySelectedTxIds = new Set();
 let historyFilterPresets = [];
 let historyRecentPresetNames = [];
 let historyFavoritePresetName = '';
+let historyLastPastedUndoState = null;
 const HISTORY_PAGE_SIZE = 30;
 
 function applyAutomationApiAvailability() {
@@ -3336,6 +3337,40 @@ function buildSuggestedPastedPresetName() {
   return `Filtro pegado ${datePart} ${timePart}`;
 }
 
+function setHistoryUndoPasteButtonVisibility(visible) {
+  const button = $('historyUndoPasteBtn');
+  if (!button) return;
+  button.style.display = visible ? '' : 'none';
+}
+
+function captureHistoryUndoStateForPaste() {
+  historyLastPastedUndoState = {
+    snapshot: buildHistoryLastState(),
+    selectedPresetName: String($('historyPresetSelect')?.value || '').trim()
+  };
+  setHistoryUndoPasteButtonVisibility(true);
+}
+
+function clearHistoryUndoStateForPaste() {
+  historyLastPastedUndoState = null;
+  setHistoryUndoPasteButtonVisibility(false);
+}
+
+function undoLastPastedHistoryFilter() {
+  if (!historyLastPastedUndoState?.snapshot) {
+    showAlert('No hay un pegado reciente para deshacer', 'error');
+    return;
+  }
+
+  applyHistoryFiltersSnapshot(historyLastPastedUndoState.snapshot);
+  renderHistoryPresetSelect(historyLastPastedUndoState.selectedPresetName || '');
+  persistCurrentHistoryState();
+  syncHistoryFilterActivityUi(historyLastPastedUndoState.snapshot);
+  loadHistoryView();
+  clearHistoryUndoStateForPaste();
+  showAlert('Pegado deshecho', 'success');
+}
+
 async function copyCurrentOrSelectedHistoryFilter() {
   await Promise.all([ensureAccountsLoaded(), ensureCategoriesLoaded()]);
 
@@ -3420,6 +3455,7 @@ async function pasteHistoryFilterFromText() {
     return;
   }
 
+  captureHistoryUndoStateForPaste();
   applyHistoryFiltersSnapshot(parsed.snapshot);
   renderHistoryPresetSelect(presetMatch?.name || '');
   if (presetMatch?.name) {
@@ -8107,6 +8143,7 @@ function initHistoryListeners() {
   const historyExportPresetBtn = $('historyExportPresetBtn');
   const historyCopyFilterBtn = $('historyCopyFilterBtn');
   const historyPasteFilterBtn = $('historyPasteFilterBtn');
+  const historyUndoPasteBtn = $('historyUndoPasteBtn');
   syncHistoryRangeUi();
   historyFilterPresets = readHistoryFilterPresets();
   historyRecentPresetNames = readHistoryRecentPresetNames();
@@ -8147,6 +8184,10 @@ function initHistoryListeners() {
   if (historyPasteFilterBtn)
     historyPasteFilterBtn.addEventListener('click', () => {
       pasteHistoryFilterFromText();
+    });
+  if (historyUndoPasteBtn)
+    historyUndoPasteBtn.addEventListener('click', () => {
+      undoLastPastedHistoryFilter();
     });
   if (historyExportCsvBtn)
     historyExportCsvBtn.addEventListener('click', () => {
