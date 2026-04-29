@@ -81,10 +81,25 @@
 
       .modal-header {
         display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        margin-bottom: 14px;
+      }
+
+      .modal-header-row {
+        width: 100%;
+        display: flex;
         justify-content: space-between;
         align-items: center;
         gap: 10px;
-        margin-bottom: 10px;
+      }
+
+      .modal-subtitle {
+        margin: 0;
+        font-size: 12px;
+        font-weight: 600;
+        color: rgba(148, 163, 184, 0.78);
       }
 
       .modal-title {
@@ -962,6 +977,10 @@
 
           <div id="budgetStatusSummary" class="budget-summary-meta"></div>
 
+          <div class="section-tip-chip">
+            Puedes filtrar por riesgo y revisar avance en tiempo real.
+          </div>
+
           <div id="budgetStatusFilters" class="budget-filter-group">
             <button
               type="button"
@@ -984,10 +1003,6 @@
             >
               Excedidos
             </button>
-          </div>
-
-          <div class="section-tip-chip">
-            Puedes filtrar por riesgo y revisar avance en tiempo real.
           </div>
 
           <div
@@ -1683,14 +1698,20 @@
           <div class="section-header">
             <div class="section-head-block">
               <h3>Recordatorios</h3>
-              <p class="section-intro">Seguros, suscripciones y cobros pendientes.</p>
+              <p class="section-intro">
+                Seguros, suscripciones y cobros pendientes.
+              </p>
             </div>
             <button class="btn btn-sm" id="btnToggleReminderForm" type="button">
               <i class="ph ph-plus"></i> Nuevo
             </button>
           </div>
 
-          <div class="reminder-editor-card" id="reminderEditorCard" style="margin-top: 12px">
+          <div
+            class="reminder-editor-card"
+            id="reminderEditorCard"
+            style="margin-top: 12px"
+          >
             <div class="reminders-form-grid">
               <input
                 id="reminderTitle"
@@ -1877,7 +1898,9 @@
             <h3 class="modal-title">Añadir movimiento</h3>
             <button class="close-modal" aria-label="Cerrar">✕</button>
           </div>
-          <p class="modal-subtitle">Registra un gasto, ingreso u otro tipo de movimiento.</p>
+          <p class="modal-subtitle">
+            Registra un gasto, ingreso u otro tipo de movimiento.
+          </p>
         </div>
 
         <form id="txForm" onsubmit="return false;">
@@ -1965,7 +1988,9 @@
             <h3 class="modal-title">Añadir cuenta</h3>
             <button class="close-modal" aria-label="Cerrar">✕</button>
           </div>
-          <p class="modal-subtitle">Banco, efectivo o cualquier otro medio de pago.</p>
+          <p class="modal-subtitle">
+            Banco, efectivo o cualquier otro medio de pago.
+          </p>
         </div>
 
         <form id="accountForm" onsubmit="return false;">
@@ -2094,7 +2119,9 @@
             <h3 class="modal-title">Transferir entre cuentas</h3>
             <button class="close-modal" aria-label="Cerrar">✕</button>
           </div>
-          <p class="modal-subtitle">Mueve saldo de una cuenta a otra sin crear movimientos duplicados.</p>
+          <p class="modal-subtitle">
+            Mueve saldo de una cuenta a otra sin crear movimientos duplicados.
+          </p>
         </div>
 
         <form id="transferForm" onsubmit="return false;">

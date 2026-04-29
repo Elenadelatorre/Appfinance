@@ -1236,6 +1236,18 @@ function initReminderListeners() {
   const btnClearReminderForm = $('btnClearReminderForm');
   const reminderFilters = $('reminderFilters');
   const remindersList = $('remindersList');
+  const btnToggleReminderForm = $('btnToggleReminderForm');
+  const reminderEditorCard = $('reminderEditorCard');
+
+  if (btnToggleReminderForm && reminderEditorCard) {
+    btnToggleReminderForm.addEventListener('click', () => {
+      const isHidden = reminderEditorCard.style.display === 'none';
+      reminderEditorCard.style.display = isHidden ? '' : 'none';
+      btnToggleReminderForm.innerHTML = isHidden
+        ? '<i class="ph ph-minus"></i> Cerrar'
+        : '<i class="ph ph-plus"></i> Nuevo';
+    });
+  }
 
   if (btnSaveReminder)
     btnSaveReminder.addEventListener('click', () => {
@@ -6098,7 +6110,7 @@ async function loadHomeAccount() {
         weekday: 'long',
         day: 'numeric',
         month: 'long',
-        year: 'numeric',
+        year: 'numeric'
       });
     }
     const homeBadge = $('homeAccountBadge');
