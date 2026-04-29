@@ -39,6 +39,7 @@ const API = resolveApiBase();
 const TRANSACTIONS_PAGE_SIZE = 500;
 const BUDGET_FILTER_STORAGE_KEY = 'budgetStatusFilter';
 const HISTORY_PRESETS_STORAGE_KEY = 'financeApp.history.filterPresets';
+const HISTORY_PRESET_RECENTS_STORAGE_KEY = 'financeApp.history.presetRecents';
 const SETTINGS_DEFAULT_VIEW_KEY = 'financeApp.settings.defaultView';
 const SETTINGS_REDUCE_MOTION_KEY = 'financeApp.settings.reduceMotion';
 const SETTINGS_OPEN_PANEL_KEY = 'financeApp.settings.openPanel';
@@ -125,6 +126,7 @@ let historyFilteredTxns = [];
 let historyVisibleCount = 30;
 const historySelectedTxIds = new Set();
 let historyFilterPresets = [];
+let historyRecentPresetNames = [];
 const HISTORY_PAGE_SIZE = 30;
 
 function applyAutomationApiAvailability() {
@@ -2458,11 +2460,83 @@ function readHistoryFilterPresets() {
   }
 }
 
+function readHistoryRecentPresetNames() {
+  try {
+    const raw = localStorage.getItem(HISTORY_PRESET_RECENTS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+      .slice(0, 8);
+  } catch {
+    return [];
+  }
+}
+
 function persistHistoryFilterPresets() {
   localStorage.setItem(
     HISTORY_PRESETS_STORAGE_KEY,
     JSON.stringify(historyFilterPresets)
   );
+}
+
+function persistHistoryRecentPresetNames() {
+  localStorage.setItem(
+    HISTORY_PRESET_RECENTS_STORAGE_KEY,
+    JSON.stringify(historyRecentPresetNames)
+  );
+}
+
+function renderHistoryPresetChips() {
+  const container = $('historyPresetChips');
+  if (!container) return;
+
+  const validNames = historyRecentPresetNames.filter((name) =>
+    historyFilterPresets.some((preset) => preset.name === name)
+  );
+  historyRecentPresetNames = validNames;
+  persistHistoryRecentPresetNames();
+
+  if (!validNames.length) {
+    container.innerHTML = '';
+    container.style.display = 'none';
+    return;
+  }
+
+  const chipsHtml = validNames
+    .map(
+      (name) =>
+        `<button type="button" class="history-preset-chip" data-history-preset-chip="${escapeHtml(name)}">${escapeHtml(name)}</button>`
+    )
+    .join('');
+
+  container.innerHTML = chipsHtml;
+  container.style.display = '';
+}
+
+function touchRecentHistoryPreset(name) {
+  const normalizedName = String(name || '').trim();
+  if (!normalizedName) return;
+
+  historyRecentPresetNames = historyRecentPresetNames.filter(
+    (item) => item !== normalizedName
+  );
+  historyRecentPresetNames.unshift(normalizedName);
+  historyRecentPresetNames = historyRecentPresetNames.slice(0, 8);
+  persistHistoryRecentPresetNames();
+  renderHistoryPresetChips();
+}
+
+function removeRecentHistoryPreset(name) {
+  const normalizedName = String(name || '').trim();
+  if (!normalizedName) return;
+  historyRecentPresetNames = historyRecentPresetNames.filter(
+    (item) => item !== normalizedName
+  );
+  persistHistoryRecentPresetNames();
+  renderHistoryPresetChips();
 }
 
 function getCurrentHistoryFiltersSnapshot() {
@@ -2597,6 +2671,7 @@ function saveHistoryPresetWithName(presetName, successMessage = 'Filtro guardado
 
   persistHistoryFilterPresets();
   renderHistoryPresetSelect(normalizedName);
+  touchRecentHistoryPreset(normalizedName);
   showAlert(successMessage, 'success');
 }
 
@@ -2632,6 +2707,7 @@ function applySelectedHistoryPreset() {
   if (!preset?.filters) return;
 
   applyHistoryFiltersSnapshot(preset.filters);
+  touchRecentHistoryPreset(selectedName);
   loadHistoryView();
 }
 
@@ -2648,8 +2724,17 @@ function deleteSelectedHistoryPreset() {
     (item) => item.name !== selectedName
   );
   persistHistoryFilterPresets();
+  removeRecentHistoryPreset(selectedName);
   renderHistoryPresetSelect('');
   showAlert('Filtro borrado', 'success');
+}
+
+function applyHistoryPresetByName(name) {
+  const select = $('historyPresetSelect');
+  const normalizedName = String(name || '').trim();
+  if (!normalizedName) return;
+  if (select) select.value = normalizedName;
+  applySelectedHistoryPreset();
 }
 
 function getHistorySearchTerm() {
@@ -7269,6 +7354,7 @@ function initHistoryListeners() {
   const historySearchInput = $('historySearchInput');
   const historyTypeFilters = $('historyTypeFilters');
   const historyPresetSelect = $('historyPresetSelect');
+  const historyPresetChips = $('historyPresetChips');
   const historySavePresetBtn = $('historySavePresetBtn');
   const historyQuickSavePresetBtn = $('historyQuickSavePresetBtn');
   const historyDeletePresetBtn = $('historyDeletePresetBtn');
@@ -7279,7 +7365,9 @@ function initHistoryListeners() {
   const historyExpandAllBtn = $('historyExpandAllBtn');
   syncHistoryRangeUi();
   historyFilterPresets = readHistoryFilterPresets();
+  historyRecentPresetNames = readHistoryRecentPresetNames();
   renderHistoryPresetSelect();
+  renderHistoryPresetChips();
   syncHistoryFilterActivityUi();
   bindHistoryFilterInputs({
     historyMonth,
@@ -7330,6 +7418,12 @@ function initHistoryListeners() {
   if (historyDeletePresetBtn)
     historyDeletePresetBtn.addEventListener('click', () => {
       deleteSelectedHistoryPreset();
+    });
+  if (historyPresetChips)
+    historyPresetChips.addEventListener('click', (event) => {
+      const chip = event.target.closest('[data-history-preset-chip]');
+      if (!chip) return;
+      applyHistoryPresetByName(chip.dataset.historyPresetChip || '');
     });
   if (txListFull) {
     txListFull.addEventListener('click', handleHistoryListClick);

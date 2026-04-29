@@ -2348,6 +2348,29 @@ body {
   margin-bottom: 16px;
 }
 
+.history-preset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -6px 0 10px;
+}
+
+.history-preset-chip {
+  border: 1px solid rgba(14, 116, 144, 0.28);
+  background: rgba(240, 249, 255, 0.9);
+  color: #0c4a6e;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.history-preset-chip:hover {
+  background: rgba(224, 242, 254, 0.95);
+}
+
 .history-results-meta {
   font-size: 12px;
   font-weight: 700;
