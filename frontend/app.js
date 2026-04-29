@@ -41,6 +41,7 @@ const BUDGET_FILTER_STORAGE_KEY = 'budgetStatusFilter';
 const HISTORY_PRESETS_STORAGE_KEY = 'financeApp.history.filterPresets';
 const HISTORY_PRESET_RECENTS_STORAGE_KEY = 'financeApp.history.presetRecents';
 const HISTORY_LAST_STATE_STORAGE_KEY = 'financeApp.history.lastState';
+const HISTORY_FAVORITE_PRESET_STORAGE_KEY = 'financeApp.history.favoritePreset';
 const SETTINGS_DEFAULT_VIEW_KEY = 'financeApp.settings.defaultView';
 const SETTINGS_REDUCE_MOTION_KEY = 'financeApp.settings.reduceMotion';
 const SETTINGS_OPEN_PANEL_KEY = 'financeApp.settings.openPanel';
@@ -129,6 +130,7 @@ let historyVisibleCount = 30;
 const historySelectedTxIds = new Set();
 let historyFilterPresets = [];
 let historyRecentPresetNames = [];
+let historyFavoritePresetName = '';
 const HISTORY_PAGE_SIZE = 30;
 
 function applyAutomationApiAvailability() {
@@ -2491,6 +2493,23 @@ function persistHistoryRecentPresetNames() {
   );
 }
 
+function readHistoryFavoritePresetName() {
+  return String(
+    localStorage.getItem(HISTORY_FAVORITE_PRESET_STORAGE_KEY) || ''
+  ).trim();
+}
+
+function persistHistoryFavoritePresetName() {
+  if (historyFavoritePresetName) {
+    localStorage.setItem(
+      HISTORY_FAVORITE_PRESET_STORAGE_KEY,
+      historyFavoritePresetName
+    );
+    return;
+  }
+  localStorage.removeItem(HISTORY_FAVORITE_PRESET_STORAGE_KEY);
+}
+
 function readHistoryLastState() {
   try {
     const raw = localStorage.getItem(HISTORY_LAST_STATE_STORAGE_KEY);
@@ -2519,15 +2538,18 @@ function readHistoryLastState() {
 
 function buildHistoryLastState() {
   const snapshot = getCurrentHistoryFiltersSnapshot();
+  let rangeSource = '';
+  if (snapshot.rangeStart && snapshot.rangeEnd) {
+    rangeSource = state.historyRangeSource || 'range';
+    if (state.historyRangeSource === 'dashboard') {
+      rangeSource = 'range';
+    }
+  }
+
   return {
     ...snapshot,
     selectedMonth: $('historyMonth')?.value || getCurrentMonthValue(),
-    rangeSource:
-      snapshot.rangeStart && snapshot.rangeEnd
-        ? state.historyRangeSource === 'dashboard'
-          ? 'range'
-          : state.historyRangeSource || 'range'
-        : '',
+    rangeSource,
     selectedPresetName: String($('historyPresetSelect')?.value || '').trim()
   };
 }
@@ -2553,6 +2575,19 @@ function restoreSavedHistoryState() {
   syncHistoryFilterActivityUi(saved);
 }
 
+function syncHistoryFavoritePresetButton() {
+  const button = $('historyToggleFavoritePresetBtn');
+  const selectedName = String($('historyPresetSelect')?.value || '').trim();
+  if (!button) return;
+
+  const hasSelection = Boolean(selectedName);
+  button.disabled = !hasSelection;
+  button.textContent =
+    hasSelection && selectedName === historyFavoritePresetName
+      ? 'Quitar favorito'
+      : 'Marcar favorito';
+}
+
 function renderHistoryPresetChips() {
   const container = $('historyPresetChips');
   if (!container) return;
@@ -2571,8 +2606,13 @@ function renderHistoryPresetChips() {
 
   const chipsHtml = validNames
     .map(
-      (name) =>
-        `<button type="button" class="history-preset-chip" data-history-preset-chip="${escapeHtml(name)}">${escapeHtml(name)}</button>`
+      (name) => {
+        const label =
+          name === historyFavoritePresetName
+            ? `[Favorito] ${escapeHtml(name)}`
+            : escapeHtml(name);
+        return `<button type="button" class="history-preset-chip" data-history-preset-chip="${escapeHtml(name)}">${label}</button>`;
+      }
     )
     .join('');
 
@@ -2601,6 +2641,30 @@ function removeRecentHistoryPreset(name) {
   );
   persistHistoryRecentPresetNames();
   renderHistoryPresetChips();
+}
+
+function toggleFavoriteSelectedHistoryPreset() {
+  const select = $('historyPresetSelect');
+  if (!select) return;
+
+  const selectedName = String(select.value || '').trim();
+  if (!selectedName) {
+    showAlert('Selecciona un filtro guardado', 'error');
+    return;
+  }
+
+  historyFavoritePresetName =
+    historyFavoritePresetName === selectedName ? '' : selectedName;
+  persistHistoryFavoritePresetName();
+  renderHistoryPresetSelect(selectedName);
+  renderHistoryPresetChips();
+  persistCurrentHistoryState();
+  showAlert(
+    historyFavoritePresetName === selectedName
+      ? 'Filtro marcado como favorito'
+      : 'Favorito eliminado',
+    'success'
+  );
 }
 
 function getCurrentHistoryFiltersSnapshot() {
@@ -2655,9 +2719,20 @@ function renderHistoryPresetSelect(selectedName = '') {
   if (!select) return;
 
   const options = ['<option value="">Filtros guardados</option>'];
-  historyFilterPresets.forEach((preset) => {
+  const orderedPresets = [...historyFilterPresets].sort((left, right) => {
+    const leftFavorite = left.name === historyFavoritePresetName ? 1 : 0;
+    const rightFavorite = right.name === historyFavoritePresetName ? 1 : 0;
+    if (leftFavorite !== rightFavorite) return rightFavorite - leftFavorite;
+    return left.name.localeCompare(right.name, 'es-ES');
+  });
+
+  orderedPresets.forEach((preset) => {
     const safeName = escapeHtml(preset.name);
-    options.push(`<option value="${safeName}">${safeName}</option>`);
+    const label =
+      preset.name === historyFavoritePresetName
+        ? `[Favorito] ${safeName}`
+        : safeName;
+    options.push(`<option value="${safeName}">${label}</option>`);
   });
   select.innerHTML = options.join('');
 
@@ -2667,6 +2742,24 @@ function renderHistoryPresetSelect(selectedName = '') {
     );
     select.value = hasOption ? selectedName : '';
   }
+
+  syncHistoryFavoritePresetButton();
+}
+
+function applyHistorySelectValue(select, candidateValue, pendingStateKey) {
+  if (!select) return;
+
+  const normalizedValue = String(candidateValue || 'all').trim() || 'all';
+  const hasOption = select.querySelector(
+    `option[value="${CSS.escape(normalizedValue)}"]`
+  );
+  select.value = hasOption ? normalizedValue : 'all';
+
+  if (hasOption || normalizedValue === 'all') {
+    state[pendingStateKey] = '';
+    return;
+  }
+  state[pendingStateKey] = normalizedValue;
 }
 
 function applyHistoryFiltersSnapshot(snapshot = {}) {
@@ -2682,30 +2775,16 @@ function applyHistoryFiltersSnapshot(snapshot = {}) {
   if (monthInput && snapshot.selectedMonth) {
     monthInput.value = snapshot.selectedMonth;
   }
-  if (accountFilter) {
-    const candidateAccount = snapshot.selectedAccountId || 'all';
-    const hasAccountOption = accountFilter.querySelector(
-      `option[value="${CSS.escape(candidateAccount)}"]`
-    );
-    accountFilter.value = hasAccountOption ? candidateAccount : 'all';
-    state.historyPendingAccountId = hasAccountOption
-      ? ''
-      : candidateAccount !== 'all'
-        ? candidateAccount
-        : '';
-  }
-  if (categoryFilter) {
-    const candidateCategory = snapshot.selectedCategoryId || 'all';
-    const hasCategoryOption = categoryFilter.querySelector(
-      `option[value="${CSS.escape(candidateCategory)}"]`
-    );
-    categoryFilter.value = hasCategoryOption ? candidateCategory : 'all';
-    state.historyPendingCategoryId = hasCategoryOption
-      ? ''
-      : candidateCategory !== 'all'
-        ? candidateCategory
-        : '';
-  }
+  applyHistorySelectValue(
+    accountFilter,
+    snapshot.selectedAccountId,
+    'historyPendingAccountId'
+  );
+  applyHistorySelectValue(
+    categoryFilter,
+    snapshot.selectedCategoryId,
+    'historyPendingCategoryId'
+  );
   if (minAmount) minAmount.value = snapshot.minAmount || '';
   if (maxAmount) maxAmount.value = snapshot.maxAmount || '';
   if (searchInput) searchInput.value = snapshot.searchTerm || '';
@@ -2810,6 +2889,10 @@ function deleteSelectedHistoryPreset() {
   );
   persistHistoryFilterPresets();
   removeRecentHistoryPreset(selectedName);
+  if (historyFavoritePresetName === selectedName) {
+    historyFavoritePresetName = '';
+    persistHistoryFavoritePresetName();
+  }
   renderHistoryPresetSelect('');
   persistCurrentHistoryState();
   showAlert('Filtro borrado', 'success');
@@ -2853,9 +2936,13 @@ function renameSelectedHistoryPreset() {
   historyRecentPresetNames = historyRecentPresetNames.map((item) =>
     item === selectedName ? newName : item
   );
+  if (historyFavoritePresetName === selectedName) {
+    historyFavoritePresetName = newName;
+  }
 
   persistHistoryFilterPresets();
   persistHistoryRecentPresetNames();
+  persistHistoryFavoritePresetName();
   renderHistoryPresetSelect(newName);
   renderHistoryPresetChips();
   persistCurrentHistoryState();
@@ -7548,6 +7635,7 @@ function initHistoryListeners() {
   const historyDeletePresetBtn = $('historyDeletePresetBtn');
   const historyRenamePresetBtn = $('historyRenamePresetBtn');
   const historyDuplicatePresetBtn = $('historyDuplicatePresetBtn');
+  const historyToggleFavoritePresetBtn = $('historyToggleFavoritePresetBtn');
   const historyClearFiltersBtn = $('historyClearFiltersBtn');
   const historyResetRangeBtn = $('historyResetRangeBtn');
   const historyBackDashboardBtn = $('historyBackDashboardBtn');
@@ -7556,6 +7644,7 @@ function initHistoryListeners() {
   syncHistoryRangeUi();
   historyFilterPresets = readHistoryFilterPresets();
   historyRecentPresetNames = readHistoryRecentPresetNames();
+  historyFavoritePresetName = readHistoryFavoritePresetName();
   renderHistoryPresetSelect();
   renderHistoryPresetChips();
   restoreSavedHistoryState();
@@ -7596,6 +7685,7 @@ function initHistoryListeners() {
     });
   if (historyPresetSelect)
     historyPresetSelect.addEventListener('change', () => {
+      syncHistoryFavoritePresetButton();
       applySelectedHistoryPreset();
     });
   if (historySavePresetBtn)
@@ -7617,6 +7707,10 @@ function initHistoryListeners() {
   if (historyDuplicatePresetBtn)
     historyDuplicatePresetBtn.addEventListener('click', () => {
       duplicateSelectedHistoryPreset();
+    });
+  if (historyToggleFavoritePresetBtn)
+    historyToggleFavoritePresetBtn.addEventListener('click', () => {
+      toggleFavoriteSelectedHistoryPreset();
     });
   if (historyPresetChips)
     historyPresetChips.addEventListener('click', (event) => {
