@@ -3404,11 +3404,19 @@ async function pasteHistoryFilterFromText() {
   const unresolvedBlock = unresolved.length
     ? `\n\nAvisos:\n- ${unresolved.join('\n- ')}`
     : '';
-  const accepted = confirm(
-    `Se aplicará este filtro:\n\n${preview}${unresolvedBlock}\n\n¿Continuar?`
-  );
-  if (!accepted) {
+  const actionChoice = String(
+    prompt(
+      `Se aplicará este filtro:\n\n${preview}${unresolvedBlock}\n\nElige una opción:\n1 = Aplicar\n2 = Guardar y aplicar\n0 = Cancelar`,
+      '1'
+    ) || ''
+  ).trim();
+  if (!actionChoice || actionChoice === '0') {
     showAlert('Pegado cancelado', 'info');
+    return;
+  }
+  const shouldSaveAsPreset = actionChoice === '2';
+  if (!['1', '2'].includes(actionChoice)) {
+    showAlert('Opción no válida', 'error');
     return;
   }
 
@@ -3422,9 +3430,6 @@ async function pasteHistoryFilterFromText() {
   syncHistoryFilterActivityUi(parsed.snapshot);
   loadHistoryView();
 
-  const shouldSaveAsPreset = confirm(
-    '¿Quieres guardar este filtro pegado como preset?'
-  );
   if (shouldSaveAsPreset) {
     const suggestedName =
       parsed.presetName || presetMatch?.name || buildSuggestedPastedPresetName();
