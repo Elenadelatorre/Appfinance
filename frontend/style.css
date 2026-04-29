@@ -2360,6 +2360,18 @@ body {
   gap: 6px;
 }
 
+.history-active-filters-meta {
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(2, 132, 199, 0.24);
+  background: rgba(239, 246, 255, 0.95);
+  color: #0c4a6e;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .history-selection-meta {
   display: inline-flex;
   width: fit-content;
@@ -2418,6 +2430,12 @@ body {
 .history-results-btn--clear {
   border-color: rgba(99, 102, 241, 0.34);
   color: #4338ca;
+}
+
+.history-results-btn--attention {
+  border-color: rgba(2, 132, 199, 0.44);
+  background: rgba(239, 246, 255, 0.9);
+  color: #0c4a6e;
 }
 
 .history-results-btn--export {

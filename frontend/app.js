@@ -2478,6 +2478,40 @@ function getCurrentHistoryFiltersSnapshot() {
   };
 }
 
+function countActiveHistoryFilters(snapshot = getCurrentHistoryFiltersSnapshot()) {
+  let count = 0;
+  if ((snapshot.selectedType || 'all') !== 'all') count += 1;
+  if ((snapshot.selectedAccountId || 'all') !== 'all') count += 1;
+  if ((snapshot.selectedCategoryId || 'all') !== 'all') count += 1;
+  if (String(snapshot.minAmount || '').trim()) count += 1;
+  if (String(snapshot.maxAmount || '').trim()) count += 1;
+  if (String(snapshot.searchTerm || '').trim()) count += 1;
+  if (snapshot.rangeStart && snapshot.rangeEnd) count += 1;
+  return count;
+}
+
+function syncHistoryFilterActivityUi(snapshot = getCurrentHistoryFiltersSnapshot()) {
+  const activeMeta = $('historyActiveFiltersMeta');
+  const clearBtn = $('historyClearFiltersBtn');
+  const activeCount = countActiveHistoryFilters(snapshot);
+
+  if (activeMeta) {
+    const pluralSuffix = activeCount === 1 ? '' : 's';
+    activeMeta.style.display = activeCount > 0 ? '' : 'none';
+    if (activeCount > 0) {
+      activeMeta.textContent = `${activeCount} filtro${pluralSuffix} activo${pluralSuffix}`;
+    } else {
+      activeMeta.textContent = '';
+    }
+  }
+
+  if (clearBtn) {
+    clearBtn.classList.toggle('history-results-btn--attention', activeCount > 0);
+    clearBtn.textContent =
+      activeCount > 0 ? `Limpiar filtros (${activeCount})` : 'Limpiar filtros';
+  }
+}
+
 function renderHistoryPresetSelect(selectedName = '') {
   const select = $('historyPresetSelect');
   if (!select) return;
@@ -2537,9 +2571,16 @@ function saveCurrentHistoryPreset() {
   ).trim();
   if (!presetName) return;
 
+  saveHistoryPresetWithName(presetName, 'Filtro guardado');
+}
+
+function saveHistoryPresetWithName(presetName, successMessage = 'Filtro guardado') {
+  const normalizedName = String(presetName || '').trim();
+  if (!normalizedName) return;
+
   const snapshot = getCurrentHistoryFiltersSnapshot();
   const existingIndex = historyFilterPresets.findIndex(
-    (item) => item.name.toLowerCase() === presetName.toLowerCase()
+    (item) => item.name.toLowerCase() === normalizedName.toLowerCase()
   );
 
   if (existingIndex >= 0) {
@@ -2548,15 +2589,37 @@ function saveCurrentHistoryPreset() {
       filters: snapshot
     };
   } else {
-    historyFilterPresets.push({ name: presetName, filters: snapshot });
+    historyFilterPresets.push({ name: normalizedName, filters: snapshot });
     historyFilterPresets.sort((left, right) =>
       left.name.localeCompare(right.name, 'es-ES')
     );
   }
 
   persistHistoryFilterPresets();
-  renderHistoryPresetSelect(presetName);
-  showAlert('Filtro guardado', 'success');
+  renderHistoryPresetSelect(normalizedName);
+  showAlert(successMessage, 'success');
+}
+
+function buildQuickHistoryPresetName() {
+  const now = new Date();
+  const datePart = now.toLocaleDateString('es-ES');
+  const timePart = now.toLocaleTimeString('es-ES', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  return `Filtro rápido ${datePart} ${timePart}`;
+}
+
+function saveQuickHistoryPreset() {
+  let candidateName = buildQuickHistoryPresetName();
+  let suffix = 2;
+  while (
+    historyFilterPresets.some((item) => item.name.toLowerCase() === candidateName.toLowerCase())
+  ) {
+    candidateName = `${buildQuickHistoryPresetName()} #${suffix}`;
+    suffix += 1;
+  }
+  saveHistoryPresetWithName(candidateName, 'Filtro guardado rápido');
 }
 
 function applySelectedHistoryPreset() {
@@ -2790,6 +2853,7 @@ function updateHistoryResultsMeta(transactions = [], selectedMonth = '') {
     selectionMeta.style.display = selectedCount > 0 ? '' : 'none';
     selectionMeta.textContent = selectedCount > 0 ? `${selectedCount} seleccionados` : '';
   }
+  syncHistoryFilterActivityUi();
 }
 
 function pruneHistorySelection(transactions = []) {
@@ -7206,6 +7270,7 @@ function initHistoryListeners() {
   const historyTypeFilters = $('historyTypeFilters');
   const historyPresetSelect = $('historyPresetSelect');
   const historySavePresetBtn = $('historySavePresetBtn');
+  const historyQuickSavePresetBtn = $('historyQuickSavePresetBtn');
   const historyDeletePresetBtn = $('historyDeletePresetBtn');
   const historyClearFiltersBtn = $('historyClearFiltersBtn');
   const historyResetRangeBtn = $('historyResetRangeBtn');
@@ -7215,6 +7280,7 @@ function initHistoryListeners() {
   syncHistoryRangeUi();
   historyFilterPresets = readHistoryFilterPresets();
   renderHistoryPresetSelect();
+  syncHistoryFilterActivityUi();
   bindHistoryFilterInputs({
     historyMonth,
     historyAccountFilter,
@@ -7256,6 +7322,10 @@ function initHistoryListeners() {
   if (historySavePresetBtn)
     historySavePresetBtn.addEventListener('click', () => {
       saveCurrentHistoryPreset();
+    });
+  if (historyQuickSavePresetBtn)
+    historyQuickSavePresetBtn.addEventListener('click', () => {
+      saveQuickHistoryPreset();
     });
   if (historyDeletePresetBtn)
     historyDeletePresetBtn.addEventListener('click', () => {
