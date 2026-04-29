@@ -2775,6 +2775,49 @@ function renameSelectedHistoryPreset() {
   showAlert('Filtro renombrado', 'success');
 }
 
+function duplicateSelectedHistoryPreset() {
+  const select = $('historyPresetSelect');
+  if (!select) return;
+
+  const selectedName = String(select.value || '').trim();
+  if (!selectedName) {
+    showAlert('Selecciona un filtro guardado', 'error');
+    return;
+  }
+
+  const sourcePreset = historyFilterPresets.find(
+    (item) => item.name === selectedName
+  );
+  if (!sourcePreset?.filters) return;
+
+  let candidateName = `${selectedName} (copia)`;
+  let suffix = 2;
+  while (
+    historyFilterPresets.some(
+      (item) => item.name.toLowerCase() === candidateName.toLowerCase()
+    )
+  ) {
+    candidateName = `${selectedName} (copia ${suffix})`;
+    suffix += 1;
+  }
+
+  const copiedFilters = {
+    ...sourcePreset.filters
+  };
+  historyFilterPresets.push({
+    name: candidateName,
+    filters: copiedFilters
+  });
+  historyFilterPresets.sort((left, right) =>
+    left.name.localeCompare(right.name, 'es-ES')
+  );
+
+  persistHistoryFilterPresets();
+  renderHistoryPresetSelect(candidateName);
+  touchRecentHistoryPreset(candidateName);
+  showAlert('Filtro duplicado', 'success');
+}
+
 function applyHistoryPresetByName(name) {
   const select = $('historyPresetSelect');
   const normalizedName = String(name || '').trim();
@@ -7405,6 +7448,7 @@ function initHistoryListeners() {
   const historyQuickSavePresetBtn = $('historyQuickSavePresetBtn');
   const historyDeletePresetBtn = $('historyDeletePresetBtn');
   const historyRenamePresetBtn = $('historyRenamePresetBtn');
+  const historyDuplicatePresetBtn = $('historyDuplicatePresetBtn');
   const historyClearFiltersBtn = $('historyClearFiltersBtn');
   const historyResetRangeBtn = $('historyResetRangeBtn');
   const historyBackDashboardBtn = $('historyBackDashboardBtn');
@@ -7469,6 +7513,10 @@ function initHistoryListeners() {
   if (historyRenamePresetBtn)
     historyRenamePresetBtn.addEventListener('click', () => {
       renameSelectedHistoryPreset();
+    });
+  if (historyDuplicatePresetBtn)
+    historyDuplicatePresetBtn.addEventListener('click', () => {
+      duplicateSelectedHistoryPreset();
     });
   if (historyPresetChips)
     historyPresetChips.addEventListener('click', (event) => {
