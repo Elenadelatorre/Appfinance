@@ -599,7 +599,10 @@
           </details>
 
           <div class="section-header">
-            <h3>Movimientos</h3>
+            <div class="section-head-block">
+              <h3>Movimientos</h3>
+              <p class="section-intro">Operaciones registradas en esta cuenta.</p>
+            </div>
           </div>
           <div class="tx-list" id="accountTxList"></div>
         </section>
@@ -607,7 +610,10 @@
         <!-- HISTORY -->
         <section id="view-history" class="view fade-in" style="display: none">
           <div class="section-header">
-            <h3>Historial</h3>
+            <div class="section-head-block">
+              <h3>Historial</h3>
+              <p class="section-intro">Filtra y explora todos tus movimientos.</p>
+            </div>
             <input type="month" id="historyMonth" class="input-field-small" />
           </div>
           <div class="history-summary-card">
@@ -1383,7 +1389,7 @@
                 <i class="ph ph-caret-down settings-caret"></i>
               </summary>
               <div class="settings-panel-body automation-panel-body">
-                <p class="muted" style="margin-top: 0">
+                <p class="section-intro" style="margin-bottom: 14px">
                   Recurrentes, reglas automáticas, proyección y CSV.
                 </p>
 
@@ -1657,7 +1663,7 @@
                 <i class="ph ph-caret-down settings-caret"></i>
               </summary>
               <div class="settings-panel-body">
-                <p class="muted" style="margin-top: 0">
+                <p class="section-intro" style="margin-bottom: 14px">
                   Gestiona tu sesión de forma rápida sin salir de Ajustes.
                 </p>
                 <button class="btn" id="btnLogoutFromSettings" type="button">
@@ -1678,7 +1684,7 @@
                 <i class="ph ph-caret-down settings-caret"></i>
               </summary>
               <div class="settings-panel-body">
-                <p class="muted" style="margin-top: 0; opacity: 0.9">
+                <p class="section-intro" style="margin-bottom: 14px; color: #9f1239">
                   Se borrarán todos tus movimientos, cuentas y presupuestos.
                 </p>
                 <button
@@ -1710,7 +1716,7 @@
           <div
             class="reminder-editor-card"
             id="reminderEditorCard"
-            style="margin-top: 12px"
+            style="margin-top: 12px; display: none"
           >
             <div class="reminders-form-grid">
               <input

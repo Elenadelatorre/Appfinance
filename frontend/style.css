@@ -1178,6 +1178,43 @@ body {
   font-weight: 600;
 }
 
+/* ── Lista vacía genérica ─────────────────────────── */
+.list-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 32px 0 20px;
+  text-align: center;
+}
+
+.list-empty-state__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: rgba(238, 242, 255, 0.9);
+  border: 1px dashed rgba(99, 102, 241, 0.3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: #4338ca;
+}
+
+.list-empty-state__msg {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.list-empty-state__hint {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 .section-tip-chip {
   display: inline-flex;
   align-items: center;

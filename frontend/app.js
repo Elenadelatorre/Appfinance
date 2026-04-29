@@ -982,8 +982,13 @@ function renderRemindersList() {
   });
 
   if (!reminders.length) {
-    container.innerHTML =
-      '<p class="muted reminders-empty">No tienes recordatorios guardados.</p>';
+    container.innerHTML = `
+      <div class="list-empty-state">
+        <span class="list-empty-state__icon"><i class="ph ph-bell-slash"></i></span>
+        <p class="list-empty-state__msg">Sin recordatorios aún</p>
+        <p class="list-empty-state__hint">Pulsa «Nuevo» para añadir seguros, suscripciones o cobros.</p>
+      </div>
+    `;
     return;
   }
 
@@ -7310,8 +7315,13 @@ async function loadAccounts() {
     if (!container) return;
 
     if (!accounts || accounts.length === 0) {
-      container.innerHTML =
-        '<div class="muted" style="margin: 30px 0; text-align: center;">No tienes cuentas aún. Añade una para empezar.</div>';
+      container.innerHTML = `
+        <div class="list-empty-state">
+          <span class="list-empty-state__icon"><i class="ph ph-wallet"></i></span>
+          <p class="list-empty-state__msg">Sin cuentas aún</p>
+          <p class="list-empty-state__hint">Añade tu primera cuenta para empezar a registrar movimientos.</p>
+        </div>
+      `;
       return;
     }
 
