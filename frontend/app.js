@@ -131,8 +131,9 @@ const historySelectedTxIds = new Set();
 let historyFilterPresets = [];
 let historyRecentPresetNames = [];
 let historyFavoritePresetName = '';
-let historyLastPastedUndoState = null;
+let historyPasteUndoStack = [];
 const HISTORY_PAGE_SIZE = 30;
+const HISTORY_PASTE_UNDO_LIMIT = 3;
 
 function applyAutomationApiAvailability() {
   const panel = document.querySelector('[data-settings-panel="automation"]');
@@ -3337,37 +3338,48 @@ function buildSuggestedPastedPresetName() {
   return `Filtro pegado ${datePart} ${timePart}`;
 }
 
-function setHistoryUndoPasteButtonVisibility(visible) {
+function syncHistoryUndoPasteButton() {
   const button = $('historyUndoPasteBtn');
   if (!button) return;
-  button.style.display = visible ? '' : 'none';
+
+  const count = historyPasteUndoStack.length;
+  button.style.display = count > 0 ? '' : 'none';
+  button.textContent = count > 0 ? `Deshacer pegado (${count})` : 'Deshacer pegado';
 }
 
 function captureHistoryUndoStateForPaste() {
-  historyLastPastedUndoState = {
+  historyPasteUndoStack.push({
     snapshot: buildHistoryLastState(),
     selectedPresetName: String($('historyPresetSelect')?.value || '').trim()
-  };
-  setHistoryUndoPasteButtonVisibility(true);
+  });
+
+  if (historyPasteUndoStack.length > HISTORY_PASTE_UNDO_LIMIT) {
+    historyPasteUndoStack = historyPasteUndoStack.slice(
+      historyPasteUndoStack.length - HISTORY_PASTE_UNDO_LIMIT
+    );
+  }
+  syncHistoryUndoPasteButton();
 }
 
 function clearHistoryUndoStateForPaste() {
-  historyLastPastedUndoState = null;
-  setHistoryUndoPasteButtonVisibility(false);
+  historyPasteUndoStack = [];
+  syncHistoryUndoPasteButton();
 }
 
 function undoLastPastedHistoryFilter() {
-  if (!historyLastPastedUndoState?.snapshot) {
+  const previousState = historyPasteUndoStack.pop();
+  if (!previousState?.snapshot) {
     showAlert('No hay un pegado reciente para deshacer', 'error');
+    syncHistoryUndoPasteButton();
     return;
   }
 
-  applyHistoryFiltersSnapshot(historyLastPastedUndoState.snapshot);
-  renderHistoryPresetSelect(historyLastPastedUndoState.selectedPresetName || '');
+  applyHistoryFiltersSnapshot(previousState.snapshot);
+  renderHistoryPresetSelect(previousState.selectedPresetName || '');
   persistCurrentHistoryState();
-  syncHistoryFilterActivityUi(historyLastPastedUndoState.snapshot);
+  syncHistoryFilterActivityUi(previousState.snapshot);
   loadHistoryView();
-  clearHistoryUndoStateForPaste();
+  syncHistoryUndoPasteButton();
   showAlert('Pegado deshecho', 'success');
 }
 
