@@ -1647,6 +1647,29 @@ body {
   box-shadow: 0 16px 36px rgba(148, 163, 184, 0.16);
 }
 
+.tx-inline-edit-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 3px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #334155;
+  cursor: pointer;
+}
+
+.tx-inline-edit-btn:hover {
+  background: #fff;
+  color: #0f172a;
+}
+
+.tx-inline-edit-btn i {
+  font-size: 14px;
+}
+
 .tx-select {
   width: 24px;
   height: 24px;

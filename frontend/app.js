@@ -1826,6 +1826,19 @@ function renderTxItem(tx, includeNote = true, options = {}) {
   const isSelectable = Boolean(options.selectable);
   const isSelected = isSelectable && historySelectedTxIds.has(String(tx._id));
   const checkedAttribute = isSelected ? 'checked' : '';
+  const quickEditButtonHtml = isSelectable
+    ? `
+      <button
+        type="button"
+        class="tx-inline-edit-btn"
+        data-history-edit-id="${tx._id}"
+        title="Editar movimiento"
+        aria-label="Editar movimiento"
+      >
+        <i class="ph ph-pencil-simple"></i>
+      </button>
+    `
+    : '';
   const selectorHtml = isSelectable
     ? `
       <label class="tx-select" aria-label="Seleccionar movimiento">
@@ -1858,6 +1871,7 @@ function renderTxItem(tx, includeNote = true, options = {}) {
         </div>
       </div>
       <div class="tx-money ${tx.type === 'expense' ? 'is-expense' : 'is-income'}">
+        ${quickEditButtonHtml}
         <div>${sign}${amount}<span class="euro-symbol">€</span></div>
         ${showRunningBalance ? `<div class="tx-running-balance">${runningBalanceAfter.toFixed(2)}€</div>` : ''}
       </div>
@@ -2767,6 +2781,20 @@ function bindHistoryFilterInputs({
 function handleHistoryListClick(event) {
   const selector = event.target.closest('.tx-select, .tx-select-input');
   if (selector) return;
+
+  const quickEditBtn = event.target.closest('[data-history-edit-id]');
+  if (quickEditBtn) {
+    const txId = quickEditBtn.dataset.historyEditId || '';
+    if (txId) {
+      openViewTx(txId).then(() => {
+        const btnEdit = $('btnEditTx');
+        if (btnEdit && btnEdit.style.display !== 'none') {
+          btnEdit.click();
+        }
+      });
+    }
+    return;
+  }
 
   const loadMoreBtn = event.target.closest('#historyLoadMoreBtn');
   if (loadMoreBtn) {
