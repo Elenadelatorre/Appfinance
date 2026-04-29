@@ -40,6 +40,7 @@ const TRANSACTIONS_PAGE_SIZE = 500;
 const BUDGET_FILTER_STORAGE_KEY = 'budgetStatusFilter';
 const HISTORY_PRESETS_STORAGE_KEY = 'financeApp.history.filterPresets';
 const HISTORY_PRESET_RECENTS_STORAGE_KEY = 'financeApp.history.presetRecents';
+const HISTORY_LAST_STATE_STORAGE_KEY = 'financeApp.history.lastState';
 const SETTINGS_DEFAULT_VIEW_KEY = 'financeApp.settings.defaultView';
 const SETTINGS_REDUCE_MOTION_KEY = 'financeApp.settings.reduceMotion';
 const SETTINGS_OPEN_PANEL_KEY = 'financeApp.settings.openPanel';
@@ -101,6 +102,7 @@ const state = {
   historyRangeStart: '',
   historyRangeEnd: '',
   historyRangeSource: '',
+  historyPendingAccountId: '',
   historyPendingCategoryId: '',
   user: null,
   settings: { ...DEFAULT_APP_SETTINGS }
@@ -2489,6 +2491,68 @@ function persistHistoryRecentPresetNames() {
   );
 }
 
+function readHistoryLastState() {
+  try {
+    const raw = localStorage.getItem(HISTORY_LAST_STATE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    return {
+      selectedMonth: String(parsed.selectedMonth || '').trim(),
+      selectedType: String(parsed.selectedType || 'all').trim() || 'all',
+      selectedAccountId: String(parsed.selectedAccountId || 'all').trim() || 'all',
+      selectedCategoryId:
+        String(parsed.selectedCategoryId || 'all').trim() || 'all',
+      minAmount: String(parsed.minAmount || '').trim(),
+      maxAmount: String(parsed.maxAmount || '').trim(),
+      searchTerm: String(parsed.searchTerm || ''),
+      rangeStart: String(parsed.rangeStart || '').trim(),
+      rangeEnd: String(parsed.rangeEnd || '').trim(),
+      rangeSource: String(parsed.rangeSource || '').trim(),
+      selectedPresetName: String(parsed.selectedPresetName || '').trim()
+    };
+  } catch {
+    return null;
+  }
+}
+
+function buildHistoryLastState() {
+  const snapshot = getCurrentHistoryFiltersSnapshot();
+  return {
+    ...snapshot,
+    selectedMonth: $('historyMonth')?.value || getCurrentMonthValue(),
+    rangeSource:
+      snapshot.rangeStart && snapshot.rangeEnd
+        ? state.historyRangeSource === 'dashboard'
+          ? 'range'
+          : state.historyRangeSource || 'range'
+        : '',
+    selectedPresetName: String($('historyPresetSelect')?.value || '').trim()
+  };
+}
+
+function persistCurrentHistoryState() {
+  localStorage.setItem(
+    HISTORY_LAST_STATE_STORAGE_KEY,
+    JSON.stringify(buildHistoryLastState())
+  );
+}
+
+function restoreSavedHistoryState() {
+  const saved = readHistoryLastState();
+  if (!saved) return;
+
+  const monthInput = $('historyMonth');
+  if (monthInput && saved.selectedMonth) {
+    monthInput.value = saved.selectedMonth;
+  }
+
+  applyHistoryFiltersSnapshot(saved);
+  renderHistoryPresetSelect(saved.selectedPresetName || '');
+  syncHistoryFilterActivityUi(saved);
+}
+
 function renderHistoryPresetChips() {
   const container = $('historyPresetChips');
   if (!container) return;
@@ -2606,6 +2670,7 @@ function renderHistoryPresetSelect(selectedName = '') {
 }
 
 function applyHistoryFiltersSnapshot(snapshot = {}) {
+  const monthInput = $('historyMonth');
   setSelectedHistoryType(snapshot.selectedType || 'all');
 
   const accountFilter = $('historyAccountFilter');
@@ -2614,13 +2679,32 @@ function applyHistoryFiltersSnapshot(snapshot = {}) {
   const maxAmount = $('historyMaxAmount');
   const searchInput = $('historySearchInput');
 
-  if (accountFilter) accountFilter.value = snapshot.selectedAccountId || 'all';
+  if (monthInput && snapshot.selectedMonth) {
+    monthInput.value = snapshot.selectedMonth;
+  }
+  if (accountFilter) {
+    const candidateAccount = snapshot.selectedAccountId || 'all';
+    const hasAccountOption = accountFilter.querySelector(
+      `option[value="${CSS.escape(candidateAccount)}"]`
+    );
+    accountFilter.value = hasAccountOption ? candidateAccount : 'all';
+    state.historyPendingAccountId = hasAccountOption
+      ? ''
+      : candidateAccount !== 'all'
+        ? candidateAccount
+        : '';
+  }
   if (categoryFilter) {
     const candidateCategory = snapshot.selectedCategoryId || 'all';
     const hasCategoryOption = categoryFilter.querySelector(
       `option[value="${CSS.escape(candidateCategory)}"]`
     );
     categoryFilter.value = hasCategoryOption ? candidateCategory : 'all';
+    state.historyPendingCategoryId = hasCategoryOption
+      ? ''
+      : candidateCategory !== 'all'
+        ? candidateCategory
+        : '';
   }
   if (minAmount) minAmount.value = snapshot.minAmount || '';
   if (maxAmount) maxAmount.value = snapshot.maxAmount || '';
@@ -2630,7 +2714,7 @@ function applyHistoryFiltersSnapshot(snapshot = {}) {
   if (hasRange) {
     state.historyRangeStart = snapshot.rangeStart;
     state.historyRangeEnd = snapshot.rangeEnd;
-    state.historyRangeSource = 'preset';
+    state.historyRangeSource = snapshot.rangeSource || 'preset';
   } else {
     state.historyRangeStart = '';
     state.historyRangeEnd = '';
@@ -2672,6 +2756,7 @@ function saveHistoryPresetWithName(presetName, successMessage = 'Filtro guardado
   persistHistoryFilterPresets();
   renderHistoryPresetSelect(normalizedName);
   touchRecentHistoryPreset(normalizedName);
+  persistCurrentHistoryState();
   showAlert(successMessage, 'success');
 }
 
@@ -2726,6 +2811,7 @@ function deleteSelectedHistoryPreset() {
   persistHistoryFilterPresets();
   removeRecentHistoryPreset(selectedName);
   renderHistoryPresetSelect('');
+  persistCurrentHistoryState();
   showAlert('Filtro borrado', 'success');
 }
 
@@ -2772,6 +2858,7 @@ function renameSelectedHistoryPreset() {
   persistHistoryRecentPresetNames();
   renderHistoryPresetSelect(newName);
   renderHistoryPresetChips();
+  persistCurrentHistoryState();
   showAlert('Filtro renombrado', 'success');
 }
 
@@ -2815,6 +2902,7 @@ function duplicateSelectedHistoryPreset() {
   persistHistoryFilterPresets();
   renderHistoryPresetSelect(candidateName);
   touchRecentHistoryPreset(candidateName);
+  persistCurrentHistoryState();
   showAlert('Filtro duplicado', 'success');
 }
 
@@ -2863,7 +2951,7 @@ async function populateHistoryAccountFilter() {
   const select = $('historyAccountFilter');
   if (!select) return;
 
-  const currentValue = select.value || 'all';
+  const currentValue = state.historyPendingAccountId || select.value || 'all';
   const accounts = await ensureAccountsLoaded();
   select.innerHTML = '<option value="all">Todas las cuentas</option>';
   accounts.forEach((account) => {
@@ -2875,13 +2963,14 @@ async function populateHistoryAccountFilter() {
   select.value = accounts.some((account) => account.id === currentValue)
     ? currentValue
     : 'all';
+  state.historyPendingAccountId = '';
 }
 
 async function populateHistoryCategoryFilter() {
   const select = $('historyCategoryFilter');
   if (!select) return;
 
-  const currentValue = select.value || 'all';
+  const currentValue = state.historyPendingCategoryId || select.value || 'all';
   await ensureCategoriesLoaded();
 
   const options = ['<option value="all">Todas las categorías</option>'];
@@ -2912,6 +3001,7 @@ async function populateHistoryCategoryFilter() {
   )
     ? currentValue
     : 'all';
+  state.historyPendingCategoryId = '';
 }
 
 function matchesHistoryCategory(tx, selectedCategoryId) {
@@ -3308,6 +3398,14 @@ async function loadHistoryView() {
     categoryFilter.value = hasOption ? pending : 'all';
     state.historyPendingCategoryId = '';
   }
+  if (accountFilter && state.historyPendingAccountId) {
+    const pending = state.historyPendingAccountId;
+    const hasOption = accountFilter.querySelector(
+      `option[value="${CSS.escape(pending)}"]`
+    );
+    accountFilter.value = hasOption ? pending : 'all';
+    state.historyPendingAccountId = '';
+  }
 
   syncHistoryRangeUi();
 
@@ -3339,6 +3437,7 @@ async function loadHistoryView() {
       maxAmountInput.value = minAmount.toFixed(2);
     }
   }
+  persistCurrentHistoryState();
   const accounts = await ensureAccountsLoaded();
   const accountLookup = new Map();
   accounts.forEach((account) => {
@@ -7459,6 +7558,7 @@ function initHistoryListeners() {
   historyRecentPresetNames = readHistoryRecentPresetNames();
   renderHistoryPresetSelect();
   renderHistoryPresetChips();
+  restoreSavedHistoryState();
   syncHistoryFilterActivityUi();
   bindHistoryFilterInputs({
     historyMonth,
