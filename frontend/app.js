@@ -3774,6 +3774,32 @@ function jumpToCurrentHistoryMonthAndReload() {
   loadHistoryView();
 }
 
+function shiftHistoryMonth(value, deltaMonths) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})$/);
+  if (!match) return getCurrentMonthValue();
+
+  const year = Number.parseInt(match[1], 10);
+  const monthIndex = Number.parseInt(match[2], 10) - 1;
+  const date = new Date(year, monthIndex + deltaMonths, 1);
+  if (Number.isNaN(date.getTime())) return getCurrentMonthValue();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function shiftHistoryMonthAndReload(deltaMonths) {
+  state.historyRangeStart = '';
+  state.historyRangeEnd = '';
+  state.historyRangeSource = '';
+
+  const monthInput = $('historyMonth');
+  if (monthInput) {
+    const current = monthInput.value || getCurrentMonthValue();
+    monthInput.value = shiftHistoryMonth(current, deltaMonths);
+  }
+
+  syncHistoryRangeUi();
+  loadHistoryView();
+}
+
 function bindHistorySelectionActions({
   historySelectVisibleBtn,
   historyClearSelectionBtn,
@@ -3805,7 +3831,9 @@ function bindHistorySelectionActions({
 function bindHistoryRangeActions({
   historyResetRangeBtn,
   historyBackDashboardBtn,
-  historyCurrentMonthBtn
+  historyCurrentMonthBtn,
+  historyPrevMonthBtn,
+  historyNextMonthBtn
 }) {
   if (historyResetRangeBtn) {
     historyResetRangeBtn.addEventListener('click', () => {
@@ -3820,6 +3848,16 @@ function bindHistoryRangeActions({
   if (historyCurrentMonthBtn) {
     historyCurrentMonthBtn.addEventListener('click', () => {
       jumpToCurrentHistoryMonthAndReload();
+    });
+  }
+  if (historyPrevMonthBtn) {
+    historyPrevMonthBtn.addEventListener('click', () => {
+      shiftHistoryMonthAndReload(-1);
+    });
+  }
+  if (historyNextMonthBtn) {
+    historyNextMonthBtn.addEventListener('click', () => {
+      shiftHistoryMonthAndReload(1);
     });
   }
 }
@@ -8171,6 +8209,8 @@ function initHistoryListeners() {
   const historyResetRangeBtn = $('historyResetRangeBtn');
   const historyBackDashboardBtn = $('historyBackDashboardBtn');
   const historyCurrentMonthBtn = $('historyCurrentMonthBtn');
+  const historyPrevMonthBtn = $('historyPrevMonthBtn');
+  const historyNextMonthBtn = $('historyNextMonthBtn');
   const historyCollapseAllBtn = $('historyCollapseAllBtn');
   const historyExpandAllBtn = $('historyExpandAllBtn');
   const historyExportPresetBtn = $('historyExportPresetBtn');
@@ -8204,7 +8244,9 @@ function initHistoryListeners() {
   bindHistoryRangeActions({
     historyResetRangeBtn,
     historyBackDashboardBtn,
-    historyCurrentMonthBtn
+    historyCurrentMonthBtn,
+    historyPrevMonthBtn,
+    historyNextMonthBtn
   });
   const historyExportCsvBtn = $('historyExportCsvBtn');
   if (historyExportPresetBtn)
