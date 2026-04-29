@@ -3226,6 +3226,7 @@ function parseHistoryFilterSummaryText(rawText = '') {
     rangeSource: ''
   };
   let presetName = '';
+  const unresolved = [];
 
   lines.forEach((line) => {
     if (!line.includes(':')) {
@@ -3261,11 +3262,23 @@ function parseHistoryFilterSummaryText(rawText = '') {
       return;
     }
     if (key === 'cuenta') {
-      snapshot.selectedAccountId = resolveAccountIdFromLabel(value);
+      const resolvedAccountId = resolveAccountIdFromLabel(value);
+      const isAllAccounts =
+        normalizeFilterLabelKey(value) === 'todas las cuentas';
+      if (resolvedAccountId === 'all' && !isAllAccounts) {
+        unresolved.push(`Cuenta no encontrada: ${value}`);
+      }
+      snapshot.selectedAccountId = resolvedAccountId;
       return;
     }
     if (key === 'categoria') {
-      snapshot.selectedCategoryId = resolveCategoryIdFromLabel(value);
+      const resolvedCategoryId = resolveCategoryIdFromLabel(value);
+      const isAllCategories =
+        normalizeFilterLabelKey(value) === 'todas las categorias';
+      if (resolvedCategoryId === 'all' && !isAllCategories) {
+        unresolved.push(`Categoría no encontrada: ${value}`);
+      }
+      snapshot.selectedCategoryId = resolvedCategoryId;
       return;
     }
     if (key === 'importe minimo') {
@@ -3283,7 +3296,8 @@ function parseHistoryFilterSummaryText(rawText = '') {
 
   return {
     snapshot,
-    presetName
+    presetName,
+    unresolved
   };
 }
 
@@ -3361,20 +3375,7 @@ async function pasteHistoryFilterFromText() {
     return;
   }
 
-  const preview = buildHistoryFilterSummary(
-    parsed.snapshot,
-    parsed.presetName || ''
-  );
-  const accepted = confirm(
-    `Se aplicará este filtro:\n\n${preview}\n\n¿Continuar?`
-  );
-  if (!accepted) {
-    showAlert('Pegado cancelado', 'info');
-    return;
-  }
-
-  applyHistoryFiltersSnapshot(parsed.snapshot);
-
+  const unresolved = [...(parsed.unresolved || [])];
   const presetMatch = parsed.presetName
     ? historyFilterPresets.find(
         (item) =>
@@ -3382,6 +3383,26 @@ async function pasteHistoryFilterFromText() {
           parsed.presetName.toLocaleLowerCase('es-ES')
       )
     : null;
+  if (parsed.presetName && !presetMatch) {
+    unresolved.push(`Preset no encontrado: ${parsed.presetName}`);
+  }
+
+  const preview = buildHistoryFilterSummary(
+    parsed.snapshot,
+    parsed.presetName || ''
+  );
+  const unresolvedBlock = unresolved.length
+    ? `\n\nAvisos:\n- ${unresolved.join('\n- ')}`
+    : '';
+  const accepted = confirm(
+    `Se aplicará este filtro:\n\n${preview}${unresolvedBlock}\n\n¿Continuar?`
+  );
+  if (!accepted) {
+    showAlert('Pegado cancelado', 'info');
+    return;
+  }
+
+  applyHistoryFiltersSnapshot(parsed.snapshot);
   renderHistoryPresetSelect(presetMatch?.name || '');
   if (presetMatch?.name) {
     touchRecentHistoryPreset(presetMatch.name);
