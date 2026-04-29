@@ -3018,15 +3018,30 @@ function updateHistorySummary(transactions = []) {
     .filter((tx) => tx.type === 'expense')
     .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
   const balance = income - expense;
+  const totalMovements = transactions.length;
+  const totalAmount = transactions.reduce(
+    (sum, tx) => sum + Number(tx.amount || 0),
+    0
+  );
+  const averageMovement = totalMovements > 0 ? totalAmount / totalMovements : 0;
+  const maxExpense = transactions
+    .filter((tx) => tx.type === 'expense')
+    .reduce((max, tx) => Math.max(max, Number(tx.amount || 0)), 0);
 
   const elBal = $('historySummaryBalance');
   const elInc = $('historySummaryIncome');
   const elExp = $('historySummaryExpense');
   const elCnt = $('historySummaryCount');
+  const elAvg = $('historySummaryAvg');
+  const elMaxExpense = $('historySummaryMaxExpense');
+  const elFilteredTotal = $('historySummaryFilteredTotal');
   if (elBal) elBal.textContent = `${balance.toFixed(2)}€`;
   if (elInc) elInc.textContent = `${income.toFixed(2)}€`;
   if (elExp) elExp.textContent = `${expense.toFixed(2)}€`;
   if (elCnt) elCnt.textContent = String(transactions.length);
+  if (elAvg) elAvg.textContent = `${averageMovement.toFixed(2)}€`;
+  if (elMaxExpense) elMaxExpense.textContent = `${maxExpense.toFixed(2)}€`;
+  if (elFilteredTotal) elFilteredTotal.textContent = `${totalAmount.toFixed(2)}€`;
 }
 
 async function loadHistoryView() {
