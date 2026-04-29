@@ -56,6 +56,17 @@ body {
   overflow-x: hidden;
 }
 
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid rgba(79, 70, 229, 0.5);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+
 .app-container {
   max-width: 480px; /* Centrado para PC, pantalla completa en móvil */
   margin: 0 auto;
@@ -552,6 +563,16 @@ body {
   line-height: 1.1;
   font-weight: 800;
   letter-spacing: -0.01em;
+}
+
+#view-login .login-subtitle {
+  margin: -4px 0 16px;
+  max-width: 320px;
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: rgba(241, 245, 249, 0.92);
+  text-align: center;
 }
 
 #view-login .btn {
@@ -2266,6 +2287,11 @@ body {
   position: relative;
 }
 
+.tab-item:hover {
+  color: #1e293b;
+  background: rgba(255, 255, 255, 0.94);
+}
+
 .tab-item:active {
   transform: scale(0.92);
 }
@@ -2277,10 +2303,24 @@ body {
   font-size: 10px;
   font-weight: 700;
 }
+
 .tab-item.active {
-  color: var(--accent);
-  background: rgba(99, 102, 241, 0.09);
+  color: #312e81;
+  background: #ffffff;
+  border: 1px solid rgba(79, 70, 229, 0.28);
   border-radius: 12px;
+}
+
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 3px;
+  border-radius: 999px;
+  background: #4338ca;
 }
 
 .tab-brand {
@@ -2576,6 +2616,10 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 12px;
+}
+
+.history-empty-state .list-empty-state {
+  margin: 8px 0 0;
 }
 
 .history-empty-action {

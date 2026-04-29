@@ -287,6 +287,10 @@
               </span>
               <span class="login-title-text">Inicio de sesión</span>
             </h2>
+            <p class="login-subtitle">
+              Controla tus gastos y tus ingresos con una vista clara de cada
+              movimiento.
+            </p>
             <div id="loginForm">
               <input
                 id="loginEmail"
@@ -320,6 +324,9 @@
               </span>
               <span class="login-title-text">Crear nueva cuenta</span>
             </h2>
+            <p class="login-subtitle">
+              Empieza en segundos y personaliza tu seguimiento financiero.
+            </p>
             <div id="registerForm">
               <input
                 id="registerEmail"
@@ -1836,6 +1843,9 @@
 
         <button
           class="tab-item active"
+          type="button"
+          data-view="home"
+          aria-current="page"
           onclick="switchView('home', 'Inicio', event)"
         >
           <i class="ph ph-house"></i><span>Inicio</span>
@@ -1843,6 +1853,8 @@
 
         <button
           class="tab-item"
+          type="button"
+          data-view="accounts"
           onclick="switchView('accounts', 'Cuentas', event)"
         >
           <i class="ph ph-wallet"></i><span>Cuentas</span>
@@ -1850,6 +1862,8 @@
 
         <button
           class="tab-item"
+          type="button"
+          data-view="dashboard"
           onclick="switchView('dashboard', 'Resumen', event)"
         >
           <i class="ph ph-chart-line"></i><span>Resumen</span>
@@ -1857,6 +1871,8 @@
 
         <button
           class="tab-item"
+          type="button"
+          data-view="history"
           onclick="switchView('history', 'Historial', event)"
         >
           <i class="ph ph-clock-counter-clockwise"></i><span>Historial</span>
@@ -1866,6 +1882,8 @@
 
         <button
           class="tab-item"
+          type="button"
+          data-view="stats"
           onclick="switchView('stats', 'Presupuestos', event)"
         >
           <i class="ph ph-coins"></i><span>Presupuestos</span>
@@ -1873,6 +1891,8 @@
 
         <button
           class="tab-item"
+          type="button"
+          data-view="reminders"
           onclick="switchView('reminders', 'Recordatorios', event)"
         >
           <i class="ph ph-bell-ringing"></i>
@@ -1884,6 +1904,8 @@
 
         <button
           class="tab-item"
+          type="button"
+          data-view="config"
           onclick="switchView('config', 'Ajustes', event)"
         >
           <i class="ph ph-nut"></i><span>Ajustes</span>

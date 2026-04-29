@@ -1607,6 +1607,19 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
+function renderListEmptyState(iconClass, title, hint = '') {
+  const hintHtml = hint
+    ? `<p class="list-empty-state__hint">${escapeHtml(hint)}</p>`
+    : '';
+  return `
+    <div class="list-empty-state" role="status" aria-live="polite">
+      <span class="list-empty-state__icon" aria-hidden="true"><i class="ph ${escapeHtml(iconClass)}"></i></span>
+      <p class="list-empty-state__msg">${escapeHtml(title)}</p>
+      ${hintHtml}
+    </div>
+  `;
+}
+
 function normalizeColorValue(value, fallback) {
   const input = String(value || '').trim();
   return input || fallback;
@@ -4240,9 +4253,20 @@ async function loadHistoryView() {
         '<button type="button" class="history-empty-action" data-history-reset-range="1">Ver por mes</button>';
     }
 
+    let emptyIcon = 'ph-receipt';
+    let emptyHint =
+      'Añade tu primer movimiento para empezar a construir historial.';
+    if (hasExtraFilters) {
+      emptyIcon = 'ph-funnel';
+      emptyHint = 'Ajusta o limpia filtros para volver a ver resultados.';
+    } else if (rangeActive) {
+      emptyIcon = 'ph-calendar-blank';
+      emptyHint = 'Cambia al modo mensual si prefieres una vista más amplia.';
+    }
+
     txListFull.innerHTML = `
       <div class="history-empty-state">
-        <div class="muted" style="text-align:center;">${emptyMessage}</div>
+        ${renderListEmptyState(emptyIcon, emptyMessage, emptyHint)}
         ${emptyActions}
       </div>
     `;
@@ -6160,7 +6184,11 @@ async function loadHomeAccount() {
     if (txList) {
       txList.innerHTML =
         html ||
-        '<div class="muted" style="text-align:center; margin: 20px 0;">No hay movimientos aún.</div>';
+        renderListEmptyState(
+          'ph-receipt',
+          'No hay movimientos aún.',
+          'Usa el botón + para registrar el primero.'
+        );
 
       // Click handlers
       txList.querySelectorAll('.tx-item').forEach((el) => {
@@ -6886,8 +6914,11 @@ function applyEmptyHomeAccountState(
 
   const txList = $('homeAccountTxList');
   if (txList) {
-    txList.innerHTML =
-      '<div class="muted" style="text-align:center; margin: 20px 0;">No hay movimientos aún.</div>';
+    txList.innerHTML = renderListEmptyState(
+      'ph-receipt',
+      'No hay movimientos aún.',
+      'Cuando registres movimientos, aparecerán aquí.'
+    );
   }
   if (homeSpendDistribution) {
     homeSpendDistribution.innerHTML = buildAccountSpendDistributionCard([]);
@@ -7872,8 +7903,11 @@ async function loadAccountTransactions(accountId) {
     );
 
     if (filtered.length === 0) {
-      txList.innerHTML =
-        '<div class="muted" style="margin: 20px 0; text-align: center;">No hay movimientos en esta cuenta.</div>';
+      txList.innerHTML = renderListEmptyState(
+        'ph-wallet',
+        'No hay movimientos en esta cuenta.',
+        'Puedes añadir uno desde el botón + o transferir saldo.'
+      );
       return;
     }
 
@@ -8040,8 +8074,16 @@ function applyViewChrome(viewId, ev) {
   if (fab) fab.style.display = !isLogin && showTxFab ? '' : 'none';
   document
     .querySelectorAll('.tab-item')
-    .forEach((btn) => btn.classList.remove('active'));
-  if (ev?.currentTarget) ev.currentTarget.classList.add('active');
+    .forEach((btn) => {
+      btn.classList.remove('active');
+      btn.removeAttribute('aria-current');
+    });
+  const activeButton =
+    ev?.currentTarget || document.querySelector(`.tab-item[data-view="${viewId}"]`);
+  if (activeButton) {
+    activeButton.classList.add('active');
+    activeButton.setAttribute('aria-current', 'page');
+  }
 }
 
 function switchView(viewId, title, ev) {
