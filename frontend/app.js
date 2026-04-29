@@ -3076,6 +3076,108 @@ async function exportSelectedHistoryPresetToCSV() {
   touchRecentHistoryPreset(selectedName);
 }
 
+async function copyTextToClipboard(text) {
+  const normalizedText = String(text || '');
+  if (!normalizedText) return false;
+
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(normalizedText);
+    return true;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = normalizedText;
+  textarea.setAttribute('readonly', 'readonly');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  textarea.style.pointerEvents = 'none';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand('copy');
+  textarea.remove();
+  return copied;
+}
+
+function getHistoryTypeLabel(typeValue = 'all') {
+  if (typeValue === 'expense') return 'Gastos';
+  if (typeValue === 'income') return 'Ingresos';
+  return 'Todos';
+}
+
+function getHistoryAccountLabel(accountId = 'all') {
+  if (!accountId || accountId === 'all') return 'Todas las cuentas';
+  const account = state.accounts.find((item) => String(item.id) === String(accountId));
+  return account?.name || accountId;
+}
+
+function getHistoryCategoryLabel(categoryId = 'all') {
+  if (!categoryId || categoryId === 'all') return 'Todas las categorías';
+  const category = state.catsById.get(categoryId);
+  if (!category) return categoryId;
+  const parent = category.parent_id ? state.catsById.get(category.parent_id) : null;
+  return parent ? `${parent.name} > ${category.name}` : category.name;
+}
+
+function buildHistoryFilterSummary(snapshot = {}, presetName = '') {
+  const lines = [];
+  const selectedMonth = snapshot.selectedMonth || $('historyMonth')?.value || getCurrentMonthValue();
+  const hasRange = Boolean(snapshot.rangeStart && snapshot.rangeEnd);
+
+  if (presetName) {
+    lines.push(`Preset: ${presetName}`);
+  } else {
+    lines.push('Filtro actual del historial');
+  }
+
+  lines.push(
+    hasRange
+      ? `Rango: ${snapshot.rangeStart} a ${snapshot.rangeEnd}`
+      : `Mes: ${selectedMonth}`
+  );
+  lines.push(`Tipo: ${getHistoryTypeLabel(snapshot.selectedType || 'all')}`);
+  lines.push(`Cuenta: ${getHistoryAccountLabel(snapshot.selectedAccountId || 'all')}`);
+  lines.push(`Categoría: ${getHistoryCategoryLabel(snapshot.selectedCategoryId || 'all')}`);
+  if (String(snapshot.minAmount || '').trim()) {
+    lines.push(`Importe mínimo: ${String(snapshot.minAmount).trim()}€`);
+  }
+  if (String(snapshot.maxAmount || '').trim()) {
+    lines.push(`Importe máximo: ${String(snapshot.maxAmount).trim()}€`);
+  }
+  if (String(snapshot.searchTerm || '').trim()) {
+    lines.push(`Búsqueda: ${String(snapshot.searchTerm).trim()}`);
+  }
+
+  return lines.join('\n');
+}
+
+async function copyCurrentOrSelectedHistoryFilter() {
+  await Promise.all([ensureAccountsLoaded(), ensureCategoriesLoaded()]);
+
+  const selectedName = String($('historyPresetSelect')?.value || '').trim();
+  const preset = selectedName
+    ? historyFilterPresets.find((item) => item.name === selectedName)
+    : null;
+
+  const snapshot = preset?.filters
+    ? {
+        ...preset.filters,
+        selectedMonth: preset.filters.selectedMonth || $('historyMonth')?.value || getCurrentMonthValue()
+      }
+    : buildHistoryLastState();
+  const summary = buildHistoryFilterSummary(snapshot, preset?.name || '');
+  const copied = await copyTextToClipboard(summary);
+
+  if (!copied) {
+    showAlert('No se pudo copiar el filtro', 'error');
+    return;
+  }
+
+  if (preset?.name) {
+    touchRecentHistoryPreset(preset.name);
+  }
+  showAlert('Filtro copiado', 'success');
+}
+
 function applyHistoryPresetByName(name) {
   const select = $('historyPresetSelect');
   const normalizedName = String(name || '').trim();
@@ -7725,6 +7827,7 @@ function initHistoryListeners() {
   const historyCollapseAllBtn = $('historyCollapseAllBtn');
   const historyExpandAllBtn = $('historyExpandAllBtn');
   const historyExportPresetBtn = $('historyExportPresetBtn');
+  const historyCopyFilterBtn = $('historyCopyFilterBtn');
   syncHistoryRangeUi();
   historyFilterPresets = readHistoryFilterPresets();
   historyRecentPresetNames = readHistoryRecentPresetNames();
@@ -7757,6 +7860,10 @@ function initHistoryListeners() {
   if (historyExportPresetBtn)
     historyExportPresetBtn.addEventListener('click', () => {
       exportSelectedHistoryPresetToCSV();
+    });
+  if (historyCopyFilterBtn)
+    historyCopyFilterBtn.addEventListener('click', () => {
+      copyCurrentOrSelectedHistoryFilter();
     });
   if (historyExportCsvBtn)
     historyExportCsvBtn.addEventListener('click', () => {
