@@ -2993,6 +2993,89 @@ function duplicateSelectedHistoryPreset() {
   showAlert('Filtro duplicado', 'success');
 }
 
+async function exportSelectedHistoryPresetToCSV() {
+  const select = $('historyPresetSelect');
+  if (!select) return;
+
+  const selectedName = String(select.value || '').trim();
+  if (!selectedName) {
+    showAlert('Selecciona un filtro guardado', 'error');
+    return;
+  }
+
+  const preset = historyFilterPresets.find((item) => item.name === selectedName);
+  const snapshot = preset?.filters;
+  if (!snapshot) {
+    showAlert('No se pudo cargar ese filtro guardado', 'error');
+    return;
+  }
+
+  await Promise.all([ensureAccountsLoaded(), ensureCategoriesLoaded()]);
+
+  const selectedMonth = snapshot.selectedMonth || getCurrentMonthValue();
+  const hasRange = Boolean(snapshot.rangeStart && snapshot.rangeEnd);
+  const rangeStart = hasRange
+    ? new Date(`${snapshot.rangeStart}T00:00:00`)
+    : null;
+  const rangeEndExclusive = hasRange
+    ? new Date(`${snapshot.rangeEnd}T00:00:00`)
+    : null;
+  if (rangeEndExclusive && !Number.isNaN(rangeEndExclusive.getTime())) {
+    rangeEndExclusive.setDate(rangeEndExclusive.getDate() + 1);
+  }
+
+  const minAmount = String(snapshot.minAmount || '').trim()
+    ? Number.parseFloat(String(snapshot.minAmount).trim())
+    : null;
+  const rawMaxAmount = String(snapshot.maxAmount || '').trim()
+    ? Number.parseFloat(String(snapshot.maxAmount).trim())
+    : null;
+  const maxAmount =
+    minAmount !== null && rawMaxAmount !== null && minAmount > rawMaxAmount
+      ? minAmount
+      : rawMaxAmount;
+
+  const accountLookup = new Map();
+  state.accounts.forEach((account) => {
+    accountLookup.set(String(account.id), account.name);
+    accountLookup.set(String(account.name), account.name);
+  });
+
+  const selectedAccountId = snapshot.selectedAccountId || 'all';
+  const selectedAccount = state.accounts.find(
+    (account) => account.id === selectedAccountId
+  );
+  const allTransactions = await fetchAllTransactions(
+    hasRange
+      ? {
+          start_date: snapshot.rangeStart,
+          end_date: snapshot.rangeEnd
+        }
+      : { month: selectedMonth }
+  );
+
+  const filters = {
+    selectedMonth,
+    rangeStart,
+    rangeEndExclusive,
+    selectedType: snapshot.selectedType || 'all',
+    selectedAccountId,
+    selectedAccountName: selectedAccount?.name || '',
+    selectedCategoryId: snapshot.selectedCategoryId || 'all',
+    minAmount,
+    maxAmount,
+    searchTerm: String(snapshot.searchTerm || '').trim().toLocaleLowerCase('es-ES'),
+    accountLookup
+  };
+
+  const filtered = sortTransactionsByMostRecent(
+    allTransactions.filter((tx) => matchesHistoryFilters(tx, filters))
+  );
+
+  exportHistoryToCSV(filtered, `preset-${selectedName}`);
+  touchRecentHistoryPreset(selectedName);
+}
+
 function applyHistoryPresetByName(name) {
   const select = $('historyPresetSelect');
   const normalizedName = String(name || '').trim();
@@ -7641,6 +7724,7 @@ function initHistoryListeners() {
   const historyBackDashboardBtn = $('historyBackDashboardBtn');
   const historyCollapseAllBtn = $('historyCollapseAllBtn');
   const historyExpandAllBtn = $('historyExpandAllBtn');
+  const historyExportPresetBtn = $('historyExportPresetBtn');
   syncHistoryRangeUi();
   historyFilterPresets = readHistoryFilterPresets();
   historyRecentPresetNames = readHistoryRecentPresetNames();
@@ -7670,6 +7754,10 @@ function initHistoryListeners() {
     historyBackDashboardBtn
   });
   const historyExportCsvBtn = $('historyExportCsvBtn');
+  if (historyExportPresetBtn)
+    historyExportPresetBtn.addEventListener('click', () => {
+      exportSelectedHistoryPresetToCSV();
+    });
   if (historyExportCsvBtn)
     historyExportCsvBtn.addEventListener('click', () => {
       const monthInput = $('historyMonth');
