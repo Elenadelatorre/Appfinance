@@ -3080,22 +3080,25 @@ async function copyTextToClipboard(text) {
   const normalizedText = String(text || '');
   if (!normalizedText) return false;
 
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(normalizedText);
-    return true;
+  if (!navigator.clipboard?.writeText) return false;
+  await navigator.clipboard.writeText(normalizedText);
+  return true;
+}
+
+async function readTextFromClipboardOrPrompt() {
+  let clipboardText = '';
+  if (navigator.clipboard?.readText) {
+    try {
+      clipboardText = String(await navigator.clipboard.readText() || '').trim();
+    } catch {
+      clipboardText = '';
+    }
   }
 
-  const textarea = document.createElement('textarea');
-  textarea.value = normalizedText;
-  textarea.setAttribute('readonly', 'readonly');
-  textarea.style.position = 'fixed';
-  textarea.style.opacity = '0';
-  textarea.style.pointerEvents = 'none';
-  document.body.appendChild(textarea);
-  textarea.select();
-  const copied = document.execCommand('copy');
-  textarea.remove();
-  return copied;
+  if (clipboardText) return clipboardText;
+  return String(
+    prompt('Pega aquí el texto del filtro:') || ''
+  ).trim();
 }
 
 function getHistoryTypeLabel(typeValue = 'all') {
@@ -3118,36 +3121,195 @@ function getHistoryCategoryLabel(categoryId = 'all') {
   return parent ? `${parent.name} > ${category.name}` : category.name;
 }
 
+function normalizeFilterLabelKey(key = '') {
+  return String(key || '')
+    .trim()
+    .toLocaleLowerCase('es-ES')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function resolveHistoryTypeFromLabel(value = '') {
+  const normalized = String(value || '').trim().toLocaleLowerCase('es-ES');
+  if (normalized === 'gastos' || normalized === 'gasto') return 'expense';
+  if (normalized === 'ingresos' || normalized === 'ingreso') return 'income';
+  return 'all';
+}
+
+function resolveAccountIdFromLabel(value = '') {
+  const normalized = String(value || '').trim();
+  if (!normalized || normalizeFilterLabelKey(normalized) === 'todas las cuentas') {
+    return 'all';
+  }
+
+  const exactMatch = state.accounts.find(
+    (account) => String(account.name || '').trim() === normalized
+  );
+  if (exactMatch) return String(exactMatch.id || 'all');
+
+  const lowerMatch = state.accounts.find(
+    (account) =>
+      String(account.name || '').trim().toLocaleLowerCase('es-ES') ===
+      normalized.toLocaleLowerCase('es-ES')
+  );
+  return lowerMatch ? String(lowerMatch.id || 'all') : 'all';
+}
+
+function resolveCategoryIdFromLabel(value = '') {
+  const normalized = String(value || '').trim();
+  if (!normalized || normalizeFilterLabelKey(normalized) === 'todas las categorias') {
+    return 'all';
+  }
+
+  const parts = normalized.split('>').map((item) => item.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const parentName = parts[0].toLocaleLowerCase('es-ES');
+    const childName = parts[parts.length - 1].toLocaleLowerCase('es-ES');
+    for (const category of state.catsById.values()) {
+      const categoryName = String(category?.name || '').toLocaleLowerCase('es-ES');
+      if (categoryName !== childName) continue;
+      const parent = category.parent_id ? state.catsById.get(category.parent_id) : null;
+      const parentLabel = String(parent?.name || '').toLocaleLowerCase('es-ES');
+      if (parent && parentLabel === parentName) {
+        return String(category._id || 'all');
+      }
+    }
+  }
+
+  for (const category of state.catsById.values()) {
+    if (String(category?.name || '').trim() === normalized) {
+      return String(category._id || 'all');
+    }
+  }
+
+  const lower = normalized.toLocaleLowerCase('es-ES');
+  for (const category of state.catsById.values()) {
+    if (String(category?.name || '').toLocaleLowerCase('es-ES') === lower) {
+      return String(category._id || 'all');
+    }
+  }
+
+  return 'all';
+}
+
+function parseAmountFilterValue(rawValue = '') {
+  const cleaned = String(rawValue || '')
+    .replace(/€/g, '')
+    .replace(/\s/g, '')
+    .replace(',', '.')
+    .trim();
+  if (!cleaned) return '';
+  const parsed = Number.parseFloat(cleaned);
+  return Number.isFinite(parsed) ? String(parsed) : '';
+}
+
+function parseHistoryFilterSummaryText(rawText = '') {
+  const text = String(rawText || '').trim();
+  if (!text) return null;
+
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => String(line || '').trim())
+    .filter(Boolean);
+  if (!lines.length) return null;
+
+  const snapshot = {
+    selectedMonth: getCurrentMonthValue(),
+    selectedType: 'all',
+    selectedAccountId: 'all',
+    selectedCategoryId: 'all',
+    minAmount: '',
+    maxAmount: '',
+    searchTerm: '',
+    rangeStart: '',
+    rangeEnd: '',
+    rangeSource: ''
+  };
+  let presetName = '';
+
+  lines.forEach((line) => {
+    if (!line.includes(':')) {
+      return;
+    }
+
+    const separatorIndex = line.indexOf(':');
+    const key = normalizeFilterLabelKey(line.slice(0, separatorIndex));
+    const value = String(line.slice(separatorIndex + 1) || '').trim();
+    if (!value) return;
+
+    if (key === 'preset') {
+      presetName = value;
+      return;
+    }
+    if (key === 'mes') {
+      if (/^\d{4}-\d{2}$/.test(value)) {
+        snapshot.selectedMonth = value;
+      }
+      return;
+    }
+    if (key === 'rango') {
+      const match = value.match(/^(\d{4}-\d{2}-\d{2})\s+a\s+(\d{4}-\d{2}-\d{2})$/i);
+      if (match) {
+        snapshot.rangeStart = match[1];
+        snapshot.rangeEnd = match[2];
+        snapshot.rangeSource = 'pasted';
+      }
+      return;
+    }
+    if (key === 'tipo') {
+      snapshot.selectedType = resolveHistoryTypeFromLabel(value);
+      return;
+    }
+    if (key === 'cuenta') {
+      snapshot.selectedAccountId = resolveAccountIdFromLabel(value);
+      return;
+    }
+    if (key === 'categoria') {
+      snapshot.selectedCategoryId = resolveCategoryIdFromLabel(value);
+      return;
+    }
+    if (key === 'importe minimo') {
+      snapshot.minAmount = parseAmountFilterValue(value);
+      return;
+    }
+    if (key === 'importe maximo') {
+      snapshot.maxAmount = parseAmountFilterValue(value);
+      return;
+    }
+    if (key === 'busqueda') {
+      snapshot.searchTerm = value;
+    }
+  });
+
+  return {
+    snapshot,
+    presetName
+  };
+}
+
 function buildHistoryFilterSummary(snapshot = {}, presetName = '') {
-  const lines = [];
   const selectedMonth = snapshot.selectedMonth || $('historyMonth')?.value || getCurrentMonthValue();
   const hasRange = Boolean(snapshot.rangeStart && snapshot.rangeEnd);
-
-  if (presetName) {
-    lines.push(`Preset: ${presetName}`);
-  } else {
-    lines.push('Filtro actual del historial');
-  }
-
-  lines.push(
+  const baseLines = [
+    presetName ? `Preset: ${presetName}` : 'Filtro actual del historial',
     hasRange
       ? `Rango: ${snapshot.rangeStart} a ${snapshot.rangeEnd}`
-      : `Mes: ${selectedMonth}`
-  );
-  lines.push(`Tipo: ${getHistoryTypeLabel(snapshot.selectedType || 'all')}`);
-  lines.push(`Cuenta: ${getHistoryAccountLabel(snapshot.selectedAccountId || 'all')}`);
-  lines.push(`Categoría: ${getHistoryCategoryLabel(snapshot.selectedCategoryId || 'all')}`);
-  if (String(snapshot.minAmount || '').trim()) {
-    lines.push(`Importe mínimo: ${String(snapshot.minAmount).trim()}€`);
-  }
-  if (String(snapshot.maxAmount || '').trim()) {
-    lines.push(`Importe máximo: ${String(snapshot.maxAmount).trim()}€`);
-  }
-  if (String(snapshot.searchTerm || '').trim()) {
-    lines.push(`Búsqueda: ${String(snapshot.searchTerm).trim()}`);
-  }
+      : `Mes: ${selectedMonth}`,
+    `Tipo: ${getHistoryTypeLabel(snapshot.selectedType || 'all')}`,
+    `Cuenta: ${getHistoryAccountLabel(snapshot.selectedAccountId || 'all')}`,
+    `Categoría: ${getHistoryCategoryLabel(snapshot.selectedCategoryId || 'all')}`
+  ];
+  const minLine = String(snapshot.minAmount || '').trim()
+    ? [`Importe mínimo: ${String(snapshot.minAmount).trim()}€`]
+    : [];
+  const maxLine = String(snapshot.maxAmount || '').trim()
+    ? [`Importe máximo: ${String(snapshot.maxAmount).trim()}€`]
+    : [];
+  const searchLine = String(snapshot.searchTerm || '').trim()
+    ? [`Búsqueda: ${String(snapshot.searchTerm).trim()}`]
+    : [];
 
-  return lines.join('\n');
+  return [...baseLines, ...minLine, ...maxLine, ...searchLine].join('\n');
 }
 
 async function copyCurrentOrSelectedHistoryFilter() {
@@ -3168,7 +3330,8 @@ async function copyCurrentOrSelectedHistoryFilter() {
   const copied = await copyTextToClipboard(summary);
 
   if (!copied) {
-    showAlert('No se pudo copiar el filtro', 'error');
+    prompt('Tu navegador no permite copiar automáticamente. Copia este texto:', summary);
+    showAlert('Copia manual mostrada', 'info');
     return;
   }
 
@@ -3176,6 +3339,46 @@ async function copyCurrentOrSelectedHistoryFilter() {
     touchRecentHistoryPreset(preset.name);
   }
   showAlert('Filtro copiado', 'success');
+}
+
+async function pasteHistoryFilterFromText() {
+  await Promise.all([
+    ensureAccountsLoaded(),
+    ensureCategoriesLoaded(),
+    populateHistoryAccountFilter(),
+    populateHistoryCategoryFilter()
+  ]);
+
+  const text = await readTextFromClipboardOrPrompt();
+  if (!text) {
+    showAlert('No hay texto para aplicar', 'error');
+    return;
+  }
+
+  const parsed = parseHistoryFilterSummaryText(text);
+  if (!parsed) {
+    showAlert('Formato de filtro no válido', 'error');
+    return;
+  }
+
+  applyHistoryFiltersSnapshot(parsed.snapshot);
+
+  const presetMatch = parsed.presetName
+    ? historyFilterPresets.find(
+        (item) =>
+          item.name.toLocaleLowerCase('es-ES') ===
+          parsed.presetName.toLocaleLowerCase('es-ES')
+      )
+    : null;
+  renderHistoryPresetSelect(presetMatch?.name || '');
+  if (presetMatch?.name) {
+    touchRecentHistoryPreset(presetMatch.name);
+  }
+
+  persistCurrentHistoryState();
+  syncHistoryFilterActivityUi(parsed.snapshot);
+  loadHistoryView();
+  showAlert('Filtro pegado', 'success');
 }
 
 function applyHistoryPresetByName(name) {
@@ -7828,6 +8031,7 @@ function initHistoryListeners() {
   const historyExpandAllBtn = $('historyExpandAllBtn');
   const historyExportPresetBtn = $('historyExportPresetBtn');
   const historyCopyFilterBtn = $('historyCopyFilterBtn');
+  const historyPasteFilterBtn = $('historyPasteFilterBtn');
   syncHistoryRangeUi();
   historyFilterPresets = readHistoryFilterPresets();
   historyRecentPresetNames = readHistoryRecentPresetNames();
@@ -7864,6 +8068,10 @@ function initHistoryListeners() {
   if (historyCopyFilterBtn)
     historyCopyFilterBtn.addEventListener('click', () => {
       copyCurrentOrSelectedHistoryFilter();
+    });
+  if (historyPasteFilterBtn)
+    historyPasteFilterBtn.addEventListener('click', () => {
+      pasteHistoryFilterFromText();
     });
   if (historyExportCsvBtn)
     historyExportCsvBtn.addEventListener('click', () => {
