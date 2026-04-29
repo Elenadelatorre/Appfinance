@@ -2522,7 +2522,8 @@ function readHistoryLastState() {
     return {
       selectedMonth: String(parsed.selectedMonth || '').trim(),
       selectedType: String(parsed.selectedType || 'all').trim() || 'all',
-      selectedAccountId: String(parsed.selectedAccountId || 'all').trim() || 'all',
+      selectedAccountId:
+        String(parsed.selectedAccountId || 'all').trim() || 'all',
       selectedCategoryId:
         String(parsed.selectedCategoryId || 'all').trim() || 'all',
       minAmount: String(parsed.minAmount || '').trim(),
@@ -2607,15 +2608,13 @@ function renderHistoryPresetChips() {
   }
 
   const chipsHtml = validNames
-    .map(
-      (name) => {
-        const label =
-          name === historyFavoritePresetName
-            ? `[Favorito] ${escapeHtml(name)}`
-            : escapeHtml(name);
-        return `<button type="button" class="history-preset-chip" data-history-preset-chip="${escapeHtml(name)}">${label}</button>`;
-      }
-    )
+    .map((name) => {
+      const label =
+        name === historyFavoritePresetName
+          ? `[Favorito] ${escapeHtml(name)}`
+          : escapeHtml(name);
+      return `<button type="button" class="history-preset-chip" data-history-preset-chip="${escapeHtml(name)}">${label}</button>`;
+    })
     .join('');
 
   container.innerHTML = chipsHtml;
@@ -2682,7 +2681,9 @@ function getCurrentHistoryFiltersSnapshot() {
   };
 }
 
-function countActiveHistoryFilters(snapshot = getCurrentHistoryFiltersSnapshot()) {
+function countActiveHistoryFilters(
+  snapshot = getCurrentHistoryFiltersSnapshot()
+) {
   let count = 0;
   if ((snapshot.selectedType || 'all') !== 'all') count += 1;
   if ((snapshot.selectedAccountId || 'all') !== 'all') count += 1;
@@ -2694,7 +2695,9 @@ function countActiveHistoryFilters(snapshot = getCurrentHistoryFiltersSnapshot()
   return count;
 }
 
-function syncHistoryFilterActivityUi(snapshot = getCurrentHistoryFiltersSnapshot()) {
+function syncHistoryFilterActivityUi(
+  snapshot = getCurrentHistoryFiltersSnapshot()
+) {
   const activeMeta = $('historyActiveFiltersMeta');
   const clearBtn = $('historyClearFiltersBtn');
   const activeCount = countActiveHistoryFilters(snapshot);
@@ -2710,7 +2713,10 @@ function syncHistoryFilterActivityUi(snapshot = getCurrentHistoryFiltersSnapshot
   }
 
   if (clearBtn) {
-    clearBtn.classList.toggle('history-results-btn--attention', activeCount > 0);
+    clearBtn.classList.toggle(
+      'history-results-btn--attention',
+      activeCount > 0
+    );
     clearBtn.textContent =
       activeCount > 0 ? `Limpiar filtros (${activeCount})` : 'Limpiar filtros';
   }
@@ -2813,7 +2819,10 @@ function saveCurrentHistoryPreset() {
   saveHistoryPresetWithName(presetName, 'Filtro guardado');
 }
 
-function saveHistoryPresetWithName(presetName, successMessage = 'Filtro guardado') {
+function saveHistoryPresetWithName(
+  presetName,
+  successMessage = 'Filtro guardado'
+) {
   const normalizedName = String(presetName || '').trim();
   if (!normalizedName) return;
 
@@ -2855,7 +2864,9 @@ function saveQuickHistoryPreset() {
   let candidateName = buildQuickHistoryPresetName();
   let suffix = 2;
   while (
-    historyFilterPresets.some((item) => item.name.toLowerCase() === candidateName.toLowerCase())
+    historyFilterPresets.some(
+      (item) => item.name.toLowerCase() === candidateName.toLowerCase()
+    )
   ) {
     candidateName = `${buildQuickHistoryPresetName()} #${suffix}`;
     suffix += 1;
@@ -2869,7 +2880,9 @@ function applySelectedHistoryPreset() {
   const selectedName = String(select.value || '').trim();
   if (!selectedName) return;
 
-  const preset = historyFilterPresets.find((item) => item.name === selectedName);
+  const preset = historyFilterPresets.find(
+    (item) => item.name === selectedName
+  );
   if (!preset?.filters) return;
 
   applyHistoryFiltersSnapshot(preset.filters);
@@ -2917,7 +2930,8 @@ function renameSelectedHistoryPreset() {
 
   const duplicate = historyFilterPresets.some(
     (item) =>
-      item.name.toLowerCase() === newName.toLowerCase() && item.name !== selectedName
+      item.name.toLowerCase() === newName.toLowerCase() &&
+      item.name !== selectedName
   );
   if (duplicate) {
     showAlert('Ya existe un filtro con ese nombre', 'error');
@@ -3005,7 +3019,9 @@ async function exportSelectedHistoryPresetToCSV() {
     return;
   }
 
-  const preset = historyFilterPresets.find((item) => item.name === selectedName);
+  const preset = historyFilterPresets.find(
+    (item) => item.name === selectedName
+  );
   const snapshot = preset?.filters;
   if (!snapshot) {
     showAlert('No se pudo cargar ese filtro guardado', 'error');
@@ -3066,7 +3082,9 @@ async function exportSelectedHistoryPresetToCSV() {
     selectedCategoryId: snapshot.selectedCategoryId || 'all',
     minAmount,
     maxAmount,
-    searchTerm: String(snapshot.searchTerm || '').trim().toLocaleLowerCase('es-ES'),
+    searchTerm: String(snapshot.searchTerm || '')
+      .trim()
+      .toLocaleLowerCase('es-ES'),
     accountLookup
   };
 
@@ -3091,16 +3109,16 @@ async function readTextFromClipboardOrPrompt() {
   let clipboardText = '';
   if (navigator.clipboard?.readText) {
     try {
-      clipboardText = String(await navigator.clipboard.readText() || '').trim();
+      clipboardText = String(
+        (await navigator.clipboard.readText()) || ''
+      ).trim();
     } catch {
       clipboardText = '';
     }
   }
 
   if (clipboardText) return clipboardText;
-  return String(
-    prompt('Pega aquí el texto del filtro:') || ''
-  ).trim();
+  return String(prompt('Pega aquí el texto del filtro:') || '').trim();
 }
 
 function getHistoryTypeLabel(typeValue = 'all') {
@@ -3111,7 +3129,9 @@ function getHistoryTypeLabel(typeValue = 'all') {
 
 function getHistoryAccountLabel(accountId = 'all') {
   if (!accountId || accountId === 'all') return 'Todas las cuentas';
-  const account = state.accounts.find((item) => String(item.id) === String(accountId));
+  const account = state.accounts.find(
+    (item) => String(item.id) === String(accountId)
+  );
   return account?.name || accountId;
 }
 
@@ -3119,7 +3139,9 @@ function getHistoryCategoryLabel(categoryId = 'all') {
   if (!categoryId || categoryId === 'all') return 'Todas las categorías';
   const category = state.catsById.get(categoryId);
   if (!category) return categoryId;
-  const parent = category.parent_id ? state.catsById.get(category.parent_id) : null;
+  const parent = category.parent_id
+    ? state.catsById.get(category.parent_id)
+    : null;
   return parent ? `${parent.name} > ${category.name}` : category.name;
 }
 
@@ -3132,7 +3154,9 @@ function normalizeFilterLabelKey(key = '') {
 }
 
 function resolveHistoryTypeFromLabel(value = '') {
-  const normalized = String(value || '').trim().toLocaleLowerCase('es-ES');
+  const normalized = String(value || '')
+    .trim()
+    .toLocaleLowerCase('es-ES');
   if (normalized === 'gastos' || normalized === 'gasto') return 'expense';
   if (normalized === 'ingresos' || normalized === 'ingreso') return 'income';
   return 'all';
@@ -3140,7 +3164,10 @@ function resolveHistoryTypeFromLabel(value = '') {
 
 function resolveAccountIdFromLabel(value = '') {
   const normalized = String(value || '').trim();
-  if (!normalized || normalizeFilterLabelKey(normalized) === 'todas las cuentas') {
+  if (
+    !normalized ||
+    normalizeFilterLabelKey(normalized) === 'todas las cuentas'
+  ) {
     return 'all';
   }
 
@@ -3151,26 +3178,37 @@ function resolveAccountIdFromLabel(value = '') {
 
   const lowerMatch = state.accounts.find(
     (account) =>
-      String(account.name || '').trim().toLocaleLowerCase('es-ES') ===
-      normalized.toLocaleLowerCase('es-ES')
+      String(account.name || '')
+        .trim()
+        .toLocaleLowerCase('es-ES') === normalized.toLocaleLowerCase('es-ES')
   );
   return lowerMatch ? String(lowerMatch.id || 'all') : 'all';
 }
 
 function resolveCategoryIdFromLabel(value = '') {
   const normalized = String(value || '').trim();
-  if (!normalized || normalizeFilterLabelKey(normalized) === 'todas las categorias') {
+  if (
+    !normalized ||
+    normalizeFilterLabelKey(normalized) === 'todas las categorias'
+  ) {
     return 'all';
   }
 
-  const parts = normalized.split('>').map((item) => item.trim()).filter(Boolean);
+  const parts = normalized
+    .split('>')
+    .map((item) => item.trim())
+    .filter(Boolean);
   if (parts.length >= 2) {
     const parentName = parts[0].toLocaleLowerCase('es-ES');
     const childName = parts[parts.length - 1].toLocaleLowerCase('es-ES');
     for (const category of state.catsById.values()) {
-      const categoryName = String(category?.name || '').toLocaleLowerCase('es-ES');
+      const categoryName = String(category?.name || '').toLocaleLowerCase(
+        'es-ES'
+      );
       if (categoryName !== childName) continue;
-      const parent = category.parent_id ? state.catsById.get(category.parent_id) : null;
+      const parent = category.parent_id
+        ? state.catsById.get(category.parent_id)
+        : null;
       const parentLabel = String(parent?.name || '').toLocaleLowerCase('es-ES');
       if (parent && parentLabel === parentName) {
         return String(category._id || 'all');
@@ -3251,7 +3289,9 @@ function parseHistoryFilterSummaryText(rawText = '') {
       return;
     }
     if (key === 'rango') {
-      const match = value.match(/^(\d{4}-\d{2}-\d{2})\s+a\s+(\d{4}-\d{2}-\d{2})$/i);
+      const match = value.match(
+        /^(\d{4}-\d{2}-\d{2})\s+a\s+(\d{4}-\d{2}-\d{2})$/i
+      );
       if (match) {
         snapshot.rangeStart = match[1];
         snapshot.rangeEnd = match[2];
@@ -3304,7 +3344,10 @@ function parseHistoryFilterSummaryText(rawText = '') {
 }
 
 function buildHistoryFilterSummary(snapshot = {}, presetName = '') {
-  const selectedMonth = snapshot.selectedMonth || $('historyMonth')?.value || getCurrentMonthValue();
+  const selectedMonth =
+    snapshot.selectedMonth ||
+    $('historyMonth')?.value ||
+    getCurrentMonthValue();
   const hasRange = Boolean(snapshot.rangeStart && snapshot.rangeEnd);
   const baseLines = [
     presetName ? `Preset: ${presetName}` : 'Filtro actual del historial',
@@ -3344,7 +3387,8 @@ function syncHistoryUndoPasteButton() {
 
   const count = historyPasteUndoStack.length;
   button.style.display = count > 0 ? '' : 'none';
-  button.textContent = count > 0 ? `Deshacer pegado (${count})` : 'Deshacer pegado';
+  button.textContent =
+    count > 0 ? `Deshacer pegado (${count})` : 'Deshacer pegado';
 }
 
 function captureHistoryUndoStateForPaste() {
@@ -3394,14 +3438,20 @@ async function copyCurrentOrSelectedHistoryFilter() {
   const snapshot = preset?.filters
     ? {
         ...preset.filters,
-        selectedMonth: preset.filters.selectedMonth || $('historyMonth')?.value || getCurrentMonthValue()
+        selectedMonth:
+          preset.filters.selectedMonth ||
+          $('historyMonth')?.value ||
+          getCurrentMonthValue()
       }
     : buildHistoryLastState();
   const summary = buildHistoryFilterSummary(snapshot, preset?.name || '');
   const copied = await copyTextToClipboard(summary);
 
   if (!copied) {
-    prompt('Tu navegador no permite copiar automáticamente. Copia este texto:', summary);
+    prompt(
+      'Tu navegador no permite copiar automáticamente. Copia este texto:',
+      summary
+    );
     showAlert('Copia manual mostrada', 'info');
     return;
   }
@@ -3480,13 +3530,17 @@ async function pasteHistoryFilterFromText() {
 
   if (shouldSaveAsPreset) {
     const suggestedName =
-      parsed.presetName || presetMatch?.name || buildSuggestedPastedPresetName();
+      parsed.presetName ||
+      presetMatch?.name ||
+      buildSuggestedPastedPresetName();
     const chosenName = String(
       prompt('Nombre del preset:', suggestedName) || ''
     ).trim();
     if (chosenName) {
       const existingPreset = historyFilterPresets.find(
-        (item) => item.name.toLocaleLowerCase('es-ES') === chosenName.toLocaleLowerCase('es-ES')
+        (item) =>
+          item.name.toLocaleLowerCase('es-ES') ===
+          chosenName.toLocaleLowerCase('es-ES')
       );
       if (existingPreset) {
         const overwrite = confirm(
@@ -3713,7 +3767,8 @@ function updateHistoryResultsMeta(transactions = [], selectedMonth = '') {
   if (selectionMeta) {
     const selectedCount = getSelectedHistoryTransactions().length;
     selectionMeta.style.display = selectedCount > 0 ? '' : 'none';
-    selectionMeta.textContent = selectedCount > 0 ? `${selectedCount} seleccionados` : '';
+    selectionMeta.textContent =
+      selectedCount > 0 ? `${selectedCount} seleccionados` : '';
   }
   syncHistoryFilterActivityUi();
 }
@@ -3726,7 +3781,9 @@ function pruneHistorySelection(transactions = []) {
 }
 
 function getSelectedHistoryTransactions() {
-  return historyFilteredTxns.filter((tx) => historySelectedTxIds.has(String(tx._id)));
+  return historyFilteredTxns.filter((tx) =>
+    historySelectedTxIds.has(String(tx._id))
+  );
 }
 
 function clearHistorySelection() {
@@ -3984,7 +4041,9 @@ function handleHistoryListChange(event) {
 function selectVisibleHistoryTransactions() {
   const visibleIds = Array.from(
     document.querySelectorAll('#txListFull .tx-item[data-id]')
-  ).map((item) => String(item.dataset.id || '').trim()).filter(Boolean);
+  )
+    .map((item) => String(item.dataset.id || '').trim())
+    .filter(Boolean);
 
   visibleIds.forEach((id) => historySelectedTxIds.add(id));
   updateHistoryResultsMeta(
@@ -4025,7 +4084,8 @@ function updateHistorySummary(transactions = []) {
   if (elCnt) elCnt.textContent = String(transactions.length);
   if (elAvg) elAvg.textContent = `${averageMovement.toFixed(2)}€`;
   if (elMaxExpense) elMaxExpense.textContent = `${maxExpense.toFixed(2)}€`;
-  if (elFilteredTotal) elFilteredTotal.textContent = `${totalAmount.toFixed(2)}€`;
+  if (elFilteredTotal)
+    elFilteredTotal.textContent = `${totalAmount.toFixed(2)}€`;
 }
 
 async function loadHistoryView() {
@@ -4156,9 +4216,11 @@ async function loadHistoryView() {
 
     let emptyActions = '';
     if (hasExtraFilters) {
-      emptyActions = '<button type="button" class="history-empty-action" data-history-empty-clear="1">Quitar filtros</button>';
+      emptyActions =
+        '<button type="button" class="history-empty-action" data-history-empty-clear="1">Quitar filtros</button>';
     } else if (rangeActive) {
-      emptyActions = '<button type="button" class="history-empty-action" data-history-reset-range="1">Ver por mes</button>';
+      emptyActions =
+        '<button type="button" class="history-empty-action" data-history-reset-range="1">Ver por mes</button>';
     }
 
     txListFull.innerHTML = `
@@ -6028,6 +6090,17 @@ async function loadHomeAccount() {
       .map((part) => part.trim())
       .filter(Boolean);
     applyAccountTheme(homeCard, principalAccount);
+    // Chip de fecha en Inicio
+    const welcomeChip = $('homeWelcomeDate');
+    if (welcomeChip) {
+      const now = new Date();
+      welcomeChip.textContent = now.toLocaleDateString('es-ES', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+    }
     const homeBadge = $('homeAccountBadge');
     if (homeBadge) {
       homeBadge.innerHTML = getAccountBadgeMarkup(
@@ -6155,7 +6228,12 @@ async function loadDashboardView() {
           openHistoryFromDashboardCategory(catId, ms);
         };
         row.addEventListener('click', handler);
-        row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); } });
+        row.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handler();
+          }
+        });
       });
     } else if (details) {
       details.innerHTML = `<div class="muted" style="text-align:center; margin: 16px 0;">Aún no hay gastos en este ${periodLabel}.</div>`;

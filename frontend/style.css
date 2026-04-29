@@ -2090,12 +2090,6 @@ body {
   box-shadow: 0 -12px 40px rgba(15, 23, 42, 0.1);
 }
 
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 25px;
-}
 .close-modal {
   background: #f1f5f9;
   border: none;
@@ -4383,6 +4377,98 @@ select.input-field option {
   box-shadow:
     0 16px 36px rgba(15, 23, 42, 0.14),
     0 2px 10px rgba(15, 23, 42, 0.07);
+}
+
+/* =====================================================
+   HOME — chip de fecha + cabecera de bienvenida
+   ===================================================== */
+.home-welcome-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.home-date-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* =====================================================
+   DASHBOARD — ojo de párrafo dentro de la tarjeta
+   ===================================================== */
+.dashboard-card-eyebrow {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+/* =====================================================
+   BTN PEQUEÑO  (btn-sm)
+   ===================================================== */
+.btn.btn-sm,
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 32px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.btn.btn-sm:hover,
+.btn-sm:hover {
+  background: #eef2ff;
+  border-color: rgba(99, 102, 241, 0.35);
+  color: #3730a3;
+}
+
+/* =====================================================
+   MODAL — subtítulo y pie de acciones mejorado
+   ===================================================== */
+.modal-subtitle {
+  margin: -18px 0 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.modal-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-bottom: 20px;
+}
+
+.modal-header-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-content .actions-row {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
 }
 
 @media (max-width: 640px) {

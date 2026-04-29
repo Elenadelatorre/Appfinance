@@ -328,6 +328,9 @@
 
         <!-- HOME - Cuenta Principal -->
         <section id="view-home" class="view fade-in" style="display: none">
+          <div class="home-welcome-row">
+            <span class="home-date-chip" id="homeWelcomeDate"></span>
+          </div>
           <div class="balance-card home-account-card account-detail-card">
             <div class="home-account-corner-actions">
               <button
@@ -393,7 +396,10 @@
           </details>
 
           <div class="section-header">
-            <h3>Movimientos</h3>
+            <div class="section-head-block">
+              <h3>Movimientos</h3>
+              <p class="section-intro">Últimas operaciones de esta cuenta.</p>
+            </div>
           </div>
           <div class="tx-list" id="homeAccountTxList"></div>
         </section>
@@ -401,7 +407,7 @@
         <!-- DASHBOARD - Resumen mensual -->
         <section id="view-dashboard" class="view fade-in" style="display: none">
           <div class="balance-card">
-            <p>Resumen de gastos</p>
+            <p class="dashboard-card-eyebrow">Resumen de gastos</p>
             <div
               class="dashboard-mode-toggle"
               role="tablist"
@@ -1674,13 +1680,17 @@
 
         <!-- REMINDERS -->
         <section id="view-reminders" class="view fade-in" style="display: none">
-          <div class="section-header"><h3>Recordatorios</h3></div>
-          <div class="muted" style="opacity: 0.8">
-            Gestiona pagos de seguros, suscripciones y cualquier cobro
-            pendiente.
+          <div class="section-header">
+            <div class="section-head-block">
+              <h3>Recordatorios</h3>
+              <p class="section-intro">Seguros, suscripciones y cobros pendientes.</p>
+            </div>
+            <button class="btn btn-sm" id="btnToggleReminderForm" type="button">
+              <i class="ph ph-plus"></i> Nuevo
+            </button>
           </div>
 
-          <div class="reminder-editor-card" style="margin-top: 12px">
+          <div class="reminder-editor-card" id="reminderEditorCard" style="margin-top: 12px">
             <div class="reminders-form-grid">
               <input
                 id="reminderTitle"
@@ -1863,8 +1873,11 @@
     <div class="modal" id="modalAddTx" aria-hidden="true">
       <div class="modal-content">
         <div class="modal-header">
-          <h3 class="modal-title">Añadir movimiento</h3>
-          <button class="close-modal" aria-label="Cerrar">✕</button>
+          <div class="modal-header-row">
+            <h3 class="modal-title">Añadir movimiento</h3>
+            <button class="close-modal" aria-label="Cerrar">✕</button>
+          </div>
+          <p class="modal-subtitle">Registra un gasto, ingreso u otro tipo de movimiento.</p>
         </div>
 
         <form id="txForm" onsubmit="return false;">
@@ -1948,8 +1961,11 @@
     <div class="modal" id="modalAddAccount" aria-hidden="true">
       <div class="modal-content">
         <div class="modal-header">
-          <h3 class="modal-title">Añadir cuenta</h3>
-          <button class="close-modal" aria-label="Cerrar">✕</button>
+          <div class="modal-header-row">
+            <h3 class="modal-title">Añadir cuenta</h3>
+            <button class="close-modal" aria-label="Cerrar">✕</button>
+          </div>
+          <p class="modal-subtitle">Banco, efectivo o cualquier otro medio de pago.</p>
         </div>
 
         <form id="accountForm" onsubmit="return false;">
@@ -2074,8 +2090,11 @@
     <div class="modal" id="modalTransfer" aria-hidden="true">
       <div class="modal-content">
         <div class="modal-header">
-          <h3 class="modal-title">Transferir entre cuentas</h3>
-          <button class="close-modal" aria-label="Cerrar">✕</button>
+          <div class="modal-header-row">
+            <h3 class="modal-title">Transferir entre cuentas</h3>
+            <button class="close-modal" aria-label="Cerrar">✕</button>
+          </div>
+          <p class="modal-subtitle">Mueve saldo de una cuenta a otra sin crear movimientos duplicados.</p>
         </div>
 
         <form id="transferForm" onsubmit="return false;">
