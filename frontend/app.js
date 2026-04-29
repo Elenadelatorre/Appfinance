@@ -122,6 +122,7 @@ let backendCapabilitiesPromise = null;
 const collapsedHistoryGroups = new Set();
 let historyFilteredTxns = [];
 let historyVisibleCount = 30;
+const historySelectedTxIds = new Set();
 const HISTORY_PAGE_SIZE = 30;
 
 function applyAutomationApiAvailability() {
@@ -1809,7 +1810,7 @@ function renderTxAccountMeta(tx) {
   return `<span class="tx-account-chip tx-account-chip--fallback"><span class="tx-account-name">${escapeHtml(fallbackAccount)}</span></span>`;
 }
 
-function renderTxItem(tx, includeNote = true) {
+function renderTxItem(tx, includeNote = true, options = {}) {
   const cat = state.catsById.get(tx.category_id);
   const sub = tx.subcategory_id ? state.catsById.get(tx.subcategory_id) : null;
   const transferVisual = getTransferVisual(tx.category_id);
@@ -1822,9 +1823,26 @@ function renderTxItem(tx, includeNote = true) {
   const title = transferVisual ? visual.name : cat?.name || visual.name;
   const runningBalanceAfter = Number(tx?.running_balance_after);
   const showRunningBalance = Number.isFinite(runningBalanceAfter);
+  const isSelectable = Boolean(options.selectable);
+  const isSelected = isSelectable && historySelectedTxIds.has(String(tx._id));
+  const checkedAttribute = isSelected ? 'checked' : '';
+  const selectorHtml = isSelectable
+    ? `
+      <label class="tx-select" aria-label="Seleccionar movimiento">
+        <input
+          type="checkbox"
+          class="tx-select-input"
+          data-history-select="${tx._id}"
+          ${checkedAttribute}
+        />
+        <span class="tx-select-mark" aria-hidden="true"></span>
+      </label>
+    `
+    : '';
 
   return `
-    <div class="tx-item" data-id="${tx._id}">
+    <div class="tx-item${isSelected ? ' is-selected' : ''}" data-id="${tx._id}">
+      ${selectorHtml}
       <div class="tx-main">
         <div class="tx-icon-badge" style="${buildCategoryVisualStyle(visual)}">
           ${renderCategoryVisualContent(visual, 'visual-token-image visual-token-image--tx')}
@@ -2286,7 +2304,9 @@ function renderHistoryGroup(dateKey, transactions = []) {
   }, 0);
   const totalClass = total < 0 ? 'is-expense' : 'is-income';
   const totalLabel = `${total < 0 ? '-' : '+'}${Math.abs(total).toFixed(2)}€`;
-  const itemsHtml = transactions.map((tx) => renderTxItem(tx, true)).join('');
+  const itemsHtml = transactions
+    .map((tx) => renderTxItem(tx, true, { selectable: true }))
+    .join('');
   const isCollapsed = collapsedHistoryGroups.has(dateKey);
 
   return `
@@ -2567,6 +2587,7 @@ function matchesHistoryFilters(tx, filters) {
 
 function updateHistoryResultsMeta(transactions = [], selectedMonth = '') {
   const meta = $('historyResultsMeta');
+  const selectionMeta = $('historySelectionMeta');
   if (!meta) return;
 
   const categoryCount = new Set(
@@ -2591,6 +2612,215 @@ function updateHistoryResultsMeta(transactions = [], selectedMonth = '') {
   }
 
   meta.textContent = `${transactions.length} movimientos · ${categoryCount} categorías · ${monthLabel}`;
+  if (selectionMeta) {
+    const selectedCount = getSelectedHistoryTransactions().length;
+    selectionMeta.style.display = selectedCount > 0 ? '' : 'none';
+    selectionMeta.textContent = selectedCount > 0 ? `${selectedCount} seleccionados` : '';
+  }
+}
+
+function pruneHistorySelection(transactions = []) {
+  const availableIds = new Set(transactions.map((tx) => String(tx._id || '')));
+  Array.from(historySelectedTxIds).forEach((id) => {
+    if (!availableIds.has(id)) historySelectedTxIds.delete(id);
+  });
+}
+
+function getSelectedHistoryTransactions() {
+  return historyFilteredTxns.filter((tx) => historySelectedTxIds.has(String(tx._id)));
+}
+
+function clearHistorySelection() {
+  historySelectedTxIds.clear();
+  updateHistoryResultsMeta(
+    historyFilteredTxns,
+    $('historyMonth')?.value || getCurrentMonthValue()
+  );
+  renderHistoryPage();
+}
+
+function toggleHistorySelection(txId, isSelected) {
+  const normalizedId = String(txId || '').trim();
+  if (!normalizedId) return;
+  if (isSelected) {
+    historySelectedTxIds.add(normalizedId);
+  } else {
+    historySelectedTxIds.delete(normalizedId);
+  }
+  updateHistoryResultsMeta(
+    historyFilteredTxns,
+    $('historyMonth')?.value || getCurrentMonthValue()
+  );
+}
+
+function resetHistoryRangeAndReload() {
+  state.historyRangeStart = '';
+  state.historyRangeEnd = '';
+  state.historyRangeSource = '';
+  syncHistoryRangeUi();
+  loadHistoryView();
+}
+
+function bindHistorySelectionActions({
+  historySelectVisibleBtn,
+  historyClearSelectionBtn,
+  historyExportSelectionBtn
+}) {
+  if (historySelectVisibleBtn) {
+    historySelectVisibleBtn.addEventListener('click', () => {
+      selectVisibleHistoryTransactions();
+    });
+  }
+  if (historyClearSelectionBtn) {
+    historyClearSelectionBtn.addEventListener('click', () => {
+      clearHistorySelection();
+    });
+  }
+  if (historyExportSelectionBtn) {
+    historyExportSelectionBtn.addEventListener('click', () => {
+      const selectedTransactions = getSelectedHistoryTransactions();
+      const monthLabel = $('historyMonth')?.value || getCurrentMonthValue();
+      if (!selectedTransactions.length) {
+        showAlert('Selecciona al menos un movimiento', 'error');
+        return;
+      }
+      exportHistoryToCSV(selectedTransactions, `${monthLabel}-seleccion`);
+    });
+  }
+}
+
+function bindHistoryRangeActions({
+  historyResetRangeBtn,
+  historyBackDashboardBtn
+}) {
+  if (historyResetRangeBtn) {
+    historyResetRangeBtn.addEventListener('click', () => {
+      resetHistoryRangeAndReload();
+    });
+  }
+  if (historyBackDashboardBtn) {
+    historyBackDashboardBtn.addEventListener('click', () => {
+      switchView('dashboard', 'Resumen');
+    });
+  }
+}
+
+function bindHistoryFilterInputs({
+  historyMonth,
+  historyAccountFilter,
+  historyCategoryFilter,
+  historyMinAmount,
+  historyMaxAmount,
+  historySearchInput,
+  historyClearFiltersBtn,
+  historyCollapseAllBtn,
+  historyExpandAllBtn
+}) {
+  if (historyMonth) {
+    historyMonth.addEventListener('change', () => {
+      if (isHistoryRangeActive()) return;
+      loadHistoryView();
+    });
+  }
+  if (historyAccountFilter) {
+    historyAccountFilter.addEventListener('change', () => {
+      loadHistoryView();
+    });
+  }
+  if (historyCategoryFilter) {
+    historyCategoryFilter.addEventListener('change', () => {
+      loadHistoryView();
+    });
+  }
+  if (historyMinAmount) {
+    historyMinAmount.addEventListener('input', () => {
+      scheduleHistoryReload();
+    });
+  }
+  if (historyMaxAmount) {
+    historyMaxAmount.addEventListener('input', () => {
+      scheduleHistoryReload();
+    });
+  }
+  if (historySearchInput) {
+    historySearchInput.addEventListener('input', () => {
+      scheduleHistoryReload();
+    });
+  }
+  if (historyClearFiltersBtn) {
+    historyClearFiltersBtn.addEventListener('click', () => {
+      resetHistoryFilters();
+    });
+  }
+  if (historyCollapseAllBtn) {
+    historyCollapseAllBtn.addEventListener('click', () => {
+      setAllHistoryGroupsCollapsed(true);
+    });
+  }
+  if (historyExpandAllBtn) {
+    historyExpandAllBtn.addEventListener('click', () => {
+      setAllHistoryGroupsCollapsed(false);
+    });
+  }
+}
+
+function handleHistoryListClick(event) {
+  const selector = event.target.closest('.tx-select, .tx-select-input');
+  if (selector) return;
+
+  const loadMoreBtn = event.target.closest('#historyLoadMoreBtn');
+  if (loadMoreBtn) {
+    historyVisibleCount += HISTORY_PAGE_SIZE;
+    renderHistoryPage();
+    return;
+  }
+
+  const clearEmptyBtn = event.target.closest('[data-history-empty-clear]');
+  if (clearEmptyBtn) {
+    resetHistoryFilters();
+    return;
+  }
+
+  const resetRangeEmptyBtn = event.target.closest('[data-history-reset-range]');
+  if (resetRangeEmptyBtn) {
+    resetHistoryRangeAndReload();
+    return;
+  }
+
+  const toggleBtn = event.target.closest('[data-history-toggle]');
+  if (toggleBtn) {
+    toggleHistoryGroup(toggleBtn.dataset.historyToggle || '');
+    return;
+  }
+
+  const txItem = event.target.closest('.tx-item');
+  if (txItem) {
+    const id = txItem.dataset.id;
+    openViewTx(id);
+  }
+}
+
+function handleHistoryListChange(event) {
+  const input = event.target.closest('[data-history-select]');
+  if (!input) return;
+  toggleHistorySelection(input.dataset.historySelect || '', input.checked);
+  const txItem = input.closest('.tx-item');
+  if (txItem) {
+    txItem.classList.toggle('is-selected', input.checked);
+  }
+}
+
+function selectVisibleHistoryTransactions() {
+  const visibleIds = Array.from(
+    document.querySelectorAll('#txListFull .tx-item[data-id]')
+  ).map((item) => String(item.dataset.id || '').trim()).filter(Boolean);
+
+  visibleIds.forEach((id) => historySelectedTxIds.add(id));
+  updateHistoryResultsMeta(
+    historyFilteredTxns,
+    $('historyMonth')?.value || getCurrentMonthValue()
+  );
+  renderHistoryPage();
 }
 
 function updateHistorySummary(transactions = []) {
@@ -2708,6 +2938,8 @@ async function loadHistoryView() {
       allTransactions.filter((tx) => matchesHistoryFilters(tx, filters))
     )
   );
+
+  pruneHistorySelection(filtered);
 
   updateHistorySummary(filtered);
   updateHistoryResultsMeta(filtered, selectedMonth);
@@ -6761,6 +6993,9 @@ function initAccountListeners() {
 function initHistoryListeners() {
   const txListFull = $('txListFull');
   const historyMonth = $('historyMonth');
+  const historySelectVisibleBtn = $('historySelectVisibleBtn');
+  const historyClearSelectionBtn = $('historyClearSelectionBtn');
+  const historyExportSelectionBtn = $('historyExportSelectionBtn');
   const historyAccountFilter = $('historyAccountFilter');
   const historyCategoryFilter = $('historyCategoryFilter');
   const historyMinAmount = $('historyMinAmount');
@@ -6773,57 +7008,26 @@ function initHistoryListeners() {
   const historyCollapseAllBtn = $('historyCollapseAllBtn');
   const historyExpandAllBtn = $('historyExpandAllBtn');
   syncHistoryRangeUi();
-  if (historyMonth)
-    historyMonth.addEventListener('change', () => {
-      if (isHistoryRangeActive()) {
-        return;
-      }
-      loadHistoryView();
-    });
-  if (historyAccountFilter)
-    historyAccountFilter.addEventListener('change', () => {
-      loadHistoryView();
-    });
-  if (historyCategoryFilter)
-    historyCategoryFilter.addEventListener('change', () => {
-      loadHistoryView();
-    });
-  if (historyMinAmount)
-    historyMinAmount.addEventListener('input', () => {
-      scheduleHistoryReload();
-    });
-  if (historyMaxAmount)
-    historyMaxAmount.addEventListener('input', () => {
-      scheduleHistoryReload();
-    });
-  if (historySearchInput)
-    historySearchInput.addEventListener('input', () => {
-      scheduleHistoryReload();
-    });
-  if (historyClearFiltersBtn)
-    historyClearFiltersBtn.addEventListener('click', () => {
-      resetHistoryFilters();
-    });
-  if (historyResetRangeBtn)
-    historyResetRangeBtn.addEventListener('click', () => {
-      state.historyRangeStart = '';
-      state.historyRangeEnd = '';
-      state.historyRangeSource = '';
-      syncHistoryRangeUi();
-      loadHistoryView();
-    });
-  if (historyBackDashboardBtn)
-    historyBackDashboardBtn.addEventListener('click', () => {
-      switchView('dashboard', 'Resumen');
-    });
-  if (historyCollapseAllBtn)
-    historyCollapseAllBtn.addEventListener('click', () => {
-      setAllHistoryGroupsCollapsed(true);
-    });
-  if (historyExpandAllBtn)
-    historyExpandAllBtn.addEventListener('click', () => {
-      setAllHistoryGroupsCollapsed(false);
-    });
+  bindHistoryFilterInputs({
+    historyMonth,
+    historyAccountFilter,
+    historyCategoryFilter,
+    historyMinAmount,
+    historyMaxAmount,
+    historySearchInput,
+    historyClearFiltersBtn,
+    historyCollapseAllBtn,
+    historyExpandAllBtn
+  });
+  bindHistorySelectionActions({
+    historySelectVisibleBtn,
+    historyClearSelectionBtn,
+    historyExportSelectionBtn
+  });
+  bindHistoryRangeActions({
+    historyResetRangeBtn,
+    historyBackDashboardBtn
+  });
   const historyExportCsvBtn = $('historyExportCsvBtn');
   if (historyExportCsvBtn)
     historyExportCsvBtn.addEventListener('click', () => {
@@ -6841,43 +7045,10 @@ function initHistoryListeners() {
       button.classList.add('is-active');
       loadHistoryView();
     });
-  if (txListFull)
-    txListFull.addEventListener('click', (event) => {
-      const loadMoreBtn = event.target.closest('#historyLoadMoreBtn');
-      if (loadMoreBtn) {
-        historyVisibleCount += HISTORY_PAGE_SIZE;
-        renderHistoryPage();
-        return;
-      }
-
-      const clearEmptyBtn = event.target.closest('[data-history-empty-clear]');
-      if (clearEmptyBtn) {
-        resetHistoryFilters();
-        return;
-      }
-
-      const resetRangeEmptyBtn = event.target.closest('[data-history-reset-range]');
-      if (resetRangeEmptyBtn) {
-        state.historyRangeStart = '';
-        state.historyRangeEnd = '';
-        state.historyRangeSource = '';
-        syncHistoryRangeUi();
-        loadHistoryView();
-        return;
-      }
-
-      const toggleBtn = event.target.closest('[data-history-toggle]');
-      if (toggleBtn) {
-        toggleHistoryGroup(toggleBtn.dataset.historyToggle || '');
-        return;
-      }
-
-      const txItem = event.target.closest('.tx-item');
-      if (txItem) {
-        const id = txItem.dataset.id;
-        openViewTx(id);
-      }
-    });
+  if (txListFull) {
+    txListFull.addEventListener('click', handleHistoryListClick);
+    txListFull.addEventListener('change', handleHistoryListChange);
+  }
 }
 
 function initBudgetListeners() {
