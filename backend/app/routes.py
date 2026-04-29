@@ -1143,14 +1143,21 @@ async def list_transactions(
         start, end = month_range(month)
         query["date"] = {"$gte": start, "$lt": end}
 
-    cursor = tx_col().find(query).sort([("date", -1), ("_id", -1)]).skip(skip).limit(limit)
+    cursor = (
+        tx_col().find(query).sort([("date", -1), ("_id", -1)]).skip(skip).limit(limit)
+    )
     transactions = await cursor.to_list(length=limit)
     return [fix_id(t) for t in transactions]
 
 
 @router.get("/transactions/export.csv")
 async def export_transactions_csv(user_id: CurrentUserId):
-    rows = await tx_col().find({"user_id": str(user_id)}).sort([("date", -1), ("_id", -1)]).to_list(5000)
+    rows = (
+        await tx_col()
+        .find({"user_id": str(user_id)})
+        .sort([("date", -1), ("_id", -1)])
+        .to_list(5000)
+    )
 
     buffer = io.StringIO()
     writer = csv.writer(buffer)
