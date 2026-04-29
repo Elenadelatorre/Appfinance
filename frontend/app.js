@@ -38,6 +38,7 @@ function resolveApiBase() {
 const API = resolveApiBase();
 const TRANSACTIONS_PAGE_SIZE = 500;
 const BUDGET_FILTER_STORAGE_KEY = 'budgetStatusFilter';
+const HISTORY_PRESETS_STORAGE_KEY = 'financeApp.history.filterPresets';
 const SETTINGS_DEFAULT_VIEW_KEY = 'financeApp.settings.defaultView';
 const SETTINGS_REDUCE_MOTION_KEY = 'financeApp.settings.reduceMotion';
 const SETTINGS_OPEN_PANEL_KEY = 'financeApp.settings.openPanel';
@@ -123,6 +124,7 @@ const collapsedHistoryGroups = new Set();
 let historyFilteredTxns = [];
 let historyVisibleCount = 30;
 const historySelectedTxIds = new Set();
+let historyFilterPresets = [];
 const HISTORY_PAGE_SIZE = 30;
 
 function applyAutomationApiAvailability() {
@@ -2398,20 +2400,13 @@ function setAllHistoryGroupsCollapsed(collapsed) {
 }
 
 function resetHistoryFilters() {
-  const typeFilters = $('historyTypeFilters');
   const accountFilter = $('historyAccountFilter');
   const categoryFilter = $('historyCategoryFilter');
   const minAmount = $('historyMinAmount');
   const maxAmount = $('historyMaxAmount');
   const searchInput = $('historySearchInput');
 
-  if (typeFilters) {
-    typeFilters
-      .querySelectorAll('.history-filter-btn')
-      .forEach((item) => item.classList.remove('is-active'));
-    const allTypeBtn = typeFilters.querySelector('[data-history-type="all"]');
-    if (allTypeBtn) allTypeBtn.classList.add('is-active');
-  }
+  setSelectedHistoryType('all');
 
   if (accountFilter) accountFilter.value = 'all';
   if (categoryFilter) categoryFilter.value = 'all';
@@ -2428,6 +2423,170 @@ function getSelectedHistoryType() {
     '#historyTypeFilters .history-filter-btn.is-active'
   );
   return active?.dataset.historyType || 'all';
+}
+
+function setSelectedHistoryType(typeValue = 'all') {
+  const typeFilters = $('historyTypeFilters');
+  if (!typeFilters) return;
+
+  typeFilters
+    .querySelectorAll('.history-filter-btn')
+    .forEach((item) => item.classList.remove('is-active'));
+
+  const target = typeFilters.querySelector(
+    `[data-history-type="${CSS.escape(typeValue)}"]`
+  );
+  const fallback = typeFilters.querySelector('[data-history-type="all"]');
+  (target || fallback)?.classList.add('is-active');
+}
+
+function readHistoryFilterPresets() {
+  try {
+    const raw = localStorage.getItem(HISTORY_PRESETS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item) => item && typeof item.name === 'string' && item.filters)
+      .map((item) => ({
+        name: String(item.name).trim(),
+        filters: item.filters
+      }))
+      .filter((item) => item.name);
+  } catch {
+    return [];
+  }
+}
+
+function persistHistoryFilterPresets() {
+  localStorage.setItem(
+    HISTORY_PRESETS_STORAGE_KEY,
+    JSON.stringify(historyFilterPresets)
+  );
+}
+
+function getCurrentHistoryFiltersSnapshot() {
+  return {
+    selectedType: getSelectedHistoryType(),
+    selectedAccountId: $('historyAccountFilter')?.value || 'all',
+    selectedCategoryId: $('historyCategoryFilter')?.value || 'all',
+    minAmount: String($('historyMinAmount')?.value || '').trim(),
+    maxAmount: String($('historyMaxAmount')?.value || '').trim(),
+    searchTerm: String($('historySearchInput')?.value || ''),
+    rangeStart: state.historyRangeStart || '',
+    rangeEnd: state.historyRangeEnd || ''
+  };
+}
+
+function renderHistoryPresetSelect(selectedName = '') {
+  const select = $('historyPresetSelect');
+  if (!select) return;
+
+  const options = ['<option value="">Filtros guardados</option>'];
+  historyFilterPresets.forEach((preset) => {
+    const safeName = escapeHtml(preset.name);
+    options.push(`<option value="${safeName}">${safeName}</option>`);
+  });
+  select.innerHTML = options.join('');
+
+  if (selectedName) {
+    const hasOption = historyFilterPresets.some(
+      (item) => item.name === selectedName
+    );
+    select.value = hasOption ? selectedName : '';
+  }
+}
+
+function applyHistoryFiltersSnapshot(snapshot = {}) {
+  setSelectedHistoryType(snapshot.selectedType || 'all');
+
+  const accountFilter = $('historyAccountFilter');
+  const categoryFilter = $('historyCategoryFilter');
+  const minAmount = $('historyMinAmount');
+  const maxAmount = $('historyMaxAmount');
+  const searchInput = $('historySearchInput');
+
+  if (accountFilter) accountFilter.value = snapshot.selectedAccountId || 'all';
+  if (categoryFilter) {
+    const candidateCategory = snapshot.selectedCategoryId || 'all';
+    const hasCategoryOption = categoryFilter.querySelector(
+      `option[value="${CSS.escape(candidateCategory)}"]`
+    );
+    categoryFilter.value = hasCategoryOption ? candidateCategory : 'all';
+  }
+  if (minAmount) minAmount.value = snapshot.minAmount || '';
+  if (maxAmount) maxAmount.value = snapshot.maxAmount || '';
+  if (searchInput) searchInput.value = snapshot.searchTerm || '';
+
+  const hasRange = Boolean(snapshot.rangeStart && snapshot.rangeEnd);
+  if (hasRange) {
+    state.historyRangeStart = snapshot.rangeStart;
+    state.historyRangeEnd = snapshot.rangeEnd;
+    state.historyRangeSource = 'preset';
+  } else {
+    state.historyRangeStart = '';
+    state.historyRangeEnd = '';
+    state.historyRangeSource = '';
+  }
+  syncHistoryRangeUi();
+}
+
+function saveCurrentHistoryPreset() {
+  const presetName = String(
+    prompt('Nombre para este filtro guardado:') || ''
+  ).trim();
+  if (!presetName) return;
+
+  const snapshot = getCurrentHistoryFiltersSnapshot();
+  const existingIndex = historyFilterPresets.findIndex(
+    (item) => item.name.toLowerCase() === presetName.toLowerCase()
+  );
+
+  if (existingIndex >= 0) {
+    historyFilterPresets[existingIndex] = {
+      name: historyFilterPresets[existingIndex].name,
+      filters: snapshot
+    };
+  } else {
+    historyFilterPresets.push({ name: presetName, filters: snapshot });
+    historyFilterPresets.sort((left, right) =>
+      left.name.localeCompare(right.name, 'es-ES')
+    );
+  }
+
+  persistHistoryFilterPresets();
+  renderHistoryPresetSelect(presetName);
+  showAlert('Filtro guardado', 'success');
+}
+
+function applySelectedHistoryPreset() {
+  const select = $('historyPresetSelect');
+  if (!select) return;
+  const selectedName = String(select.value || '').trim();
+  if (!selectedName) return;
+
+  const preset = historyFilterPresets.find((item) => item.name === selectedName);
+  if (!preset?.filters) return;
+
+  applyHistoryFiltersSnapshot(preset.filters);
+  loadHistoryView();
+}
+
+function deleteSelectedHistoryPreset() {
+  const select = $('historyPresetSelect');
+  if (!select) return;
+  const selectedName = String(select.value || '').trim();
+  if (!selectedName) {
+    showAlert('Selecciona un filtro guardado', 'error');
+    return;
+  }
+
+  historyFilterPresets = historyFilterPresets.filter(
+    (item) => item.name !== selectedName
+  );
+  persistHistoryFilterPresets();
+  renderHistoryPresetSelect('');
+  showAlert('Filtro borrado', 'success');
 }
 
 function getHistorySearchTerm() {
@@ -7030,12 +7189,17 @@ function initHistoryListeners() {
   const historyMaxAmount = $('historyMaxAmount');
   const historySearchInput = $('historySearchInput');
   const historyTypeFilters = $('historyTypeFilters');
+  const historyPresetSelect = $('historyPresetSelect');
+  const historySavePresetBtn = $('historySavePresetBtn');
+  const historyDeletePresetBtn = $('historyDeletePresetBtn');
   const historyClearFiltersBtn = $('historyClearFiltersBtn');
   const historyResetRangeBtn = $('historyResetRangeBtn');
   const historyBackDashboardBtn = $('historyBackDashboardBtn');
   const historyCollapseAllBtn = $('historyCollapseAllBtn');
   const historyExpandAllBtn = $('historyExpandAllBtn');
   syncHistoryRangeUi();
+  historyFilterPresets = readHistoryFilterPresets();
+  renderHistoryPresetSelect();
   bindHistoryFilterInputs({
     historyMonth,
     historyAccountFilter,
@@ -7067,11 +7231,20 @@ function initHistoryListeners() {
     historyTypeFilters.addEventListener('click', (event) => {
       const button = event.target.closest('[data-history-type]');
       if (!button) return;
-      historyTypeFilters
-        .querySelectorAll('.history-filter-btn')
-        .forEach((item) => item.classList.remove('is-active'));
-      button.classList.add('is-active');
+      setSelectedHistoryType(button.dataset.historyType || 'all');
       loadHistoryView();
+    });
+  if (historyPresetSelect)
+    historyPresetSelect.addEventListener('change', () => {
+      applySelectedHistoryPreset();
+    });
+  if (historySavePresetBtn)
+    historySavePresetBtn.addEventListener('click', () => {
+      saveCurrentHistoryPreset();
+    });
+  if (historyDeletePresetBtn)
+    historyDeletePresetBtn.addEventListener('click', () => {
+      deleteSelectedHistoryPreset();
     });
   if (txListFull) {
     txListFull.addEventListener('click', handleHistoryListClick);

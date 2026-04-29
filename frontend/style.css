@@ -2511,6 +2511,12 @@ body {
   min-width: 180px;
 }
 
+.history-preset-select {
+  width: auto;
+  min-width: 170px;
+  max-width: 240px;
+}
+
 .history-amount-input {
   width: 150px;
   min-width: 150px;
