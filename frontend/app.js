@@ -3361,6 +3361,18 @@ async function pasteHistoryFilterFromText() {
     return;
   }
 
+  const preview = buildHistoryFilterSummary(
+    parsed.snapshot,
+    parsed.presetName || ''
+  );
+  const accepted = confirm(
+    `Se aplicará este filtro:\n\n${preview}\n\n¿Continuar?`
+  );
+  if (!accepted) {
+    showAlert('Pegado cancelado', 'info');
+    return;
+  }
+
   applyHistoryFiltersSnapshot(parsed.snapshot);
 
   const presetMatch = parsed.presetName
