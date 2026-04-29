@@ -3760,6 +3760,20 @@ function resetHistoryRangeAndReload() {
   loadHistoryView();
 }
 
+function jumpToCurrentHistoryMonthAndReload() {
+  state.historyRangeStart = '';
+  state.historyRangeEnd = '';
+  state.historyRangeSource = '';
+
+  const monthInput = $('historyMonth');
+  if (monthInput) {
+    monthInput.value = getCurrentMonthValue();
+  }
+
+  syncHistoryRangeUi();
+  loadHistoryView();
+}
+
 function bindHistorySelectionActions({
   historySelectVisibleBtn,
   historyClearSelectionBtn,
@@ -3790,7 +3804,8 @@ function bindHistorySelectionActions({
 
 function bindHistoryRangeActions({
   historyResetRangeBtn,
-  historyBackDashboardBtn
+  historyBackDashboardBtn,
+  historyCurrentMonthBtn
 }) {
   if (historyResetRangeBtn) {
     historyResetRangeBtn.addEventListener('click', () => {
@@ -3800,6 +3815,11 @@ function bindHistoryRangeActions({
   if (historyBackDashboardBtn) {
     historyBackDashboardBtn.addEventListener('click', () => {
       switchView('dashboard', 'Resumen');
+    });
+  }
+  if (historyCurrentMonthBtn) {
+    historyCurrentMonthBtn.addEventListener('click', () => {
+      jumpToCurrentHistoryMonthAndReload();
     });
   }
 }
@@ -8150,6 +8170,7 @@ function initHistoryListeners() {
   const historyClearFiltersBtn = $('historyClearFiltersBtn');
   const historyResetRangeBtn = $('historyResetRangeBtn');
   const historyBackDashboardBtn = $('historyBackDashboardBtn');
+  const historyCurrentMonthBtn = $('historyCurrentMonthBtn');
   const historyCollapseAllBtn = $('historyCollapseAllBtn');
   const historyExpandAllBtn = $('historyExpandAllBtn');
   const historyExportPresetBtn = $('historyExportPresetBtn');
@@ -8182,7 +8203,8 @@ function initHistoryListeners() {
   });
   bindHistoryRangeActions({
     historyResetRangeBtn,
-    historyBackDashboardBtn
+    historyBackDashboardBtn,
+    historyCurrentMonthBtn
   });
   const historyExportCsvBtn = $('historyExportCsvBtn');
   if (historyExportPresetBtn)
