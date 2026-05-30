@@ -1110,6 +1110,7 @@ async def list_transactions(
     cycle: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    account_id: Optional[str] = None,
 ):
     """Lista transacciones. Permite filtrar por mes natural o por ciclo activo."""
     await generate_due_recurring_transactions(str(user_id))
@@ -1122,6 +1123,9 @@ async def list_transactions(
 
     if bool(start_date) != bool(end_date):
         raise BadRequestError("Debes indicar start_date y end_date juntos")
+
+    if account_id:
+        query["account_id"] = str(account_id).strip()
 
     if start_date and end_date:
         try:

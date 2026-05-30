@@ -42,6 +42,8 @@ const HISTORY_PRESETS_STORAGE_KEY = 'financeApp.history.filterPresets';
 const HISTORY_PRESET_RECENTS_STORAGE_KEY = 'financeApp.history.presetRecents';
 const HISTORY_LAST_STATE_STORAGE_KEY = 'financeApp.history.lastState';
 const HISTORY_FAVORITE_PRESET_STORAGE_KEY = 'financeApp.history.favoritePreset';
+const TOKEN_STORAGE_KEY = 'token';
+const REMEMBER_DEVICE_STORAGE_KEY = 'financeApp.auth.rememberDevice';
 const SETTINGS_DEFAULT_VIEW_KEY = 'financeApp.settings.defaultView';
 const SETTINGS_REDUCE_MOTION_KEY = 'financeApp.settings.reduceMotion';
 const SETTINGS_OPEN_PANEL_KEY = 'financeApp.settings.openPanel';
@@ -72,8 +74,57 @@ const REMINDER_RECURRENCE_LABELS = {
   monthly: 'Cada mes',
   yearly: 'Cada año'
 };
-let token = localStorage.getItem('token') || '';
+let token = '';
 const $ = (id) => document.getElementById(id);
+
+function isRememberDeviceEnabled() {
+  return localStorage.getItem(REMEMBER_DEVICE_STORAGE_KEY) === '1';
+}
+
+function setRememberDevicePreference(enabled) {
+  if (enabled) {
+    localStorage.setItem(REMEMBER_DEVICE_STORAGE_KEY, '1');
+    return;
+  }
+  localStorage.removeItem(REMEMBER_DEVICE_STORAGE_KEY);
+}
+
+function readStartupToken() {
+  const remembered = isRememberDeviceEnabled();
+  const sourceStorage = remembered ? localStorage : sessionStorage;
+  const staleStorage = remembered ? sessionStorage : localStorage;
+  staleStorage.removeItem(TOKEN_STORAGE_KEY);
+  return String(sourceStorage.getItem(TOKEN_STORAGE_KEY) || '').trim();
+}
+
+function syncRememberDeviceControl() {
+  const checkbox = $('loginRememberDevice');
+  if (!checkbox) return;
+  checkbox.checked = isRememberDeviceEnabled();
+}
+
+function persistAuthToken(nextToken, rememberDevice = false) {
+  const normalized = String(nextToken || '').trim();
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
+  sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+
+  if (!normalized) {
+    setRememberDevicePreference(false);
+    return;
+  }
+
+  setRememberDevicePreference(Boolean(rememberDevice));
+  if (rememberDevice) {
+    localStorage.setItem(TOKEN_STORAGE_KEY, normalized);
+    return;
+  }
+  sessionStorage.setItem(TOKEN_STORAGE_KEY, normalized);
+}
+
+function clearPersistedAuthToken() {
+  sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
+}
 
 // Estado de la aplicación
 const state = {
@@ -124,6 +175,7 @@ let supportsRemoteSettingsApi = true;
 let supportsAutomationApi = true;
 let backendCapabilitiesLoaded = false;
 let backendCapabilitiesPromise = null;
+let dashboardLoadNonce = 0;
 const collapsedHistoryGroups = new Set();
 let historyFilteredTxns = [];
 let historyVisibleCount = 30;
@@ -134,6 +186,9 @@ let historyFavoritePresetName = '';
 let historyPasteUndoStack = [];
 const HISTORY_PAGE_SIZE = 30;
 const HISTORY_PASTE_UNDO_LIMIT = 3;
+const HISTORY_FETCH_PAGE_BLOCK = 2;
+let historyFetchPages = HISTORY_FETCH_PAGE_BLOCK;
+let historyCanLoadMoreData = false;
 
 function applyAutomationApiAvailability() {
   const panel = document.querySelector('[data-settings-panel="automation"]');
@@ -1862,7 +1917,8 @@ function renderTxItem(tx, includeNote = true, options = {}) {
   const amount = Number(tx.amount || 0).toFixed(2);
   const title = transferVisual ? visual.name : cat?.name || visual.name;
   const runningBalanceAfter = Number(tx?.running_balance_after);
-  const showRunningBalance = Number.isFinite(runningBalanceAfter);
+  const showRunningBalance =
+    options.showRunningBalance !== false && Number.isFinite(runningBalanceAfter);
   const isSelectable = Boolean(options.selectable);
   const isSelected = isSelectable && historySelectedTxIds.has(String(tx._id));
   const checkedAttribute = isSelected ? 'checked' : '';
@@ -2154,10 +2210,16 @@ function buildDashboardSummaryPath() {
   return query ? `/summary/monthly?${query}` : '/summary/monthly';
 }
 
-async function fetchAllTransactions(filters = {}) {
+async function fetchAllTransactions(filters = {}, options = {}) {
   const allTransactions = [];
-  const maxPages = 200;
+  const maxPages = Math.max(1, Number.parseInt(options.maxPages || '200', 10));
+  const maxRecords = Math.max(
+    TRANSACTIONS_PAGE_SIZE,
+    Number.parseInt(options.maxRecords || '100000', 10)
+  );
+  const returnMeta = Boolean(options.returnMeta);
   let skip = 0;
+  let hasMore = false;
 
   for (let page = 0; page < maxPages; page += 1) {
     const params = new URLSearchParams({
@@ -2174,11 +2236,26 @@ async function fetchAllTransactions(filters = {}) {
     if (!Array.isArray(chunk) || chunk.length === 0) break;
 
     allTransactions.push(...chunk);
-    if (chunk.length < TRANSACTIONS_PAGE_SIZE) break;
+    if (allTransactions.length >= maxRecords) {
+      hasMore = true;
+      const items = allTransactions.slice(0, maxRecords);
+      return returnMeta ? { items, hasMore } : items;
+    }
+    if (chunk.length < TRANSACTIONS_PAGE_SIZE) {
+      hasMore = false;
+      break;
+    }
+
+    // Reached page window limit with a full page: likely there is more data.
+    if (page === maxPages - 1) {
+      hasMore = true;
+      break;
+    }
+
     skip += TRANSACTIONS_PAGE_SIZE;
   }
 
-  return allTransactions;
+  return returnMeta ? { items: allTransactions, hasMore } : allTransactions;
 }
 
 function getDashboardTransactionFilters() {
@@ -4033,6 +4110,13 @@ function handleHistoryListClick(event) {
     return;
   }
 
+  const loadMoreDataBtn = event.target.closest('#historyLoadMoreDataBtn');
+  if (loadMoreDataBtn) {
+    historyFetchPages += HISTORY_FETCH_PAGE_BLOCK;
+    loadHistoryView({ preserveFetchWindow: true });
+    return;
+  }
+
   const clearEmptyBtn = event.target.closest('[data-history-empty-clear]');
   if (clearEmptyBtn) {
     resetHistoryFilters();
@@ -4118,7 +4202,7 @@ function updateHistorySummary(transactions = []) {
     elFilteredTotal.textContent = `${totalAmount.toFixed(2)}€`;
 }
 
-async function loadHistoryView() {
+async function loadHistoryView(options = {}) {
   const txListFull = $('txListFull');
   const monthInput = $('historyMonth');
   const accountFilter = $('historyAccountFilter');
@@ -4184,6 +4268,11 @@ async function loadHistoryView() {
     }
   }
   persistCurrentHistoryState();
+
+  if (!options.preserveFetchWindow) {
+    historyFetchPages = HISTORY_FETCH_PAGE_BLOCK;
+  }
+
   const accounts = await ensureAccountsLoaded();
   const accountLookup = new Map();
   accounts.forEach((account) => {
@@ -4193,14 +4282,20 @@ async function loadHistoryView() {
   const selectedAccount = accounts.find(
     (account) => account.id === selectedAccountId
   );
-  const allTransactions = await fetchAllTransactions(
+  const historyData = await fetchAllTransactions(
     rangeActive
       ? {
           start_date: state.historyRangeStart,
           end_date: state.historyRangeEnd
         }
-      : { month: selectedMonth }
+      : { month: selectedMonth },
+    {
+      maxPages: historyFetchPages,
+      returnMeta: true
+    }
   );
+  const allTransactions = historyData?.items || [];
+  historyCanLoadMoreData = Boolean(historyData?.hasMore);
 
   const filters = {
     selectedMonth,
@@ -4271,6 +4366,7 @@ async function loadHistoryView() {
       </div>
     `;
     historyFilteredTxns = [];
+    historyCanLoadMoreData = false;
     return;
   }
 
@@ -4302,7 +4398,12 @@ function renderHistoryPage() {
       ? `<button type="button" id="historyLoadMoreBtn" class="history-load-more-btn">Ver ${Math.min(HISTORY_PAGE_SIZE, remaining)} más · ${remaining} restantes</button>`
       : '';
 
-  txListFull.innerHTML = groupsHtml + loadMoreHtml;
+  const loadMoreDataHtml =
+    remaining <= 0 && historyCanLoadMoreData
+      ? `<button type="button" id="historyLoadMoreDataBtn" class="history-load-more-btn">Cargar más datos del historial</button>`
+      : '';
+
+  txListFull.innerHTML = groupsHtml + loadMoreHtml + loadMoreDataHtml;
 }
 
 function renderCategoryManager() {
@@ -5065,7 +5166,7 @@ async function readErrorMessage(response, fallback) {
  */
 function logout() {
   flushRemoteSettingsSync();
-  localStorage.removeItem('token');
+  clearPersistedAuthToken();
   if (appSettingsSyncTimer) {
     clearTimeout(appSettingsSyncTimer);
     appSettingsSyncTimer = null;
@@ -5096,15 +5197,14 @@ async function hasValidStoredSession() {
     if (res.ok) {
       const me = await res.json().catch(() => null);
       state.user = me;
-      await ensureBackendCapabilities();
-      await fetchRemoteAppSettings();
       renderProfileIdentity();
+      Promise.allSettled([ensureBackendCapabilities(), fetchRemoteAppSettings()]);
       return true;
     }
 
     // Invalid/expired token: clean up silently during startup
     if (res.status === 401) {
-      localStorage.removeItem('token');
+      clearPersistedAuthToken();
       token = '';
       state.user = null;
       renderProfileIdentity();
@@ -5117,6 +5217,14 @@ async function hasValidStoredSession() {
     renderProfileIdentity();
     return false;
   }
+}
+
+async function getAccountsFast() {
+  const cached = Array.isArray(state.accounts) ? state.accounts : [];
+  if (cached.length) return getSortedAccounts(cached);
+  const fresh = getSortedAccounts(await api('/accounts'));
+  state.accounts = fresh;
+  return fresh;
 }
 
 // ---------- Modal ----------
@@ -6001,6 +6109,7 @@ function setAuthSubmitLoading(mode = 'login', isLoading = false) {
 async function login() {
   const email = $('loginEmail')?.value?.trim();
   const password = $('loginPassword')?.value || '';
+  const rememberDevice = Boolean($('loginRememberDevice')?.checked);
   if (!email || !password) {
     showAlert('Introduce email y contraseña', 'error');
     return;
@@ -6020,20 +6129,18 @@ async function login() {
 
     const data = await res.json();
     token = data.access_token;
-    localStorage.setItem('token', token);
+    persistAuthToken(token, rememberDevice);
     if ($('loginPassword')) $('loginPassword').value = '';
-    await hasValidStoredSession();
-
-    // hasValidStoredSession may clear token if /me fails
-    if (!token) {
-      showAlert('No se pudo verificar la sesión. Intenta de nuevo.', 'error');
-      return;
-    }
-
-    // Show app immediately; load data in parallel background
+    // Mostrar app inmediatamente y cargar datos complementarios en segundo plano.
     const startupView = getConfiguredStartView();
     switchView(startupView.id, startupView.title);
-    Promise.all([loadCategoryTree(), loadAccounts()]).catch(() => {});
+    hasValidStoredSession().catch(() => {});
+    Promise.all([
+      loadCategoryTree(),
+      startupView.id === 'home' || startupView.id === 'accounts'
+        ? Promise.resolve()
+        : loadAccounts()
+    ]).catch(() => {});
   } catch (err) {
     // SESSION_EXPIRED y NO_AUTH ya fueron manejados por api() — no mostrar segundo toast
     if (err?.code === 'SESSION_EXPIRED' || err?.code === 'NO_AUTH') return;
@@ -6073,19 +6180,19 @@ async function register() {
     // El endpoint de registro ya devuelve access_token.
     const data = await res.json();
     token = data.access_token;
-    localStorage.setItem('token', token);
+    persistAuthToken(token, false);
     if ($('registerPassword')) $('registerPassword').value = '';
-    await hasValidStoredSession();
 
-    if (!token) {
-      showAlert('No se pudo verificar la sesión. Intenta de nuevo.', 'error');
-      return;
-    }
-
-    // Show app immediately; load data in parallel background
+    // Mostrar app inmediatamente y cargar datos complementarios en segundo plano.
     const startupView = getConfiguredStartView();
     switchView(startupView.id, startupView.title);
-    Promise.all([loadCategoryTree(), loadAccounts()]).catch(() => {});
+    hasValidStoredSession().catch(() => {});
+    Promise.all([
+      loadCategoryTree(),
+      startupView.id === 'home' || startupView.id === 'accounts'
+        ? Promise.resolve()
+        : loadAccounts()
+    ]).catch(() => {});
   } catch (err) {
     if (err?.code === 'SESSION_EXPIRED' || err?.code === 'NO_AUTH') return;
     showAlert('Registro fallido: ' + (err?.message ?? String(err)), 'error');
@@ -6101,8 +6208,7 @@ async function loadHomeAccount() {
     const homeTransferBtn = $('btnHomeTransfer');
     const homeResetBtn = $('btnHomeResetAccount');
     const homeSpendDistribution = $('homeSpendDistribution');
-    const accounts = getSortedAccounts(await api('/accounts'));
-    state.accounts = accounts;
+    const accounts = await getAccountsFast();
     const principalAccount = accounts[0] || null;
 
     if (!principalAccount) {
@@ -6163,22 +6269,29 @@ async function loadHomeAccount() {
     syncHomeResetButton(homeResetBtn, principalAccount);
 
     // Cargar movimientos de esta cuenta
-    const list = await fetchAllTransactions();
-    const filtered = list.filter((t) => {
-      const acc_id = t.account_id || null;
-      return acc_id === principalAccount.id || acc_id === principalAccount.name;
-    });
+    const list = await fetchAllTransactions(
+      {
+        cycle: 'current',
+        account_id: principalAccount.id
+      },
+      {
+        maxPages: 2,
+        maxRecords: 300
+      }
+    );
+    const filtered = list;
 
     if (homeSpendDistribution) {
       homeSpendDistribution.innerHTML =
         buildAccountSpendDistributionCard(filtered);
     }
 
-    // Render home account transactions sorted by most recent
-    const sortedTransactions = annotateTransactionsWithRunningBalances(
-      sortTransactionsByMostRecent(filtered)
-    );
-    const html = sortedTransactions.map((t) => renderTxItem(t, true)).join('');
+    // Render home account transactions sorted by most recent (top 10)
+    const sortedTransactions = sortTransactionsByMostRecent(filtered);
+    const recentTransactions = sortedTransactions.slice(0, 10);
+    const html = recentTransactions
+      .map((t) => renderTxItem(t, true, { showRunningBalance: false }))
+      .join('');
 
     const txList = $('homeAccountTxList');
     if (txList) {
@@ -6189,6 +6302,21 @@ async function loadHomeAccount() {
           'No hay movimientos aún.',
           'Usa el botón + para registrar el primero.'
         );
+
+      if (sortedTransactions.length > 10) {
+        const moreWrap = document.createElement('div');
+        moreWrap.style.display = 'flex';
+        moreWrap.style.justifyContent = 'center';
+        moreWrap.style.marginTop = '10px';
+        moreWrap.innerHTML =
+          '<button type="button" class="btn" id="btnHomeSeeMoreTx">Ver más movimientos</button>';
+        txList.appendChild(moreWrap);
+        $('btnHomeSeeMoreTx')?.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          openViewAccount(principalAccount.id);
+        });
+      }
 
       // Click handlers
       txList.querySelectorAll('.tx-item').forEach((el) => {
@@ -6210,17 +6338,17 @@ async function loadHomeAccount() {
 }
 
 async function loadDashboardView() {
+  const currentLoadNonce = ++dashboardLoadNonce;
+
   try {
-    const [ms, accounts, transactions] = await Promise.all([
+    const [ms, accounts] = await Promise.all([
       api(buildDashboardSummaryPath()),
-      api('/accounts'),
-      fetchAllTransactions(getDashboardTransactionFilters())
+      getAccountsFast()
     ]);
+
+    if (currentLoadNonce !== dashboardLoadNonce) return;
+
     syncDashboardRangeInputs(ms || {});
-    const rangeTransactions = filterTransactionsByDashboardCycle(
-      transactions || [],
-      ms
-    );
     const cycleLabel = formatDashboardCycle(ms);
     const summaryMode =
       state.dashboardSummaryMode === 'compact' ? 'compact' : 'full';
@@ -6288,21 +6416,50 @@ async function loadDashboardView() {
     if (accountsDistribution) {
       accountsDistribution.style.display =
         summaryMode === 'compact' ? 'none' : '';
-      accountsDistribution.innerHTML = buildDashboardAccountSpendCard(
-        accounts || [],
-        rangeTransactions
-      );
 
-      accountsDistribution
-        .querySelectorAll('[data-dashboard-account-id]')
-        .forEach((button) => {
-          button.addEventListener('click', () => {
-            const selectedAccountId = button.dataset.dashboardAccountId || '';
-            state.dashboardSelectedAccountId =
-              selectedAccountId === '__all__' ? null : selectedAccountId;
-            state.dashboardAccountSpendMode = 'all';
-            loadDashboardView();
-          });
+      if (summaryMode === 'compact') {
+        accountsDistribution.innerHTML = '';
+      } else {
+        accountsDistribution.innerHTML =
+          '<div class="muted" style="text-align:center; margin: 12px 0;">Cargando distribución por cuentas...</div>';
+      }
+
+      fetchAllTransactions(getDashboardTransactionFilters(), {
+        maxPages: 8,
+        maxRecords: 2500
+      })
+        .then((transactions) => {
+          if (currentLoadNonce !== dashboardLoadNonce) return;
+          if (state.currentViewId !== 'dashboard') return;
+          if (!accountsDistribution) return;
+
+          const rangeTransactions = filterTransactionsByDashboardCycle(
+            transactions || [],
+            ms
+          );
+          accountsDistribution.innerHTML = buildDashboardAccountSpendCard(
+            accounts || [],
+            rangeTransactions
+          );
+
+          accountsDistribution
+            .querySelectorAll('[data-dashboard-account-id]')
+            .forEach((button) => {
+              button.addEventListener('click', () => {
+                const selectedAccountId =
+                  button.dataset.dashboardAccountId || '';
+                state.dashboardSelectedAccountId =
+                  selectedAccountId === '__all__' ? null : selectedAccountId;
+                state.dashboardAccountSpendMode = 'all';
+                loadDashboardView();
+              });
+            });
+        })
+        .catch(() => {
+          if (currentLoadNonce !== dashboardLoadNonce) return;
+          if (!accountsDistribution) return;
+          accountsDistribution.innerHTML =
+            '<div class="muted" style="text-align:center; margin: 12px 0;">No se pudo cargar la distribución por cuentas.</div>';
         });
     }
   } catch (err) {
@@ -8810,6 +8967,8 @@ function initAuthListeners() {
 
 // ---------- Init ----------
 document.addEventListener('DOMContentLoaded', async () => {
+  token = readStartupToken();
+
   modal = $('modalAddTx');
   attachModalOutsideClose();
   initModalListeners();
@@ -8827,6 +8986,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadAppSettings();
   applyAppSettings();
   updateProfilePasswordFormState();
+  syncRememberDeviceControl();
 
   const hasSession = await hasValidStoredSession();
   if (!hasSession) {
@@ -8834,11 +8994,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  // Show app immediately; load categories + accounts in parallel background
   const startupView = getConfiguredStartView();
   switchView(startupView.id, startupView.title);
 
-  Promise.all([loadCategoryTree(), loadAccounts()])
+  Promise.all([
+    loadCategoryTree(),
+    startupView.id === 'home' || startupView.id === 'accounts'
+      ? Promise.resolve()
+      : loadAccounts()
+  ])
     .then(() => {
       resetCategoryForm({});
       renderCategoryIconPicker();

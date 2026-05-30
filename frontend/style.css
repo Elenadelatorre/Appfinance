@@ -616,6 +616,15 @@ summary:focus-visible {
   text-align: center;
 }
 
+#view-login .login-remember-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 2px;
+  font-size: 13px;
+  color: rgba(241, 245, 249, 0.88);
+}
+
 .account-detail-header {
   display: flex;
   justify-content: space-between;
@@ -3974,6 +3983,102 @@ select.input-field option {
     padding-bottom: 170px;
   }
 
+  #view-login .login-card {
+    min-height: auto;
+    padding: 24px 18px;
+    border-radius: 20px;
+  }
+
+  #view-login .login-title-text {
+    font-size: 24px;
+  }
+
+  #view-login .login-subtitle {
+    margin-bottom: 12px;
+    font-size: 12px;
+  }
+
+  #view-login .auth-switch-copy {
+    line-height: 1.4;
+  }
+
+  #view-login .login-remember-row {
+    align-items: flex-start;
+    line-height: 1.35;
+    margin-top: 6px;
+  }
+
+  #loginRememberDevice {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent-dark);
+  }
+
+  .modal-content {
+    padding: 20px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    border-radius: 20px 20px 0 0;
+  }
+
+  .modal-content .actions-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  #view-login .input,
+  .input-field,
+  .category-input,
+  .dashboard-date-input,
+  .history-account-filter,
+  .history-preset-select,
+  .history-amount-input,
+  .history-search-input,
+  .dashboard-range-btn,
+  .history-filter-btn,
+  .btn,
+  .btn-primary {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .dashboard-range-toolbar,
+  .dashboard-range-actions,
+  .history-filters,
+  .history-filter-group,
+  .transfer-form-tools {
+    width: 100%;
+  }
+
+  .dashboard-date-field {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .dashboard-range-actions,
+  .history-filter-group {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  #view-history .history-results-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .history-account-filter,
+  .history-preset-select,
+  .history-amount-input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .transfer-form-tools {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #btnSwapTransferAccounts {
+    width: 100%;
+  }
+
   .section-header {
     align-items: flex-start;
     gap: 8px;
@@ -4131,6 +4236,21 @@ select.input-field option {
     height: 52px;
     font-size: 22px;
     right: 12px;
+  }
+
+  #view-login .login-card {
+    padding: 20px 14px;
+  }
+
+  #view-login .login-title-text {
+    font-size: 22px;
+  }
+
+  #view-history .history-results-actions,
+  #view-history .history-results-actions .history-results-btn,
+  #view-history .history-results-actions .history-preset-select {
+    width: 100%;
+    max-width: none;
   }
 }
 
