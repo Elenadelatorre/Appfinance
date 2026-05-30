@@ -1796,14 +1796,64 @@ function getTransferVisual(categoryId) {
   return null;
 }
 
+function hasCustomCategoryVisual(category) {
+  if (!category || typeof category !== 'object') return false;
+  const icon = String(category.icon || '').trim();
+  const imageData = String(category.image_data || '').trim();
+  return Boolean(icon || imageData);
+}
+
+function resolveTransactionVisual(tx, category, subcategory) {
+  const transferVisual = getTransferVisual(tx?.category_id);
+  if (transferVisual) {
+    return {
+      visual: transferVisual,
+      title: transferVisual.name,
+      subtitle: ''
+    };
+  }
+
+  const hasSubcategorySelection = Boolean(
+    String(tx?.subcategory_id || '').trim()
+  );
+
+  // If a subcategory was selected, use its visual only when it actually has one.
+  // Otherwise, fallback to the parent category visual to avoid unexpected icon swaps.
+  let sourceForVisual = category || subcategory;
+  if (hasSubcategorySelection && subcategory) {
+    sourceForVisual = hasCustomCategoryVisual(subcategory)
+      ? subcategory
+      : category || subcategory;
+  }
+
+  const visual = getCategoryVisual(sourceForVisual);
+  const title = category?.name || visual.name;
+  const subtitle = hasSubcategorySelection && subcategory ? subcategory.name : '';
+
+  return {
+    visual,
+    title,
+    subtitle: subtitle && subtitle !== title ? subtitle : ''
+  };
+}
+
 function buildCategoryOption(category) {
   const visual = getCategoryVisual(category);
   const label = escapeHtml(visual.icon + ' ' + visual.name);
   return `<option value="${category._id}">${label}</option>`;
 }
 
-function buildSubcategoryOption(category) {
-  const visual = getCategoryVisual(category, '•');
+function buildSubcategoryOption(category, parentCategory = null) {
+  const parentVisual = parentCategory ? getCategoryVisual(parentCategory) : null;
+  const fallbackIcon = parentVisual?.icon || '•';
+  const fallbackColor = parentVisual?.color || '#94a3b8';
+  const hasCustomVisual = hasCustomCategoryVisual(category);
+  const visual = hasCustomVisual
+    ? getCategoryVisual(category, fallbackIcon, fallbackColor)
+    : {
+        ...getCategoryVisual(category, fallbackIcon, fallbackColor),
+        icon: fallbackIcon
+      };
   const label = escapeHtml(visual.icon + ' ' + visual.name);
   return `<option value="${category._id}">${label}</option>`;
 }
@@ -1908,14 +1958,15 @@ function renderTxAccountMeta(tx) {
 function renderTxItem(tx, includeNote = true, options = {}) {
   const cat = state.catsById.get(tx.category_id);
   const sub = tx.subcategory_id ? state.catsById.get(tx.subcategory_id) : null;
-  const transferVisual = getTransferVisual(tx.category_id);
-  const visual = transferVisual || getCategoryVisual(sub || cat);
+  const txVisual = resolveTransactionVisual(tx, cat, sub);
+  const visual = txVisual.visual;
   const date = new Date(tx.date).toLocaleDateString();
   const accountMeta = renderTxAccountMeta(tx);
   const note = (tx.note || '').trim();
   const sign = tx.type === 'expense' ? '-' : '+';
   const amount = Number(tx.amount || 0).toFixed(2);
-  const title = transferVisual ? visual.name : cat?.name || visual.name;
+  const title = txVisual.title;
+  const subtitle = txVisual.subtitle;
   const runningBalanceAfter = Number(tx?.running_balance_after);
   const showRunningBalance =
     options.showRunningBalance !== false &&
@@ -1959,7 +2010,7 @@ function renderTxItem(tx, includeNote = true, options = {}) {
         </div>
         <div class="tx-copy">
           <div class="tx-title">${escapeHtml(title)}</div>
-          ${sub ? `<div class="tx-sub">${escapeHtml(sub.name)}</div>` : ''}
+          ${subtitle ? `<div class="tx-sub">${escapeHtml(subtitle)}</div>` : ''}
           ${includeNote && note ? `<div class="tx-note">${escapeHtml(note)}</div>` : ''}
           <div class="tx-meta-row">
             <div class="tx-meta">${date}</div>
@@ -3742,11 +3793,12 @@ async function populateHistoryCategoryFilter() {
         `<option value="${category._id}">${escapeHtml(categoryLabel)}</option>`
       );
       for (const subcategory of category.subcategories || []) {
-        const subVisual = getCategoryVisual(
-          subcategory,
-          visual.icon,
-          visual.color
-        );
+        const subVisual = hasCustomCategoryVisual(subcategory)
+          ? getCategoryVisual(subcategory, visual.icon, visual.color)
+          : {
+              ...getCategoryVisual(subcategory, visual.icon, visual.color),
+              icon: visual.icon
+            };
         const subcategoryLabel = `↳ ${subVisual.icon} ${subcategory.name}`;
         options.push(
           `<option value="${subcategory._id}">${escapeHtml(subcategoryLabel)}</option>`
@@ -5368,7 +5420,7 @@ function onCategoryChange() {
   subSel.disabled = false;
   subSel.innerHTML =
     `<option value="">(Opcional) Subcategoría</option>` +
-    subs.map((sc) => buildSubcategoryOption(sc)).join('');
+    subs.map((sc) => buildSubcategoryOption(sc, parent)).join('');
 }
 
 function getAllParentCategories() {
@@ -5388,7 +5440,7 @@ function renderRecurringSubcategories(parentId) {
   const subs = parent?.subcategories || [];
   sel.innerHTML =
     `<option value="">Sin subcategoría</option>` +
-    subs.map((item) => buildSubcategoryOption(item)).join('');
+    subs.map((item) => buildSubcategoryOption(item, parent)).join('');
 }
 
 function renderRuleSubcategories(parentId) {
@@ -5398,7 +5450,7 @@ function renderRuleSubcategories(parentId) {
   const subs = parent?.subcategories || [];
   sel.innerHTML =
     `<option value="">Sin subcategoría</option>` +
-    subs.map((item) => buildSubcategoryOption(item)).join('');
+    subs.map((item) => buildSubcategoryOption(item, parent)).join('');
 }
 
 function fillAutomationSelectors() {
