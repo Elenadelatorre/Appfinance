@@ -5287,9 +5287,9 @@ async function hasValidStoredSession() {
   }
 }
 
-async function getAccountsFast() {
+async function getAccountsFast(forceReload = false) {
   const cached = Array.isArray(state.accounts) ? state.accounts : [];
-  if (cached.length) return getSortedAccounts(cached);
+  if (cached.length && !forceReload) return getSortedAccounts(cached);
   const fresh = getSortedAccounts(await api('/accounts'));
   state.accounts = fresh;
   return fresh;
@@ -6111,8 +6111,8 @@ async function saveTx() {
 }
 
 async function refreshAfterTransactionChange(accountId = null) {
-  // Load accounts and home in parallel, not sequentially
-  await Promise.all([loadAccounts(), loadHomeAccount()]);
+  // Reload from backend so Home never stays on stale cached balances.
+  await Promise.all([loadAccounts(), loadHomeAccount({ forceAccountsReload: true })]);
 
   if (state.currentViewId === 'account-detail') {
     const targetAccountId = state.currentAccountId || accountId;
@@ -6282,8 +6282,9 @@ function schedulePostAuthHydration(startupViewId = 'home') {
 }
 
 // ---------- Dashboard ----------
-async function loadHomeAccount() {
+async function loadHomeAccount(options = {}) {
   const currentLoadNonce = ++homeLoadNonce;
+  const forceAccountsReload = Boolean(options.forceAccountsReload);
 
   try {
     const homeCard = document.querySelector('.home-account-card');
@@ -6300,7 +6301,7 @@ async function loadHomeAccount() {
         '<div class="muted" style="text-align:center; margin: 10px 0;">Cargando gasto por categoría...</div>';
     }
 
-    const accounts = await getAccountsFast();
+    const accounts = await getAccountsFast(forceAccountsReload);
     if (currentLoadNonce !== homeLoadNonce) return;
     const principalAccount = accounts[0] || null;
 
@@ -6364,6 +6365,9 @@ async function loadHomeAccount() {
     // Hydrate expensive Home data after first paint to keep login/navigation snappy.
     setTimeout(async () => {
       try {
+        await ensureCategoriesLoaded();
+        if (currentLoadNonce !== homeLoadNonce) return;
+
         const list = await fetchAllTransactions(
           {
             account_id: principalAccount.id
