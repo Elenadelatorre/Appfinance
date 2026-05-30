@@ -625,6 +625,17 @@ summary:focus-visible {
   color: rgba(241, 245, 249, 0.88);
 }
 
+#view-login #loginRememberDevice {
+  -webkit-appearance: checkbox;
+  appearance: auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--accent-dark);
+  flex-shrink: 0;
+}
+
 .account-detail-header {
   display: flex;
   justify-content: space-between;
