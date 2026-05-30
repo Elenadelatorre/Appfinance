@@ -2472,6 +2472,17 @@ function openHistoryFromDashboardCategory(categoryId, summary = {}) {
   switchView('history', 'Historial');
 }
 
+function openHistoryForAccount(accountId) {
+  const normalizedAccountId = String(accountId || '').trim();
+  if (!normalizedAccountId) {
+    switchView('history', 'Historial');
+    return;
+  }
+
+  state.historyPendingAccountId = normalizedAccountId;
+  switchView('history', 'Historial');
+}
+
 function formatHistoryDayLabel(date) {
   return new Intl.DateTimeFormat('es-ES', {
     weekday: 'long',
@@ -6355,7 +6366,6 @@ async function loadHomeAccount() {
       try {
         const list = await fetchAllTransactions(
           {
-            cycle: 'current',
             account_id: principalAccount.id
           },
           {
@@ -6372,7 +6382,18 @@ async function loadHomeAccount() {
             buildAccountSpendDistributionCard(filtered);
         }
 
-        const sortedTransactions = sortTransactionsByMostRecent(filtered);
+        let sortedTransactions = sortTransactionsByMostRecent(filtered);
+        if (sortedTransactions.length === 0) {
+          const globalRecent = await fetchAllTransactions(
+            {},
+            {
+              maxPages: 1,
+              maxRecords: 120
+            }
+          );
+          if (currentLoadNonce !== homeLoadNonce) return;
+          sortedTransactions = sortTransactionsByMostRecent(globalRecent);
+        }
         const recentTransactions = sortedTransactions.slice(0, 10);
         const html = recentTransactions
           .map((t) => renderTxItem(t, true, { showRunningBalance: false }))
@@ -6398,7 +6419,7 @@ async function loadHomeAccount() {
             $('btnHomeSeeMoreTx')?.addEventListener('click', (ev) => {
               ev.preventDefault();
               ev.stopPropagation();
-              openViewAccount(principalAccount.id);
+              openHistoryForAccount(principalAccount.id);
             });
           }
 
