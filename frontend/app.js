@@ -176,6 +176,7 @@ let supportsAutomationApi = true;
 let backendCapabilitiesLoaded = false;
 let backendCapabilitiesPromise = null;
 let dashboardLoadNonce = 0;
+let homeLoadNonce = 0;
 const collapsedHistoryGroups = new Set();
 let historyFilteredTxns = [];
 let historyVisibleCount = 30;
@@ -6271,12 +6272,25 @@ function schedulePostAuthHydration(startupViewId = 'home') {
 
 // ---------- Dashboard ----------
 async function loadHomeAccount() {
+  const currentLoadNonce = ++homeLoadNonce;
+
   try {
     const homeCard = document.querySelector('.home-account-card');
     const homeTransferBtn = $('btnHomeTransfer');
     const homeResetBtn = $('btnHomeResetAccount');
     const homeSpendDistribution = $('homeSpendDistribution');
+    const txList = $('homeAccountTxList');
+
+    if (txList) {
+      txList.innerHTML = '<div class="muted" style="text-align:center; margin: 12px 0;">Cargando movimientos...</div>';
+    }
+    if (homeSpendDistribution) {
+      homeSpendDistribution.innerHTML =
+        '<div class="muted" style="text-align:center; margin: 10px 0;">Cargando gasto por categoría...</div>';
+    }
+
     const accounts = await getAccountsFast();
+    if (currentLoadNonce !== homeLoadNonce) return;
     const principalAccount = accounts[0] || null;
 
     if (!principalAccount) {
@@ -6336,64 +6350,74 @@ async function loadHomeAccount() {
     syncHomeTransferButton(homeTransferBtn, principalAccount);
     syncHomeResetButton(homeResetBtn, principalAccount);
 
-    // Cargar movimientos de esta cuenta
-    const list = await fetchAllTransactions(
-      {
-        cycle: 'current',
-        account_id: principalAccount.id
-      },
-      {
-        maxPages: 2,
-        maxRecords: 300
-      }
-    );
-    const filtered = list;
-
-    if (homeSpendDistribution) {
-      homeSpendDistribution.innerHTML =
-        buildAccountSpendDistributionCard(filtered);
-    }
-
-    // Render home account transactions sorted by most recent (top 10)
-    const sortedTransactions = sortTransactionsByMostRecent(filtered);
-    const recentTransactions = sortedTransactions.slice(0, 10);
-    const html = recentTransactions
-      .map((t) => renderTxItem(t, true, { showRunningBalance: false }))
-      .join('');
-
-    const txList = $('homeAccountTxList');
-    if (txList) {
-      txList.innerHTML =
-        html ||
-        renderListEmptyState(
-          'ph-receipt',
-          'No hay movimientos aún.',
-          'Usa el botón + para registrar el primero.'
+    // Hydrate expensive Home data after first paint to keep login/navigation snappy.
+    setTimeout(async () => {
+      try {
+        const list = await fetchAllTransactions(
+          {
+            cycle: 'current',
+            account_id: principalAccount.id
+          },
+          {
+            maxPages: 2,
+            maxRecords: 300
+          }
         );
 
-      if (sortedTransactions.length > 10) {
-        const moreWrap = document.createElement('div');
-        moreWrap.style.display = 'flex';
-        moreWrap.style.justifyContent = 'center';
-        moreWrap.style.marginTop = '10px';
-        moreWrap.innerHTML =
-          '<button type="button" class="btn" id="btnHomeSeeMoreTx">Ver más movimientos</button>';
-        txList.appendChild(moreWrap);
-        $('btnHomeSeeMoreTx')?.addEventListener('click', (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          openViewAccount(principalAccount.id);
-        });
-      }
+        if (currentLoadNonce !== homeLoadNonce) return;
 
-      // Click handlers
-      txList.querySelectorAll('.tx-item').forEach((el) => {
-        el.addEventListener('click', (e) => {
-          const id = el.dataset.id;
-          openViewTx(id);
-        });
-      });
-    }
+        const filtered = list;
+        if (homeSpendDistribution) {
+          homeSpendDistribution.innerHTML =
+            buildAccountSpendDistributionCard(filtered);
+        }
+
+        const sortedTransactions = sortTransactionsByMostRecent(filtered);
+        const recentTransactions = sortedTransactions.slice(0, 10);
+        const html = recentTransactions
+          .map((t) => renderTxItem(t, true, { showRunningBalance: false }))
+          .join('');
+
+        if (txList) {
+          txList.innerHTML =
+            html ||
+            renderListEmptyState(
+              'ph-receipt',
+              'No hay movimientos aún.',
+              'Usa el botón + para registrar el primero.'
+            );
+
+          if (sortedTransactions.length > 10) {
+            const moreWrap = document.createElement('div');
+            moreWrap.style.display = 'flex';
+            moreWrap.style.justifyContent = 'center';
+            moreWrap.style.marginTop = '10px';
+            moreWrap.innerHTML =
+              '<button type="button" class="btn" id="btnHomeSeeMoreTx">Ver más movimientos</button>';
+            txList.appendChild(moreWrap);
+            $('btnHomeSeeMoreTx')?.addEventListener('click', (ev) => {
+              ev.preventDefault();
+              ev.stopPropagation();
+              openViewAccount(principalAccount.id);
+            });
+          }
+
+          txList.querySelectorAll('.tx-item').forEach((el) => {
+            el.addEventListener('click', () => {
+              const id = el.dataset.id;
+              openViewTx(id);
+            });
+          });
+        }
+      } catch (err) {
+        if (
+          err?.code === 'STALE_AUTH_REQUEST' ||
+          err?.message === 'Sesión caducada. Vuelve a iniciar sesión.'
+        ) {
+          return;
+        }
+      }
+    }, 0);
   } catch (err) {
     if (
       err?.code === 'STALE_AUTH_REQUEST' ||
