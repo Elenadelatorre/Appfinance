@@ -1918,7 +1918,8 @@ function renderTxItem(tx, includeNote = true, options = {}) {
   const title = transferVisual ? visual.name : cat?.name || visual.name;
   const runningBalanceAfter = Number(tx?.running_balance_after);
   const showRunningBalance =
-    options.showRunningBalance !== false && Number.isFinite(runningBalanceAfter);
+    options.showRunningBalance !== false &&
+    Number.isFinite(runningBalanceAfter);
   const isSelectable = Boolean(options.selectable);
   const isSelected = isSelectable && historySelectedTxIds.has(String(tx._id));
   const checkedAttribute = isSelected ? 'checked' : '';
@@ -5198,7 +5199,10 @@ async function hasValidStoredSession() {
       const me = await res.json().catch(() => null);
       state.user = me;
       renderProfileIdentity();
-      Promise.allSettled([ensureBackendCapabilities(), fetchRemoteAppSettings()]);
+      Promise.allSettled([
+        ensureBackendCapabilities(),
+        fetchRemoteAppSettings()
+      ]);
       return true;
     }
 
@@ -8229,14 +8233,13 @@ function applyViewChrome(viewId, ev) {
   if (top) top.style.display = isLogin ? 'none' : '';
   if (tab) tab.style.display = isLogin ? 'none' : '';
   if (fab) fab.style.display = !isLogin && showTxFab ? '' : 'none';
-  document
-    .querySelectorAll('.tab-item')
-    .forEach((btn) => {
-      btn.classList.remove('active');
-      btn.removeAttribute('aria-current');
-    });
+  document.querySelectorAll('.tab-item').forEach((btn) => {
+    btn.classList.remove('active');
+    btn.removeAttribute('aria-current');
+  });
   const activeButton =
-    ev?.currentTarget || document.querySelector(`.tab-item[data-view="${viewId}"]`);
+    ev?.currentTarget ||
+    document.querySelector(`.tab-item[data-view="${viewId}"]`);
   if (activeButton) {
     activeButton.classList.add('active');
     activeButton.setAttribute('aria-current', 'page');

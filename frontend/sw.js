@@ -1,5 +1,11 @@
 const CACHE = 'finance-app-v3';
-const APP_SHELL = ['./', './index.html', './app.js', './style.css', './manifest.webmanifest'];
+const APP_SHELL = [
+  './',
+  './index.html',
+  './app.js',
+  './style.css',
+  './manifest.webmanifest'
+];
 
 globalThis.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(APP_SHELL)));
