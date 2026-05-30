@@ -6190,13 +6190,7 @@ async function login() {
     // Mostrar app inmediatamente y cargar datos complementarios en segundo plano.
     const startupView = getConfiguredStartView();
     switchView(startupView.id, startupView.title);
-    hasValidStoredSession().catch(() => {});
-    Promise.all([
-      loadCategoryTree(),
-      startupView.id === 'home' || startupView.id === 'accounts'
-        ? Promise.resolve()
-        : loadAccounts()
-    ]).catch(() => {});
+    schedulePostAuthHydration(startupView.id);
   } catch (err) {
     // SESSION_EXPIRED y NO_AUTH ya fueron manejados por api() — no mostrar segundo toast
     if (err?.code === 'SESSION_EXPIRED' || err?.code === 'NO_AUTH') return;
@@ -6242,19 +6236,37 @@ async function register() {
     // Mostrar app inmediatamente y cargar datos complementarios en segundo plano.
     const startupView = getConfiguredStartView();
     switchView(startupView.id, startupView.title);
-    hasValidStoredSession().catch(() => {});
-    Promise.all([
-      loadCategoryTree(),
-      startupView.id === 'home' || startupView.id === 'accounts'
-        ? Promise.resolve()
-        : loadAccounts()
-    ]).catch(() => {});
+    schedulePostAuthHydration(startupView.id);
   } catch (err) {
     if (err?.code === 'SESSION_EXPIRED' || err?.code === 'NO_AUTH') return;
     showAlert('Registro fallido: ' + (err?.message ?? String(err)), 'error');
   } finally {
     setAuthSubmitLoading('register', false);
   }
+}
+
+async function refreshSessionMetadataInBackground() {
+  if (!token) return;
+  const { ok, data } = await fetchJsonSilent('/me');
+  if (!ok || !data) return;
+
+  state.user = data;
+  renderProfileIdentity();
+  Promise.allSettled([ensureBackendCapabilities(), fetchRemoteAppSettings()]);
+}
+
+function schedulePostAuthHydration(startupViewId = 'home') {
+  // Keep login transition snappy: hydrate profile/settings shortly after first paint.
+  setTimeout(() => {
+    refreshSessionMetadataInBackground().catch(() => {});
+  }, 220);
+
+  setTimeout(() => {
+    loadCategoryTree().catch(() => {});
+    if (startupViewId !== 'home' && startupViewId !== 'accounts') {
+      loadAccounts().catch(() => {});
+    }
+  }, 420);
 }
 
 // ---------- Dashboard ----------
