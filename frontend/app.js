@@ -6394,7 +6394,9 @@ async function loadHomeAccount() {
           if (currentLoadNonce !== homeLoadNonce) return;
           sortedTransactions = sortTransactionsByMostRecent(globalRecent);
         }
-        const recentTransactions = sortedTransactions.slice(0, 10);
+        const transactionsWithRunningBalance =
+          annotateTransactionsWithRunningBalances(sortedTransactions);
+        const recentTransactions = transactionsWithRunningBalance.slice(0, 10);
         const html = recentTransactions
           .map((t) => renderTxItem(t, true))
           .join('');
