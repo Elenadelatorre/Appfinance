@@ -6396,7 +6396,7 @@ async function loadHomeAccount() {
         }
         const recentTransactions = sortedTransactions.slice(0, 10);
         const html = recentTransactions
-          .map((t) => renderTxItem(t, true, { showRunningBalance: false }))
+          .map((t) => renderTxItem(t, true))
           .join('');
 
         if (txList) {
