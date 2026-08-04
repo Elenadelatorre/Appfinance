@@ -8336,6 +8336,13 @@ async function confirmAndResetAccount(
     `¿Reiniciar la cuenta "${accountName}"? Se borrarán solo sus movimientos y su saldo inicial pasará a 0,00€.`
   );
   if (!ok) return;
+  const confirmationText = prompt(
+    'Para confirmar, escribe REINICIAR en mayúsculas:'
+  );
+  if (confirmationText !== 'REINICIAR') {
+    showAlert('Operación cancelada. No se borró ningún dato.', 'error');
+    return;
+  }
 
   const done = await resetAccount(accountId, accountName);
   if (!done) return;
