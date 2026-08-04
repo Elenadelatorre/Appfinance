@@ -6388,10 +6388,41 @@ async function loadHomeAccount(options = {}) {
         if (currentLoadNonce !== homeLoadNonce) return;
 
         const filtered = list;
-        if (homeSpendDistribution) {
-          homeSpendDistribution.innerHTML =
-            buildAccountSpendDistributionCard(filtered);
+
+        function renderHomeSpendCard() {
+          if (!homeSpendDistribution) return;
+          let txsForSpend = filtered;
+          if (state.homeSpendSinceDate) {
+            const sinceTime = new Date(
+              `${state.homeSpendSinceDate}T00:00:00`
+            ).getTime();
+            txsForSpend = filtered.filter((tx) => {
+              const txTime = new Date(tx.date).getTime();
+              return !isNaN(txTime) && txTime >= sinceTime;
+            });
+          }
+          const controlsHtml = `
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px; opacity:0.85;">
+              Desde
+              <input
+                type="date"
+                id="homeSpendSinceInput"
+                value="${state.homeSpendSinceDate || ''}"
+                style="font-size:12px; padding:2px 4px;"
+              />
+            </label>
+          `;
+          homeSpendDistribution.innerHTML = buildAccountSpendDistributionCard(
+            txsForSpend,
+            { controlsHtml }
+          );
+          $('homeSpendSinceInput')?.addEventListener('change', (ev) => {
+            state.homeSpendSinceDate = ev.target.value || null;
+            renderHomeSpendCard();
+          });
         }
+
+        renderHomeSpendCard();
 
         let sortedTransactions = sortTransactionsByMostRecent(filtered);
         if (sortedTransactions.length === 0) {
