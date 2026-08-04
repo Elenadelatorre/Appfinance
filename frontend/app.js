@@ -1829,7 +1829,8 @@ function resolveTransactionVisual(tx, category, subcategory) {
 
   const visual = getCategoryVisual(sourceForVisual);
   const title = category?.name || visual.name;
-  const subtitle = hasSubcategorySelection && subcategory ? subcategory.name : '';
+  const subtitle =
+    hasSubcategorySelection && subcategory ? subcategory.name : '';
 
   return {
     visual,
@@ -1845,7 +1846,9 @@ function buildCategoryOption(category) {
 }
 
 function buildSubcategoryOption(category, parentCategory = null) {
-  const parentVisual = parentCategory ? getCategoryVisual(parentCategory) : null;
+  const parentVisual = parentCategory
+    ? getCategoryVisual(parentCategory)
+    : null;
   const fallbackIcon = parentVisual?.icon || '•';
   const fallbackColor = parentVisual?.color || '#94a3b8';
   const hasCustomVisual = hasCustomCategoryVisual(category);
@@ -6112,7 +6115,10 @@ async function saveTx() {
 
 async function refreshAfterTransactionChange(accountId = null) {
   // Reload from backend so Home never stays on stale cached balances.
-  await Promise.all([loadAccounts(), loadHomeAccount({ forceAccountsReload: true })]);
+  await Promise.all([
+    loadAccounts(),
+    loadHomeAccount({ forceAccountsReload: true })
+  ]);
 
   if (state.currentViewId === 'account-detail') {
     const targetAccountId = state.currentAccountId || accountId;
@@ -6294,7 +6300,8 @@ async function loadHomeAccount(options = {}) {
     const txList = $('homeAccountTxList');
 
     if (txList) {
-      txList.innerHTML = '<div class="muted" style="text-align:center; margin: 12px 0;">Cargando movimientos...</div>';
+      txList.innerHTML =
+        '<div class="muted" style="text-align:center; margin: 12px 0;">Cargando movimientos...</div>';
     }
     if (homeSpendDistribution) {
       homeSpendDistribution.innerHTML =
@@ -6400,12 +6407,19 @@ async function loadHomeAccount(options = {}) {
         }
         const transactionsWithRunningBalance =
           annotateTransactionsWithRunningBalances(sortedTransactions);
-        const recentTransactions = transactionsWithRunningBalance.slice(0, 10);
-        const html = recentTransactions
-          .map((t) => renderTxItem(t, true))
-          .join('');
+        const HOME_TX_PAGE_SIZE = 10;
+        let homeTxVisibleCount = HOME_TX_PAGE_SIZE;
 
-        if (txList) {
+        function renderHomeTxList() {
+          if (!txList) return;
+          const recentTransactions = transactionsWithRunningBalance.slice(
+            0,
+            homeTxVisibleCount
+          );
+          const html = recentTransactions
+            .map((t) => renderTxItem(t, true))
+            .join('');
+
           txList.innerHTML =
             html ||
             renderListEmptyState(
@@ -6414,7 +6428,7 @@ async function loadHomeAccount(options = {}) {
               'Usa el botón + para registrar el primero.'
             );
 
-          if (sortedTransactions.length > 10) {
+          if (transactionsWithRunningBalance.length > homeTxVisibleCount) {
             const moreWrap = document.createElement('div');
             moreWrap.style.display = 'flex';
             moreWrap.style.justifyContent = 'center';
@@ -6425,7 +6439,8 @@ async function loadHomeAccount(options = {}) {
             $('btnHomeSeeMoreTx')?.addEventListener('click', (ev) => {
               ev.preventDefault();
               ev.stopPropagation();
-              openHistoryForAccount(principalAccount.id);
+              homeTxVisibleCount += HOME_TX_PAGE_SIZE;
+              renderHomeTxList();
             });
           }
 
@@ -6435,6 +6450,10 @@ async function loadHomeAccount(options = {}) {
               openViewTx(id);
             });
           });
+        }
+
+        if (txList) {
+          renderHomeTxList();
         }
       } catch (err) {
         if (
