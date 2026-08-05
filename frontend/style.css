@@ -2607,6 +2607,33 @@ summary:focus-visible {
   color: #3730a3;
 }
 
+.history-more-options-panel {
+  margin: 4px 0 14px;
+}
+
+.history-more-options-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.history-more-options-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-more-options-group-title {
+  flex-basis: 100%;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #64748b);
+  margin-bottom: 2px;
+}
+
 .history-load-more-btn {
   display: block;
   width: 100%;

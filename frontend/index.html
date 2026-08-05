@@ -776,99 +776,6 @@
               ></div>
             </div>
             <div class="history-results-actions">
-              <select
-                id="historyPresetSelect"
-                class="input-field-small history-preset-select"
-                aria-label="Filtros guardados"
-              >
-                <option value="">Filtros guardados</option>
-              </select>
-              <button
-                id="historySavePresetBtn"
-                type="button"
-                class="history-results-btn"
-              >
-                Guardar filtro
-              </button>
-              <button
-                id="historyQuickSavePresetBtn"
-                type="button"
-                class="history-results-btn"
-              >
-                Guardar rápido
-              </button>
-              <button
-                id="historyDeletePresetBtn"
-                type="button"
-                class="history-results-btn"
-              >
-                Borrar filtro
-              </button>
-              <button
-                id="historyRenamePresetBtn"
-                type="button"
-                class="history-results-btn"
-              >
-                Renombrar filtro
-              </button>
-              <button
-                id="historyDuplicatePresetBtn"
-                type="button"
-                class="history-results-btn"
-              >
-                Duplicar filtro
-              </button>
-              <button
-                id="historyToggleFavoritePresetBtn"
-                type="button"
-                class="history-results-btn"
-              >
-                Marcar favorito
-              </button>
-              <button
-                id="historyClearFiltersBtn"
-                type="button"
-                class="history-results-btn history-results-btn--clear"
-              >
-                Limpiar filtros
-              </button>
-              <button
-                id="historySelectVisibleBtn"
-                type="button"
-                class="history-results-btn"
-              >
-                Seleccionar visibles
-              </button>
-              <button
-                id="historyClearSelectionBtn"
-                type="button"
-                class="history-results-btn"
-              >
-                Limpiar selección
-              </button>
-              <button
-                id="historyExportSelectionBtn"
-                type="button"
-                class="history-results-btn history-results-btn--export"
-              >
-                Exportar selección
-              </button>
-              <button
-                id="historyResetRangeBtn"
-                type="button"
-                class="history-results-btn history-results-btn--range"
-                style="display: none"
-              >
-                Ver por mes
-              </button>
-              <button
-                id="historyBackDashboardBtn"
-                type="button"
-                class="history-results-btn history-results-btn--back"
-                style="display: none"
-              >
-                Volver al resumen
-              </button>
               <button
                 id="historyCurrentMonthBtn"
                 type="button"
@@ -891,56 +798,171 @@
                 Mes siguiente
               </button>
               <button
-                id="historyCollapseAllBtn"
+                id="historyResetRangeBtn"
                 type="button"
-                class="history-results-btn"
-              >
-                Plegar todo
-              </button>
-              <button
-                id="historyExpandAllBtn"
-                type="button"
-                class="history-results-btn"
-              >
-                Desplegar todo
-              </button>
-              <button
-                id="historyExportPresetBtn"
-                type="button"
-                class="history-results-btn history-results-btn--export"
-              >
-                Exportar preset
-              </button>
-              <button
-                id="historyCopyFilterBtn"
-                type="button"
-                class="history-results-btn"
-              >
-                Copiar filtro
-              </button>
-              <button
-                id="historyPasteFilterBtn"
-                type="button"
-                class="history-results-btn"
-              >
-                Pegar filtro
-              </button>
-              <button
-                id="historyUndoPasteBtn"
-                type="button"
-                class="history-results-btn"
+                class="history-results-btn history-results-btn--range"
                 style="display: none"
               >
-                Deshacer pegado
+                Ver por mes
               </button>
               <button
-                id="historyExportCsvBtn"
+                id="historyBackDashboardBtn"
                 type="button"
-                class="history-results-btn history-results-btn--export"
+                class="history-results-btn history-results-btn--back"
+                style="display: none"
               >
-                Exportar CSV
+                Volver al resumen
+              </button>
+              <button
+                id="historyClearFiltersBtn"
+                type="button"
+                class="history-results-btn history-results-btn--clear"
+              >
+                Limpiar filtros
               </button>
             </div>
+            <details class="account-spend-panel history-more-options-panel">
+              <summary class="account-spend-panel-summary">
+                Más opciones
+              </summary>
+              <div class="history-more-options-grid">
+                <div class="history-more-options-group">
+                  <span class="history-more-options-group-title"
+                    >Filtros guardados</span
+                  >
+                  <select
+                    id="historyPresetSelect"
+                    class="input-field-small history-preset-select"
+                    aria-label="Filtros guardados"
+                  >
+                    <option value="">Filtros guardados</option>
+                  </select>
+                  <button
+                    id="historySavePresetBtn"
+                    type="button"
+                    class="history-results-btn"
+                  >
+                    Guardar filtro
+                  </button>
+                  <button
+                    id="historyQuickSavePresetBtn"
+                    type="button"
+                    class="history-results-btn"
+                  >
+                    Guardar rápido
+                  </button>
+                  <button
+                    id="historyDeletePresetBtn"
+                    type="button"
+                    class="history-results-btn"
+                  >
+                    Borrar filtro
+                  </button>
+                  <button
+                    id="historyRenamePresetBtn"
+                    type="button"
+                    class="history-results-btn"
+                  >
+                    Renombrar filtro
+                  </button>
+                  <button
+                    id="historyDuplicatePresetBtn"
+                    type="button"
+                    class="history-results-btn"
+                  >
+                    Duplicar filtro
+                  </button>
+                  <button
+                    id="historyToggleFavoritePresetBtn"
+                    type="button"
+                    class="history-results-btn"
+                  >
+                    Marcar favorito
+                  </button>
+                  <button
+                    id="historyExportPresetBtn"
+                    type="button"
+                    class="history-results-btn history-results-btn--export"
+                  >
+                    Exportar preset
+                  </button>
+                  <button
+                    id="historyCopyFilterBtn"
+                    type="button"
+                    class="history-results-btn"
+                  >
+                    Copiar filtro
+                  </button>
+                  <button
+                    id="historyPasteFilterBtn"
+                    type="button"
+                    class="history-results-btn"
+                  >
+                    Pegar filtro
+                  </button>
+                  <button
+                    id="historyUndoPasteBtn"
+                    type="button"
+                    class="history-results-btn"
+                    style="display: none"
+                  >
+                    Deshacer pegado
+                  </button>
+                </div>
+                <div class="history-more-options-group">
+                  <span class="history-more-options-group-title"
+                    >Selección y exportación</span
+                  >
+                  <button
+                    id="historySelectVisibleBtn"
+                    type="button"
+                    class="history-results-btn"
+                  >
+                    Seleccionar visibles
+                  </button>
+                  <button
+                    id="historyClearSelectionBtn"
+                    type="button"
+                    class="history-results-btn"
+                  >
+                    Limpiar selección
+                  </button>
+                  <button
+                    id="historyExportSelectionBtn"
+                    type="button"
+                    class="history-results-btn history-results-btn--export"
+                  >
+                    Exportar selección
+                  </button>
+                  <button
+                    id="historyExportCsvBtn"
+                    type="button"
+                    class="history-results-btn history-results-btn--export"
+                  >
+                    Exportar CSV
+                  </button>
+                </div>
+                <div class="history-more-options-group">
+                  <span class="history-more-options-group-title"
+                    >Vista de la lista</span
+                  >
+                  <button
+                    id="historyCollapseAllBtn"
+                    type="button"
+                    class="history-results-btn"
+                  >
+                    Plegar todo
+                  </button>
+                  <button
+                    id="historyExpandAllBtn"
+                    type="button"
+                    class="history-results-btn"
+                  >
+                    Desplegar todo
+                  </button>
+                </div>
+              </div>
+            </details>
           </div>
           <div class="tx-list" id="txListFull"></div>
         </section>

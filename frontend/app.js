@@ -1829,8 +1829,7 @@ function resolveTransactionVisual(tx, category, subcategory) {
 
   const visual = getCategoryVisual(sourceForVisual);
   const title = category?.name || visual.name;
-  const subtitle =
-    hasSubcategorySelection && subcategory ? subcategory.name : '';
+  const subtitle = hasSubcategorySelection && subcategory ? subcategory.name : '';
 
   return {
     visual,
@@ -1846,9 +1845,7 @@ function buildCategoryOption(category) {
 }
 
 function buildSubcategoryOption(category, parentCategory = null) {
-  const parentVisual = parentCategory
-    ? getCategoryVisual(parentCategory)
-    : null;
+  const parentVisual = parentCategory ? getCategoryVisual(parentCategory) : null;
   const fallbackIcon = parentVisual?.icon || '•';
   const fallbackColor = parentVisual?.color || '#94a3b8';
   const hasCustomVisual = hasCustomCategoryVisual(category);
@@ -6115,10 +6112,7 @@ async function saveTx() {
 
 async function refreshAfterTransactionChange(accountId = null) {
   // Reload from backend so Home never stays on stale cached balances.
-  await Promise.all([
-    loadAccounts(),
-    loadHomeAccount({ forceAccountsReload: true })
-  ]);
+  await Promise.all([loadAccounts(), loadHomeAccount({ forceAccountsReload: true })]);
 
   if (state.currentViewId === 'account-detail') {
     const targetAccountId = state.currentAccountId || accountId;
@@ -6300,8 +6294,7 @@ async function loadHomeAccount(options = {}) {
     const txList = $('homeAccountTxList');
 
     if (txList) {
-      txList.innerHTML =
-        '<div class="muted" style="text-align:center; margin: 12px 0;">Cargando movimientos...</div>';
+      txList.innerHTML = '<div class="muted" style="text-align:center; margin: 12px 0;">Cargando movimientos...</div>';
     }
     if (homeSpendDistribution) {
       homeSpendDistribution.innerHTML =
@@ -8343,6 +8336,7 @@ async function confirmAndResetAccount(
     `¿Reiniciar la cuenta "${accountName}"? Se borrarán solo sus movimientos y su saldo inicial pasará a 0,00€.`
   );
   if (!ok) return;
+
   const confirmationText = prompt(
     'Para confirmar, escribe REINICIAR en mayúsculas:'
   );
