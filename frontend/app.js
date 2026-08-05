@@ -7965,6 +7965,13 @@ async function openViewAccount(accountId) {
         if (
           confirm(`¿Eliminar la cuenta "${acc.name}"? No podrás recuperarla.`)
         ) {
+          const confirmationText = prompt(
+            'Para confirmar, escribe ELIMINAR en mayúsculas:'
+          );
+          if (confirmationText !== 'ELIMINAR') {
+            showAlert('Operación cancelada. No se eliminó la cuenta.', 'error');
+            return;
+          }
           await deleteAccount(accountId);
           backToAccounts();
         }
