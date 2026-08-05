@@ -1,17 +1,15 @@
-/**
- * Finance App - API Client & Main Logic
- * Aplicación de gestión financiera personal
- */
-
+// Configuración inicial de almacenamiento y URLs de la API.
 const API_STORAGE_KEY = 'financeApiBaseUrl';
 const DEFAULT_LOCAL_API = 'http://127.0.0.1:8001';
 
+// Limpia y normaliza una URL base eliminando espacios y barras finales.
 function normalizeApiBase(value) {
   const cleaned = String(value || '').trim();
   if (!cleaned) return '';
   return cleaned.replace(/\/+$/, '');
 }
 
+// Determina cuál es la URL base de la API que la app debe usar para conectarse al backend.
 function resolveApiBase() {
   const params = new URLSearchParams(globalThis.location.search);
   const fromQuery = normalizeApiBase(params.get('api'));
@@ -35,8 +33,11 @@ function resolveApiBase() {
   return isLocal ? DEFAULT_LOCAL_API : '';
 }
 
+// Inicialización de la URL de la API y constantes de la aplicación.
 const API = resolveApiBase();
 const TRANSACTIONS_PAGE_SIZE = 500;
+
+// Claves de almacenamiento local (LocalStorage Keys).
 const BUDGET_FILTER_STORAGE_KEY = 'budgetStatusFilter';
 const HISTORY_PRESETS_STORAGE_KEY = 'financeApp.history.filterPresets';
 const HISTORY_PRESET_RECENTS_STORAGE_KEY = 'financeApp.history.presetRecents';
@@ -49,6 +50,8 @@ const SETTINGS_REDUCE_MOTION_KEY = 'financeApp.settings.reduceMotion';
 const SETTINGS_OPEN_PANEL_KEY = 'financeApp.settings.openPanel';
 const SETTINGS_PROFILE_AVATAR_KEY = 'financeApp.settings.profileAvatar';
 const SETTINGS_ACCENT_COLOR_KEY = 'financeApp.settings.accentColor';
+
+// Configuraciones por defecto de la aplicación.
 const DEFAULT_APP_SETTINGS = {
   defaultView: 'home',
   reduceMotion: false,
@@ -64,6 +67,8 @@ const START_VIEW_CONFIG = {
   accounts: { id: 'accounts', title: 'Cuentas' },
   reminders: { id: 'reminders', title: 'Recordatorios' }
 };
+
+// Diccionarios de etiquetas para la interfaz.
 const REMINDER_TYPE_LABELS = {
   insurance: 'Seguro',
   subscription: 'Suscripción',
@@ -74,9 +79,13 @@ const REMINDER_RECURRENCE_LABELS = {
   monthly: 'Cada mes',
   yearly: 'Cada año'
 };
+
+// Variable global para el token de sesión.
 let token = '';
+
 const $ = (id) => document.getElementById(id);
 
+// Gestionan si el usuario ha marcado la opción de "Recordar este dispositivo" al iniciar sesión.
 function isRememberDeviceEnabled() {
   return localStorage.getItem(REMEMBER_DEVICE_STORAGE_KEY) === '1';
 }
@@ -89,6 +98,7 @@ function setRememberDevicePreference(enabled) {
   localStorage.removeItem(REMEMBER_DEVICE_STORAGE_KEY);
 }
 
+// Recupera el token de autenticación al arrancar la app.
 function readStartupToken() {
   const remembered = isRememberDeviceEnabled();
   const sourceStorage = remembered ? localStorage : sessionStorage;
@@ -126,57 +136,85 @@ function clearPersistedAuthToken() {
   localStorage.removeItem(TOKEN_STORAGE_KEY);
 }
 
-// Estado de la aplicación
+// ESTADO GLOBAL DE LA APP.
 const state = {
+  // Datos estructurales y colecciones.
   tree: [],
   catsById: new Map(),
   accounts: [],
   recurringTemplates: [],
   automationRules: [],
   forecast: null,
+
+  // Control de interfaz y arrastre.
   accountsDragLockUntil: 0,
   accountDetailOriginViewId: 'accounts',
+
+  // Configuración y filtros de Dashboard.
   dashboardSelectedAccountId: null,
   dashboardAccountSpendMode: 'all',
   dashboardSummaryMode: 'full',
   dashboardDateStart: '',
   dashboardDateEnd: '',
   dashboardUseCustomRange: false,
+
+  // Estados de edición actuales.
   budgetStatusFilter: localStorage.getItem(BUDGET_FILTER_STORAGE_KEY) || 'all',
   editingBudgetId: null,
   editingAccountId: null,
   editingCategoryId: null,
   currentAccountId: null,
   currentAccountTransactions: [],
+
+  // Control de navegabilidad y recordatorios.
   currentViewId: 'home',
   reminders: [],
   reminderFilter: 'all',
+
+  // Estados y filtros de la vista de historial.
   historyRangeStart: '',
   historyRangeEnd: '',
   historyRangeSource: '',
   historyPendingAccountId: '',
   historyPendingCategoryId: '',
+
+  // Usuario y preferencias.
   user: null,
   settings: { ...DEFAULT_APP_SETTINGS }
 };
 
+// VARIABÑES AUXILIARES Y ESTADOS DE ITNERFAZ.
+
+// Identificadores de edición activa en modales.
 let editingTxId = null;
-let historySearchTimer = null;
-let categoryFormImageData = null;
-let categoryBgColorOverridden = false;
-let accountFormImageData = null;
 let editingReminderId = null;
 let editingRecurringId = null;
 let editingRuleId = null;
+
+// Temporizadores para debounce de búsquedas y sincronizadores.
+let historySearchTimer = null;
 let appSettingsSyncTimer = null;
+
+// Almacenamiento temporal de imágenes en formularios.
+let categoryFormImageData = null;
+let categoryBgColorOverridden = false;
+let accountFormImageData = null;
+
+// Control de aarrastre y automatización.
 let categoryDragState = null;
 let automationLastRunAt = 0;
+
+// Detección de capacidades del backend.
 let supportsRemoteSettingsApi = true;
 let supportsAutomationApi = true;
 let backendCapabilitiesLoaded = false;
 let backendCapabilitiesPromise = null;
+
+// Nonces de control para evitar peticiones desordenadas.
 let dashboardLoadNonce = 0;
 let homeLoadNonce = 0;
+
+// Estado interno de la vista de Historial.
 const collapsedHistoryGroups = new Set();
 let historyFilteredTxns = [];
 let historyVisibleCount = 30;
@@ -185,18 +223,22 @@ let historyFilterPresets = [];
 let historyRecentPresetNames = [];
 let historyFavoritePresetName = '';
 let historyPasteUndoStack = [];
+
+// Constantes de paginación del historial.
 const HISTORY_PAGE_SIZE = 30;
 const HISTORY_PASTE_UNDO_LIMIT = 3;
 const HISTORY_FETCH_PAGE_BLOCK = 2;
 let historyFetchPages = HISTORY_FETCH_PAGE_BLOCK;
 let historyCanLoadMoreData = false;
 
+// Oculta o muestra el panel de configuración de automatizacones en el DOM en función de si la API del backend sorpota los endponits de automatización.
 function applyAutomationApiAvailability() {
   const panel = document.querySelector('[data-settings-panel="automation"]');
   if (!panel) return;
   panel.style.display = supportsAutomationApi ? '' : 'none';
 }
 
+// Evalúa las rutas devueltas por la documentación OpenAPI del backend y actualiza los flags de características soportadas por el servidor.
 function applyBackendCapabilities(paths = {}) {
   supportsRemoteSettingsApi = Boolean(paths['/me/settings']);
 
@@ -233,6 +275,7 @@ async function detectBackendCapabilities() {
   }
 }
 
+// Assegura que la detección de capacidades del backend solo se ejecute una vez.
 async function ensureBackendCapabilities() {
   if (backendCapabilitiesLoaded) return;
   if (backendCapabilitiesPromise) {
@@ -273,6 +316,7 @@ async function fetchJsonSilent(path, opts = {}) {
   return { ok: res.ok, status: res.status, data };
 }
 
+// Normaliza una cadena de texto para realizar búsquedas o comparaciones insensibles a mayúsculas y espacios.
 function normalizeCategoryKeyPart(value) {
   return String(value || '')
     .trim()
@@ -282,9 +326,10 @@ function normalizeCategoryKeyPart(value) {
     .join(' ');
 }
 
+// Elimina duplicados en la estructura de categorías y secciones, combinando categorías con el mismo nombre y sección, y eliminando subcategorías duplicadas.
 function dedupeCategoryTree(rawTree = []) {
   const mergedSections = new Map();
-
+  // 1. Agrupar y fusionar secciones con el mismo nombre o ID.
   for (const section of rawTree || []) {
     const sectionName = normalizeCategoryKeyPart(section?.section);
     const sectionId = String(section?.section_id || '').trim();
@@ -302,7 +347,7 @@ function dedupeCategoryTree(rawTree = []) {
     const targetSection = mergedSections.get(sectionKey);
     targetSection.categories.push(...(section?.categories || []));
   }
-
+  // 2. Desduplicar categorías padre y sus subcategorías internas.
   return Array.from(mergedSections.values()).map((section) => {
     const seenParents = new Set();
     const dedupedParents = [];
@@ -340,6 +385,7 @@ function dedupeCategoryTree(rawTree = []) {
   });
 }
 
+// Sanitiza y normaliza el objeto de configuración de la app.
 function normalizeAppSettings(rawSettings = {}) {
   const source =
     rawSettings && typeof rawSettings === 'object' ? rawSettings : {};
@@ -372,6 +418,7 @@ function normalizeAppSettings(rawSettings = {}) {
   };
 }
 
+// Valida un color en formato Hexadecimal.
 function normalizeAccentColor(
   value,
   fallback = DEFAULT_APP_SETTINGS.accentColor
@@ -380,6 +427,7 @@ function normalizeAccentColor(
   return /^#[0-9a-f]{6}$/i.test(input) ? input.toLowerCase() : fallback;
 }
 
+// Genera variantes de color (oscuro y resplandor RGBA) a partir de un color Hexadecimal para usarlas como variables dinámicas en el tema CSS de la aplicación.
 function getAccentCssTokens(color) {
   const accent = normalizeAccentColor(color, DEFAULT_APP_SETTINGS.accentColor);
   const r = Number.parseInt(accent.slice(1, 3), 16);
@@ -401,6 +449,7 @@ function getAccentCssTokens(color) {
   };
 }
 
+// Carga las configuraciones guardadas en localStorage, las normaliza y las asigna al estado global de la aplicación.
 function loadAppSettings() {
   const stored = {
     defaultView: localStorage.getItem(SETTINGS_DEFAULT_VIEW_KEY),
@@ -412,6 +461,7 @@ function loadAppSettings() {
   state.settings = normalizeAppSettings(stored);
 }
 
+// Persiste las configuraciones actuales de state.settings en localStorage.
 function saveAppSettings() {
   localStorage.setItem(
     SETTINGS_DEFAULT_VIEW_KEY,
@@ -434,6 +484,7 @@ function saveAppSettings() {
   );
 }
 
+// Actualiza una propiedad de configuración específica, la guarda en local, la aplica en la UI y programa la sincronización remota con la API.
 function updateAppSetting(key, value) {
   state.settings = {
     ...state.settings,
@@ -444,6 +495,7 @@ function updateAppSetting(key, value) {
   scheduleRemoteSettingsSync();
 }
 
+// Prepara y traduce el objeto de ajustes local (camelCase) al formato esperado por el backend (snake_case).
 function getSettingsPayloadForApi() {
   const normalized = normalizeAppSettings(state.settings);
   return {
@@ -454,6 +506,7 @@ function getSettingsPayloadForApi() {
   };
 }
 
+// Obtiene las configuraciones del usuario desde el backend (GET /me/settings). Si la sincronización es exitosa, reemplaza la configuración local y el DOM
 async function fetchRemoteAppSettings() {
   if (!token || !supportsRemoteSettingsApi) return false;
 
@@ -483,6 +536,7 @@ async function fetchRemoteAppSettings() {
   }
 }
 
+// Envía la configuración del usuario al backend mediante una petición PUT. Desactiva la función si la API responde con un 404 (endpoint no soportado)
 async function persistRemoteAppSettings() {
   if (!token || !supportsRemoteSettingsApi) return false;
   try {
@@ -507,6 +561,7 @@ async function persistRemoteAppSettings() {
   }
 }
 
+// Programa la sincronización de ajustes remotos mediante Debounce (espera 250ms). Evita múltiples llamadas a la API cuando el usuario modifica ajustes rápidamente
 function scheduleRemoteSettingsSync() {
   if (!token) return;
   if (appSettingsSyncTimer) {
@@ -518,6 +573,7 @@ function scheduleRemoteSettingsSync() {
   }, 250);
 }
 
+// Fuerza el envío inmediato de la configuración al servidor cancelando cualquier temporizador de sincronización pendiente.
 function flushRemoteSettingsSync() {
   if (!token || !supportsRemoteSettingsApi) return;
   if (appSettingsSyncTimer) {
@@ -527,6 +583,13 @@ function flushRemoteSettingsSync() {
   persistRemoteAppSettings();
 }
 
+/**
+ * Aplica visualmente la configuración guardada en la interfaz del navegador:
+ * - Actualiza las variables CSS de color del tema (:root)
+ * - Modifica la etiqueta meta 'theme-color' del navegador
+ * - Activa/desactiva animaciones según 'reduceMotion'
+ * - Actualiza controles de UI y avatares
+ */
 function applyAppSettings() {
   const root = document.documentElement;
   const accentTokens = getAccentCssTokens(state.settings.accentColor);
@@ -1829,7 +1892,8 @@ function resolveTransactionVisual(tx, category, subcategory) {
 
   const visual = getCategoryVisual(sourceForVisual);
   const title = category?.name || visual.name;
-  const subtitle = hasSubcategorySelection && subcategory ? subcategory.name : '';
+  const subtitle =
+    hasSubcategorySelection && subcategory ? subcategory.name : '';
 
   return {
     visual,
@@ -1845,7 +1909,9 @@ function buildCategoryOption(category) {
 }
 
 function buildSubcategoryOption(category, parentCategory = null) {
-  const parentVisual = parentCategory ? getCategoryVisual(parentCategory) : null;
+  const parentVisual = parentCategory
+    ? getCategoryVisual(parentCategory)
+    : null;
   const fallbackIcon = parentVisual?.icon || '•';
   const fallbackColor = parentVisual?.color || '#94a3b8';
   const hasCustomVisual = hasCustomCategoryVisual(category);
@@ -6112,7 +6178,10 @@ async function saveTx() {
 
 async function refreshAfterTransactionChange(accountId = null) {
   // Reload from backend so Home never stays on stale cached balances.
-  await Promise.all([loadAccounts(), loadHomeAccount({ forceAccountsReload: true })]);
+  await Promise.all([
+    loadAccounts(),
+    loadHomeAccount({ forceAccountsReload: true })
+  ]);
 
   if (state.currentViewId === 'account-detail') {
     const targetAccountId = state.currentAccountId || accountId;
@@ -6294,7 +6363,8 @@ async function loadHomeAccount(options = {}) {
     const txList = $('homeAccountTxList');
 
     if (txList) {
-      txList.innerHTML = '<div class="muted" style="text-align:center; margin: 12px 0;">Cargando movimientos...</div>';
+      txList.innerHTML =
+        '<div class="muted" style="text-align:center; margin: 12px 0;">Cargando movimientos...</div>';
     }
     if (homeSpendDistribution) {
       homeSpendDistribution.innerHTML =
