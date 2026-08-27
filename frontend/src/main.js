@@ -221,3 +221,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 window.addEventListener('pagehide', flushRemoteSettingsSync);
+window.addEventListener('finance:transactions-changed', async () => {
+  if (typeof renderCurrentView === 'function') {
+    await renderCurrentView();
+  } else if (typeof renderHome === 'function') {
+    await renderHome();
+  }
+});
