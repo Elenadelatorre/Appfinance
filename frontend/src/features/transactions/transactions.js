@@ -36,6 +36,7 @@ export function findAccountForTransaction(tx) {
     (state.accounts || []).find(
       (account) =>
         String(account?.id || '') === accountRef ||
+        String(account?._id || '') === accountRef ||
         String(account?.name || '') === accountRef
     ) || null
   );
@@ -142,18 +143,25 @@ export function resolveTransactionVisual(tx, category, subcategory) {
 
 export function renderTxAccountMeta(tx, getAccountBadgeMarkup) {
   const account = findAccountForTransaction(tx);
-  if (account && getAccountBadgeMarkup) {
+
+  if (account) {
+    if (typeof getAccountBadgeMarkup === 'function') {
+      return `
+        <span class="tx-account-chip" title="${escapeHtml(account.name || 'Cuenta')}">
+          ${getAccountBadgeMarkup(account, 'account-brand-badge--tx')}
+          <span class="tx-account-name">${escapeHtml(account.name || 'Cuenta')}</span>
+        </span>
+      `;
+    }
     return `
-      <span class="tx-account-chip" title="${escapeHtml(account.name || 'Cuenta')}">
-        ${getAccountBadgeMarkup(account, 'account-brand-badge--tx')}
+      <span class="tx-account-chip">
         <span class="tx-account-name">${escapeHtml(account.name || 'Cuenta')}</span>
       </span>
     `;
   }
 
-  const fallbackAccount = String(tx?.account_id || '').trim();
-  if (!fallbackAccount) return '';
-  return `<span class="tx-account-chip tx-account-chip--fallback"><span class="tx-account-name">${escapeHtml(fallbackAccount)}</span></span>`;
+  // Si no se encuentra la cuenta, no mostrar el hash de MongoDB
+  return '';
 }
 
 export function renderTxItem(
