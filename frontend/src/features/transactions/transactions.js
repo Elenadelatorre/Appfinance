@@ -585,13 +585,6 @@ export async function saveTx() {
     if (typeof refreshAppCallback === 'function') {
       await refreshAppCallback(account_id);
     }
-
-    // 3. Emitir evento global para que las vistas se repinten solas
-    window.dispatchEvent(
-      new CustomEvent('finance:transactions-changed', {
-        detail: { accountId: account_id }
-      })
-    );
   } catch (err) {
     showAlert('Error al guardar: ' + (err?.message || String(err)), 'error');
   }
