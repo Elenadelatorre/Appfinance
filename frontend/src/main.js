@@ -23,7 +23,8 @@ import {
 } from './features/accounts/accounts.js';
 import {
   saveTx,
-  openCreateTxModal
+  openCreateTxModal,
+  setTransactionRefreshCallbacks
 } from './features/transactions/transactions.js';
 import {
   loadHistoryView,
@@ -221,10 +222,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 window.addEventListener('pagehide', flushRemoteSettingsSync);
+// Configurar el callback directo de transacciones
+setTransactionRefreshCallbacks({
+  onRefresh: async () => {
+    await loadAccounts();
+    if (state.currentViewId) {
+      loadViewContent(state.currentViewId);
+    }
+  },
+  onOpenViewAccount: (accId) => {
+    openViewAccount(accId);
+  }
+});
+
+// Escuchar evento global por si se dispara desde otros módulos
 window.addEventListener('finance:transactions-changed', async () => {
-  if (typeof renderCurrentView === 'function') {
-    await renderCurrentView();
-  } else if (typeof renderHome === 'function') {
-    await renderHome();
+  await loadAccounts();
+  if (state.currentViewId) {
+    loadViewContent(state.currentViewId);
   }
 });
