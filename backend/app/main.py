@@ -1,30 +1,32 @@
-import os
+# backend/app/main.py
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from typing import Annotated
-from fastapi import FastAPI, Depends, Request
-from fastapi.middleware.cors import CORSMiddleware
+
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .db import create_indexes
-from .routes import router, BadRequestError
-from .auth import get_current_user_id
-from .logic import (
-    seed_initial_categories,
+from .core.exceptions import BadRequestError
+from .core.logging import setup_logging
+from .db.database import create_indexes
+from .routes import router
+from .core.security import get_current_user_id
+from .services.finance import (
+    check_budgets_logic,
+    get_accounts_balances,
     get_monthly_summary,
     get_summary_for_period,
-    get_accounts_balances,
-    check_budgets_logic,
     parse_date_only,
+    seed_initial_categories,
 )
 
-# Configurar logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+# Inicializar logging
+setup_logging()
 logger = logging.getLogger(__name__)
 
 CurrentUserId = Annotated[str, Depends(get_current_user_id)]
@@ -32,14 +34,13 @@ CurrentUserId = Annotated[str, Depends(get_current_user_id)]
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    # Startup: Crear índices y seed inicial
     try:
         await create_indexes()
         logger.info("✅ Índices MongoDB creados/verificados")
     except Exception as e:
         logger.error("⚠️ No se pudieron crear índices: %s", e)
 
-    # Seed opcional (solo inserta si faltan)
     try:
         await seed_initial_categories()
         logger.info("✅ Seed inicial comprobado")
@@ -47,7 +48,6 @@ async def lifespan(app: FastAPI):
         logger.error("⚠️ No se pudo hacer seed inicial: %s", e)
 
     yield
-    # Shutdown
     logger.info("App shutting down...")
 
 
@@ -72,7 +72,7 @@ def _format_validation_errors(errors):
     return messages
 
 
-# --- CORS MEJORADO ---
+# --- CORS CONFIGURACIÓN ---
 default_cors = (
     "http://localhost:3000,"
     "http://127.0.0.1:3000,"
@@ -86,6 +86,7 @@ CORS_ORIGINS = [
     o.strip() for o in os.getenv("CORS_ORIGINS", default_cors).split(",") if o.strip()
 ]
 CORS_ORIGIN_REGEX = os.getenv("CORS_ORIGIN_REGEX", r"https://.*\.vercel\.app")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
@@ -117,16 +118,16 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
-@app.exception_handler(Exception)
-async def general_exception_handler(request: Request, exc: Exception):
-    logger.error("Unexpected error on %s: %s", request.url.path, exc, exc_info=True)
-    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
-
-
 @app.exception_handler(BadRequestError)
 async def bad_request_exception_handler(request: Request, exc: BadRequestError):
     logger.warning("Bad request on %s: %s", request.url.path, exc)
     return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    logger.error("Unexpected error on %s: %s", request.url.path, exc, exc_info=True)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 # --- MIDDLEWARE DE LOGGING ---
@@ -138,16 +139,12 @@ async def log_requests(request: Request, call_next):
     return response
 
 
-# Registrar todas las rutas
-app.include_router(router)
-
-
+# --- RUTAS DE ANALÍTICA Y DASHBOARD ---
 @app.get("/")
 async def root():
     return {"ok": True, "docs": "/docs", "version": "1.0.0"}
 
 
-# --- DASHBOARD & ANALYTICS ---
 @app.get("/dashboard")
 async def get_dashboard(user_id: CurrentUserId):
     """Consolida toda la información clave en una sola respuesta rápida."""
@@ -200,3 +197,7 @@ async def monthly_summary(
 async def accounts_balances(user_id: CurrentUserId):
     """Saldos de todas las cuentas del usuario."""
     return await get_accounts_balances(user_id)
+
+
+# Montar el router principal de la app
+app.include_router(router)

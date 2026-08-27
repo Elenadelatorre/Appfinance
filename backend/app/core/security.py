@@ -1,17 +1,17 @@
-import os
+# backend/app/core/security.py
 import logging
+import os
 from datetime import datetime, timedelta, timezone
-from jose import jwt, JWTError
-import bcrypt
-from fastapi import HTTPException, status, Depends
-from fastapi.security import OAuth2PasswordBearer
 from typing import Optional
 
-# Configurar logging
+import bcrypt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+
 logger = logging.getLogger(__name__)
 
 # --- CONFIGURACIÓN ---
-# Fallback estable para desarrollo local. En producción debe definirse JWT_SECRET.
 _default_secret = "dev-key-change-in-production-fixed"
 SECRET_KEY = os.getenv("JWT_SECRET", _default_secret)
 if not SECRET_KEY or SECRET_KEY.startswith("dev-key"):
@@ -24,6 +24,7 @@ ACCESS_TOKEN_EXPIRE_DAYS = int(os.getenv("ACCESS_TOKEN_EXPIRE_DAYS", "30"))
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
+
 # --- FUNCIONES DE CONTRASEÑA ---
 
 
@@ -32,12 +33,11 @@ def _normalize_bcrypt_secret(p: str) -> str:
     b = p.encode("utf-8")
     if len(b) <= 72:
         return p
-    # Recorte por bytes para respetar el límite real de bcrypt.
     return b[:72].decode("utf-8", errors="ignore")
 
 
 def hash_password(p: str) -> str:
-    """Hashea la contraseña con bcrypt directo para evitar incompatibilidades de passlib."""
+    """Hashea la contraseña con bcrypt directo."""
     if not p or not isinstance(p, str):
         raise ValueError("Contraseña inválida")
     normalized = _normalize_bcrypt_secret(p).encode("utf-8")
@@ -65,7 +65,7 @@ def verify_password(p: str, hashed: str) -> bool:
 
 
 def create_access_token(sub: str) -> str:
-    """Crea un token de acceso JWT para un ID de usuario específico"""
+    """Crea un token de acceso JWT para un ID de usuario específico."""
     if not sub:
         raise ValueError("Field 'sub' cannot be empty")
     expire = datetime.now(timezone.utc) + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
@@ -82,10 +82,7 @@ def create_access_token(sub: str) -> str:
 
 
 def get_current_user_id(token: str = Depends(oauth2_scheme)) -> str:
-    """Dependencia para proteger rutas: extrae el ID del usuario del token.
-
-    Requiere un token y lanzará un HTTPException 401 si no hay uno o es inválido.
-    """
+    """Dependencia para proteger rutas: extrae el ID del usuario del token."""
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -108,12 +105,11 @@ def get_current_user_id(token: str = Depends(oauth2_scheme)) -> str:
 
 
 def get_current_user_id_optional(token: str = Depends(oauth2_scheme)) -> Optional[str]:
-    """Versión opcional: devuelve None si no hay token o es inválido"""
+    """Devuelve el ID del usuario si el token es válido o None si no hay sesión."""
     if not token:
         return None
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload.get("sub")
     except (JWTError, ValueError):
-        # Silently ignore invalid tokens
         return None

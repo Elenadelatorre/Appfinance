@@ -1,12 +1,20 @@
+# backend/app/services/finance.py
+import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
-import asyncio
+from typing import Any, Dict, Optional
+
 from bson import ObjectId
-from app.db import tx_col, accounts_col, categories_col, budgets_col, cat_sections_col
+
+from app.db.database import (
+    accounts_col,
+    budgets_col,
+    cat_sections_col,
+    categories_col,
+    tx_col,
+)
 
 logger = logging.getLogger(__name__)
-
 
 BILLING_CYCLE_START_DAY = 26
 GLOBAL_CATEGORY_QUERY: Dict[str, Any] = {
@@ -18,7 +26,6 @@ def parse_date_only(value: str) -> datetime:
     cleaned = str(value or "").strip()
     if not cleaned:
         raise ValueError("La fecha no puede estar vacía")
-
     try:
         return datetime.fromisoformat(f"{cleaned}T00:00:00")
     except ValueError as exc:
@@ -29,16 +36,13 @@ def parse_date_only(value: str) -> datetime:
 def fix_id(obj):
     if obj is None:
         return None
-    # handle lists of documents
     if isinstance(obj, list):
         return [fix_id(o) for o in obj]
-    # convert MongoDB ObjectId to string and keep both `_id` and `id` keys
     if isinstance(obj, dict):
         if "_id" in obj:
             sid = str(obj["_id"])
             obj["_id"] = sid
             obj["id"] = sid
-        # también convertir parent_id y section_id a string si existen y son ObjectId
         if "parent_id" in obj and obj["parent_id"] is not None:
             obj["parent_id"] = str(obj["parent_id"])
         if "section_id" in obj and obj["section_id"] is not None:
@@ -47,6 +51,41 @@ def fix_id(obj):
     return obj
 
 
+def get_billing_cycle_bounds(
+    reference: Optional[datetime] = None,
+    start_day: int = BILLING_CYCLE_START_DAY,
+) -> tuple[datetime, datetime]:
+    current = reference or datetime.now()
+    if current.day >= start_day:
+        cycle_start = datetime(current.year, current.month, start_day)
+    elif current.month == 1:
+        cycle_start = datetime(current.year - 1, 12, start_day)
+    else:
+        cycle_start = datetime(current.year, current.month - 1, start_day)
+
+    if cycle_start.month == 12:
+        cycle_end = datetime(cycle_start.year + 1, 1, start_day)
+    else:
+        cycle_end = datetime(cycle_start.year, cycle_start.month + 1, start_day)
+
+    return cycle_start, cycle_end
+
+
+def get_billing_cycle_period(
+    reference: Optional[datetime] = None,
+    start_day: int = BILLING_CYCLE_START_DAY,
+) -> tuple[int, int]:
+    cycle_start, _ = get_billing_cycle_bounds(reference, start_day)
+    return cycle_start.month, cycle_start.year
+
+
+def get_category_scope_query(user_id: Optional[str] = None) -> Dict[str, Any]:
+    if user_id:
+        return {"user_id": str(user_id)}
+    return dict(GLOBAL_CATEGORY_QUERY)
+
+
+# --- CÁLCULOS Y RESÚMENES ---
 async def get_summary_for_period(
     start_date: datetime,
     end_date_exclusive: datetime,
@@ -176,50 +215,9 @@ async def check_budgets_logic(user_id: Optional[str] = None):
     return analysis
 
 
-def get_billing_cycle_bounds(
-    reference: Optional[datetime] = None,
-    start_day: int = BILLING_CYCLE_START_DAY,
-) -> tuple[datetime, datetime]:
-    current = reference or datetime.now()
-
-    if current.day >= start_day:
-        cycle_start = datetime(current.year, current.month, start_day)
-    elif current.month == 1:
-        cycle_start = datetime(current.year - 1, 12, start_day)
-    else:
-        cycle_start = datetime(current.year, current.month - 1, start_day)
-
-    if cycle_start.month == 12:
-        cycle_end = datetime(cycle_start.year + 1, 1, start_day)
-    else:
-        cycle_end = datetime(cycle_start.year, cycle_start.month + 1, start_day)
-
-    return cycle_start, cycle_end
-
-
-def get_billing_cycle_period(
-    reference: Optional[datetime] = None,
-    start_day: int = BILLING_CYCLE_START_DAY,
-) -> tuple[int, int]:
-    cycle_start, _ = get_billing_cycle_bounds(reference, start_day)
-    return cycle_start.month, cycle_start.year
-
-
-def get_category_scope_query(user_id: Optional[str] = None) -> Dict[str, Any]:
-    if user_id:
-        return {"user_id": str(user_id)}
-    return dict(GLOBAL_CATEGORY_QUERY)
-
-
+# --- SEED DE DATOS ---
 async def seed_initial_categories() -> None:
-    """Insert default sections and categories if the collections are empty.
-
-    Categories and sections are created WITHOUT a user_id so they are
-    accessible globally (not filtered by user). Routes that show user-specific
-    categories can still filter optionally.
-    """
     try:
-        # create default sections (global, no user_id)
         if await cat_sections_col().count_documents({}) == 0:
             secciones_base = [
                 {"name": "Ingresos", "order": 1},
@@ -233,21 +231,16 @@ async def seed_initial_categories() -> None:
         sec_ahorro = await cat_sections_col().find_one({"name": "Ahorro e Inversión"})
 
         if not sec_ingresos or not sec_gastos or not sec_ahorro:
-            # nothing more we can do without the three sections
             return
 
-        # create/ensure default top-level categories (global, no user_id)
         id_i, id_g = str(sec_ingresos["_id"]), str(sec_gastos["_id"])
 
-        # Estructura completa: (nombre, icon, color, section_id, [subcats])
         categorias_con_subs = [
-            # ── INGRESOS ──────────────────────────────────────────
             ("Nómina", "💼", "#16a34a", id_i, []),
             ("Extras", "✨", "#22c55e", id_i, []),
             ("Regalos", "🎁", "#10b981", id_i, []),
             ("Intereses", "📈", "#14b8a6", id_i, []),
             ("Ventas", "🏷️", "#0ea5a4", id_i, []),
-            # ── GASTOS ────────────────────────────────────────────
             ("Hogar", "🏠", "#f97316", id_g, ["Alquiler", "Otros"]),
             ("Suministros", "💡", "#fb7185", id_g, ["Luz", "Agua"]),
             ("Alimentación", "🍎", "#f59e0b", id_g, ["Supermercado", "UberEat"]),
@@ -297,7 +290,6 @@ async def seed_initial_categories() -> None:
             ("Varios", "🧩", "#78716c", id_g, []),
         ]
 
-        # Upsert padres e hijos en un solo bucle
         for cat_name, icon, color, section_id, subs in categorias_con_subs:
             existing_parent = await categories_col().find_one(
                 {"name": cat_name, "section_id": section_id, "parent_id": None}
@@ -352,7 +344,6 @@ async def seed_initial_categories() -> None:
 
 
 async def seed_categories_for_user(user_id: str) -> None:
-    """Clona las categorías globales base a un ámbito privado por usuario."""
     scoped_user_id = str(user_id)
     existing_user_category = await categories_col().find_one(
         {"user_id": scoped_user_id}
@@ -426,11 +417,6 @@ async def seed_categories_for_user(user_id: str) -> None:
 
 
 async def seed_default_accounts_for_user(user_id: str) -> None:
-    """Seed idempotente de las 4 cuentas principales por usuario.
-
-    Se usa al hacer login/registro para que la app sea utilizable desde el
-    primer momento.
-    """
     try:
         desired = [
             {"name": "Santander · Principal", "type": "bank", "balance_inicial": 0.0},
@@ -464,5 +450,4 @@ async def seed_default_accounts_for_user(user_id: str) -> None:
     except asyncio.CancelledError:
         raise
     except Exception as exc:
-        # El seed no debe bloquear el acceso: si falla, la app sigue funcionando.
         logger.warning("seed_default_accounts_for_user(%s) failed: %s", user_id, exc)

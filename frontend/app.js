@@ -593,23 +593,34 @@ function flushRemoteSettingsSync() {
 function applyAppSettings() {
   const root = document.documentElement;
   const accentTokens = getAccentCssTokens(state.settings.accentColor);
+
+  // Inyección de variables CSS para el tema dinámico.
   root.style.setProperty('--accent', accentTokens.accent);
   root.style.setProperty('--accent-dark', accentTokens.dark);
   root.style.setProperty('--accent-glow', accentTokens.glow);
+
+  // Actualización del color de la barra del navegador (en móviles/sistemas compatibles).
   const themeMeta = document.querySelector('meta[name="theme-color"]');
   if (themeMeta) {
     themeMeta.setAttribute('content', accentTokens.accent);
   }
 
+  // Desactivación o activación de animaciones en la clase raíz.
   document.body.classList.toggle(
     'reduced-motion',
     Boolean(state.settings.reduceMotion)
   );
+  // Actualización de controles de interfaz y avatares.
   syncAppSettingsControls();
   renderProfileIdentity();
   renderProfileAvatarChoices();
 }
 
+/**
+ * Sincroniza los controles del formulario del panel de ajustes
+ * (select de inicio, checkbox de animaciones y selector de color)
+ * con los valores actuales en state.settings.
+ */
 function syncAppSettingsControls() {
   const defaultView = $('settingDefaultView');
   const reduceMotion = $('settingReduceMotion');
@@ -633,6 +644,7 @@ function syncAppSettingsControls() {
   }
 }
 
+// Obtiene el objeto de configuración correspondiente a la vista inicial predeterminada.
 function getConfiguredStartView() {
   const candidate = state.settings.defaultView;
   if (START_VIEW_CONFIG[candidate]) {
@@ -641,20 +653,24 @@ function getConfiguredStartView() {
   return START_VIEW_CONFIG.home;
 }
 
+// Recupera el correo electrónico del usuario autenticado.
 function getUserEmail() {
   return String(state.user?.email || '').trim();
 }
 
+// Obtiene la inicial del correo electrónico en mayúscula como avatar por defecto.
 function getFallbackInitial() {
   const email = getUserEmail();
   return email ? email.charAt(0).toUpperCase() : 'U';
 }
 
+// Resuelve el símbolo del avatar activo: devuelve el emoji seleccionado o la inicial del usuario si está configurado en 'auto'.
 function getActiveAvatarSymbol() {
   const chosen = state.settings.profileAvatar || 'auto';
   return chosen === 'auto' ? getFallbackInitial() : chosen;
 }
 
+// Renderiza la identidad visual del usuario (avatar, inicial y email) en todos los componentes y cabeceras de la interfaz.
 function renderProfileIdentity() {
   const topAvatar = $('topAvatar');
   const currentDate = $('currentDate');
@@ -669,6 +685,7 @@ function renderProfileIdentity() {
   if (profileEmail) profileEmail.textContent = email || 'Sin sesión activa';
 }
 
+// Genera dinámicamente los botones de selección de avatar en el panel de configuración y resalta la opción activa actualmente.
 function renderProfileAvatarChoices() {
   const container = $('profileAvatarChoices');
   if (!container) return;
@@ -682,6 +699,7 @@ function renderProfileAvatarChoices() {
   }).join('');
 }
 
+// Valida si una contraseña cumple con los requisitos mínimos de seguridad.
 function isStrongPassword(value) {
   if (!value || value.length < 8) return false;
   const hasUppercase = /[A-Z]/.test(value);
@@ -689,6 +707,7 @@ function isStrongPassword(value) {
   return hasUppercase && hasNumber;
 }
 
+// Evalúa la robustez de una contraseña basándose en 4 criterios: longitud, mayúsculas, números y caracteres especiales.
 function getPasswordStrength(value) {
   const input = String(value || '');
   if (!input) return { label: '-', className: '' };
@@ -704,11 +723,13 @@ function getPasswordStrength(value) {
   return { label: 'alta', className: 'is-high' };
 }
 
+// Asigna el atributo de accesibilidad aria-invalid a un campo del formulario.
 function setFieldAriaInvalid(field, isInvalid) {
   if (!field) return;
   field.setAttribute('aria-invalid', isInvalid ? 'true' : 'false');
 }
 
+// Sincroniza los estados de accesibilidad aria-invalid en los tres campos del formulario de cambio de contraseña para lectores de pantalla.
 function syncProfilePasswordAriaState({
   currentField,
   nextField,
@@ -722,14 +743,23 @@ function syncProfilePasswordAriaState({
   const matches = nextPassword.length > 0 && nextPassword === confirmPassword;
   const hasStarted = nextPassword.length > 0 || confirmPassword.length > 0;
 
+  // Marca error si el usuario empezó a escribir la nueva clave sin poner la actual.
   setFieldAriaInvalid(currentField, hasStarted && !hasCurrent);
+  // Marca error si la nueva contraseña no cumple los requisitos mínimos.
   setFieldAriaInvalid(
     nextField,
     hasStarted && (nextPassword.length === 0 || !strongEnough)
   );
+  // Marca error si la confirmación no coincide con la nueva clave.
   setFieldAriaInvalid(confirmField, confirmPassword.length > 0 && !matches);
 }
 
+/**
+ * Validador en tiempo real del formulario de cambio de contraseña del perfil:
+ * - Calcula la fortaleza de la clave
+ * - Actualiza mensajes de ayuda y estados de error/éxito
+ * - Habilita/deshabilita el botón de envío
+ */
 function updateProfilePasswordFormState() {
   const currentField = $('profileCurrentPassword');
   const nextField = $('profileNextPassword');
@@ -746,6 +776,7 @@ function updateProfilePasswordFormState() {
   const matches = nextPassword.length > 0 && nextPassword === confirmPassword;
   const canSubmit = hasCurrent && strongEnough && matches;
 
+  // // Sincronización de accesibilidad ARIA.
   syncProfilePasswordAriaState({
     currentField,
     nextField,
@@ -755,17 +786,18 @@ function updateProfilePasswordFormState() {
     confirmPassword
   });
 
+  // Renderizado del indicador de seguridad.
   if (strength) {
     const level = getPasswordStrength(nextPassword);
     strength.textContent = `Seguridad: ${level.label}`;
     strength.classList.remove('is-low', 'is-medium', 'is-high');
     if (level.className) strength.classList.add(level.className);
   }
-
+  // Control de estado del botón de envío
   if (submitBtn && submitBtn.textContent !== 'Actualizando...') {
     submitBtn.disabled = !canSubmit;
   }
-
+  // Renderizado dinámico de mensajes de validación
   if (hint) {
     if (!nextPassword && !confirmPassword) {
       hint.textContent =
@@ -795,12 +827,14 @@ function updateProfilePasswordFormState() {
   }
 }
 
+// Limpia los campos del formulario de cambio de contraseña y actualiza la visibilidad de los caracteres según el checkbox.
 function clearProfilePasswordForm(resetShowPasswords = false) {
   const current = $('profileCurrentPassword');
   const next = $('profileNextPassword');
   const confirm = $('profileConfirmPassword');
   const show = $('profileShowPasswords');
 
+  // Limpieza de valores.
   if (current) current.value = '';
   if (next) next.value = '';
   if (confirm) confirm.value = '';
@@ -809,14 +843,20 @@ function clearProfilePasswordForm(resetShowPasswords = false) {
     show.checked = false;
   }
 
+  // Sincronización del tipo de input (password / text).
   const nextType = show?.checked ? 'text' : 'password';
   if (current) current.type = nextType;
   if (next) next.type = nextType;
   if (confirm) confirm.type = nextType;
 
+  // Actualización de los mensajes de ayuda y botón de guardar.
   updateProfilePasswordFormState();
 }
 
+/**
+ * Valida los datos y procesa el cambio de contraseña del usuario mediante la API.
+ * Controla estados de carga (loading/disabled), accesibilidad y feedback de errores.
+ */
 async function changePasswordFromProfile() {
   const currentField = $('profileCurrentPassword');
   const nextField = $('profileNextPassword');
@@ -828,6 +868,7 @@ async function changePasswordFromProfile() {
   const clearBtn = $('btnProfileClearPasswords');
   const passwordBlock = $('profilePasswordBlock');
 
+  // Controla el estado visual y de accesibilidad durante la petición HTTP.
   const setSubmittingState = (isSubmitting) => {
     if (!submitBtn) return;
     submitBtn.disabled = isSubmitting;
@@ -840,6 +881,7 @@ async function changePasswordFromProfile() {
     }
   };
 
+  // Validaciones del lado del cliente antes de contactar con el backend.
   if (!currentPassword) {
     showAlert('Rellena contraseña actual, nueva y confirmación', 'error');
     currentField?.focus();
@@ -897,7 +939,7 @@ async function changePasswordFromProfile() {
       const data = await res.json().catch(() => null);
       throw new Error(data?.detail || 'No se pudo cambiar la contraseña');
     }
-
+    // Éxito: limpiar inputs y notificar al usuario
     clearProfilePasswordForm();
     showAlert('Contraseña actualizada', 'info');
   } catch (err) {
@@ -908,6 +950,12 @@ async function changePasswordFromProfile() {
   }
 }
 
+/**
+ * Inicializa el acordeón de ajustes:
+ * - Asegura que solo un panel esté abierto a la vez (comportamiento exclusivo)
+ * - Restaura el último panel abierto desde localStorage
+ * - Persiste el estado al alternar entre paneles
+ */
 function initSettingsAccordion() {
   const accordion = $('settingsAccordion');
   if (!accordion) return;
@@ -915,6 +963,7 @@ function initSettingsAccordion() {
   const panels = Array.from(accordion.querySelectorAll('.settings-panel'));
   if (!panels.length) return;
 
+  // Recupera el panel guardado y realiza migración si venía de versiones previas ('general' -> 'profile').
   const storedOpenPanelRaw = localStorage.getItem(SETTINGS_OPEN_PANEL_KEY);
   const storedOpenPanel =
     storedOpenPanelRaw === 'general' ? 'profile' : storedOpenPanelRaw;
@@ -926,13 +975,15 @@ function initSettingsAccordion() {
       panel.open = panel === panelToRestore;
     });
   }
-
+// Escucha el evento toggle nativo de las etiquetas <details>.
   panels.forEach((panel) => {
     panel.addEventListener('toggle', () => {
       if (panel.open) {
+        // Cierra los demás paneles abiertos.
         panels.forEach((other) => {
           if (other !== panel) other.open = false;
         });
+        // Guarda el panel activo en localStorage.
         if (panel.dataset.settingsPanel) {
           localStorage.setItem(
             SETTINGS_OPEN_PANEL_KEY,
@@ -941,7 +992,7 @@ function initSettingsAccordion() {
         }
         return;
       }
-
+      // Si se cerró el panel y no queda ninguno abierto, limpia el storage.
       const hasOpenPanel = panels.some((item) => item.open);
       if (!hasOpenPanel) {
         localStorage.removeItem(SETTINGS_OPEN_PANEL_KEY);
@@ -950,18 +1001,19 @@ function initSettingsAccordion() {
   });
 }
 
+// Obtiene el ID normalizado de un recordatorio (compatible con backend SQL o MongoDB).
 function reminderIdOf(item) {
   return String(item?.id || item?._id || '');
 }
-
+// Obtiene la etiqueta legible en español para el tipo de recordatorio.
 function reminderTypeLabel(type) {
   return REMINDER_TYPE_LABELS[type] || REMINDER_TYPE_LABELS.other;
 }
-
+// Obtiene la etiqueta legible en español para la recurrencia del recordatorio.
 function reminderRecurrenceLabel(value) {
   return REMINDER_RECURRENCE_LABELS[value] || REMINDER_RECURRENCE_LABELS.none;
 }
-
+// Normaliza cualquier formato de fecha a 'YYYY-MM-DD' para rellenar un <input type="date">.
 function reminderDueInputValue(value) {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -977,9 +1029,11 @@ function reminderDueInputValue(value) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// Formatea una fecha de vencimiento para mostrarla en texto legible para el usuario.
 function reminderDueLabel(value) {
   const inputValue = reminderDueInputValue(value);
   if (!inputValue) return 'Sin fecha';
+  // Se fija la hora a las 12:00:00 para evitar desfases por zona horaria UTC.
   const parsed = new Date(`${inputValue}T12:00:00`);
   if (Number.isNaN(parsed.getTime())) return 'Sin fecha';
   return parsed.toLocaleDateString('es-ES', {
@@ -989,6 +1043,7 @@ function reminderDueLabel(value) {
   });
 }
 
+// Determina si un recordatorio no completado ha superado su fecha de vencimiento. Establece la hora límite a las 23:59:59 del día fijado.
 function isReminderOverdue(reminder) {
   if (reminder?.is_completed) return false;
   const dueInput = reminderDueInputValue(reminder?.due_date);
@@ -998,12 +1053,14 @@ function isReminderOverdue(reminder) {
   return dueDate.getTime() < Date.now();
 }
 
+// Busca un recordatorio en el estado global mediante su identificador.
 function getReminderById(reminderId) {
   return state.reminders.find(
     (item) => reminderIdOf(item) === String(reminderId)
   );
 }
 
+//Aplica el filtro activo (todos, pendientes o vencidos) a la lista de recordatorios.
 function getFilteredReminders(reminders = []) {
   const mode = state.reminderFilter || 'all';
   if (mode === 'pending') {
@@ -1015,6 +1072,7 @@ function getFilteredReminders(reminders = []) {
   return reminders;
 }
 
+// Sincroniza la clase visual activa (.is-active) en los botones de filtro de recordatorios.
 function renderReminderFilterControls() {
   const filters = $('reminderFilters');
   if (!filters) return;
@@ -1024,6 +1082,7 @@ function renderReminderFilterControls() {
   });
 }
 
+// Analiza recordatorios pendientes que vencen en los próximos 2 meses y muestra una alerta informativa al usuario con los más próximos.
 function notifyReminderAdvanceAlert() {
   const reminders = Array.isArray(state.reminders) ? state.reminders : [];
   const now = new Date();
@@ -1039,6 +1098,7 @@ function notifyReminderAdvanceAlert() {
   const threshold = new Date(todayStart);
   threshold.setMonth(threshold.getMonth() + 2);
 
+  // Filtrar pendientes dentro de la ventana de 2 meses.
   const upcoming = reminders.filter((item) => {
     if (item?.is_completed) return false;
     const dueInput = reminderDueInputValue(item?.due_date);
@@ -1050,6 +1110,7 @@ function notifyReminderAdvanceAlert() {
 
   if (!upcoming.length) return;
 
+  // Ordenar por fecha y extraer el nombre de los dos primeros.
   const nearest = upcoming
     .slice()
     .sort((a, b) => {
@@ -1067,6 +1128,7 @@ function notifyReminderAdvanceAlert() {
   );
 }
 
+// Actualiza el contador numérico (badge) en la pestaña de navegación de recordatorios. Oculta la insignia si no hay elementos pendientes.
 function updateReminderTabBadge() {
   const badge = $('remindersTabBadge');
   if (!badge) return;
@@ -1084,6 +1146,7 @@ function updateReminderTabBadge() {
   badge.textContent = pendingCount > 99 ? '99+' : String(pendingCount);
 }
 
+// Renderiza en el DOM la lista de tarjetas de recordatorios ordenadas (pendientes primero por fecha de vencimiento, completados al final).
 function renderRemindersList() {
   const container = $('remindersList');
   if (!container) return;
@@ -1091,6 +1154,7 @@ function renderRemindersList() {
   const reminders = getFilteredReminders(
     Array.isArray(state.reminders) ? [...state.reminders] : []
   );
+  // Ordenación: pendientes antes que completados, luego por fecha ascendente
   reminders.sort((a, b) => {
     if (Boolean(a.is_completed) !== Boolean(b.is_completed)) {
       return a.is_completed ? 1 : -1;
@@ -1099,7 +1163,7 @@ function renderRemindersList() {
     const bDue = reminderDueInputValue(b?.due_date) || '9999-12-31';
     return aDue.localeCompare(bDue);
   });
-
+// Estado vacío si no hay recordatorios que mostrar.
   if (!reminders.length) {
     container.innerHTML = `
       <div class="list-empty-state">
@@ -1110,7 +1174,7 @@ function renderRemindersList() {
     `;
     return;
   }
-
+// Generación de tarjetas HTML dinámicas con sanitización XSS.
   container.innerHTML = reminders
     .map((item) => {
       const id = reminderIdOf(item);
@@ -1164,7 +1228,7 @@ function renderRemindersList() {
     })
     .join('');
 }
-
+// Restablece los campos del formulario de recordatorios a sus valores por defecto. Si es true, coloca el foco en el campo de título.
 function resetReminderForm(shouldFocus = false) {
   editingReminderId = null;
   const title = $('reminderTitle');
@@ -1191,6 +1255,7 @@ function resetReminderForm(shouldFocus = false) {
   if (shouldFocus && title) title.focus();
 }
 
+// Carga los datos de un recordatorio existente en el formulario para su edición. ID del recordatorio a editar.
 function loadReminderInForm(reminderId) {
   const reminder = getReminderById(reminderId);
   if (!reminder) return;
@@ -1222,6 +1287,7 @@ function loadReminderInForm(reminderId) {
   if (title) title.focus();
 }
 
+// Lee y valida los campos del formulario de recordatorios. Construye el objeto payload estructurado para la API. Payload listo para enviar o null si falla la validación.
 function buildReminderPayloadFromForm() {
   const titleRaw = String($('reminderTitle')?.value || '').trim();
   const amountRaw = String($('reminderAmount')?.value || '').trim();
@@ -1231,7 +1297,7 @@ function buildReminderPayloadFromForm() {
   const autoAdvance = Boolean($('reminderAutoAdvance')?.checked);
   const noteRaw = String($('reminderNote')?.value || '').trim();
   const isCompleted = Boolean($('reminderCompleted')?.checked);
-
+  // Validación de campos obligatorios.
   if (!titleRaw) {
     showAlert('Indica el nombre del recordatorio', 'error');
     $('reminderTitle')?.focus();
@@ -1242,7 +1308,7 @@ function buildReminderPayloadFromForm() {
     $('reminderDueDate')?.focus();
     return null;
   }
-
+  // Validación y casteo del importe numérico.
   let amountValue = null;
   if (amountRaw) {
     amountValue = Number(amountRaw);
@@ -1266,6 +1332,7 @@ function buildReminderPayloadFromForm() {
   };
 }
 
+// Consulta la API para obtener todos los recordatorios del usuario y actualiza el estado global, el badge del menú lateral/pestaña y la vista.
 async function loadReminders(options = {}) {
   const shouldNotify = Boolean(options?.notifyAdvance);
   if (!token) {
@@ -1289,6 +1356,11 @@ async function loadReminders(options = {}) {
   }
 }
 
+/**
+ * Guarda el recordatorio desde el formulario:
+ * - Si editingReminderId está definido -> ejecuta PATCH para actualizar
+ * - Si editingReminderId es null -> ejecuta POST para crear nuevo
+ */
 async function saveReminderFromSettings() {
   const payload = buildReminderPayloadFromForm();
   if (!payload) return;
@@ -1316,6 +1388,7 @@ async function saveReminderFromSettings() {
   }
 }
 
+// Alterna el estado de un recordatorio entre completado y pendiente (toggle).
 async function toggleReminderStatus(reminderId) {
   const reminder = getReminderById(reminderId);
   if (!reminder) return;
@@ -1333,6 +1406,7 @@ async function toggleReminderStatus(reminderId) {
   }
 }
 
+// Solicita confirmación y elimina un recordatorio del backend mediante DELETE.
 async function deleteReminder(reminderId) {
   const reminder = getReminderById(reminderId);
   const title = reminder ? String(reminder.title || '').trim() : '';
@@ -1345,6 +1419,7 @@ async function deleteReminder(reminderId) {
 
   try {
     await api(`/reminders/${reminderId}`, { method: 'DELETE' });
+    // Si se estaba editando este recordatorio en el formulario, limpiarlo.
     if (editingReminderId && editingReminderId === String(reminderId)) {
       resetReminderForm();
     }
@@ -1355,6 +1430,13 @@ async function deleteReminder(reminderId) {
   }
 }
 
+/**
+ * Inicializa los eventos de la vista de recordatorios:
+ * - Botón de alternar visibilidad del formulario (Nuevo / Cerrar)
+ * - Guardar y limpiar formulario
+ * - Delegación de eventos para filtros de estado
+ * - Delegación de eventos para acciones en las tarjetas (marcar, editar, borrar)
+ */
 function initReminderListeners() {
   const btnSaveReminder = $('btnSaveReminder');
   const btnClearReminderForm = $('btnClearReminderForm');
@@ -1363,6 +1445,7 @@ function initReminderListeners() {
   const btnToggleReminderForm = $('btnToggleReminderForm');
   const reminderEditorCard = $('reminderEditorCard');
 
+  // Control de colapso/despliegue del formulario de recordatorios.
   if (btnToggleReminderForm && reminderEditorCard) {
     btnToggleReminderForm.addEventListener('click', () => {
       const isHidden = reminderEditorCard.style.display === 'none';
@@ -1372,17 +1455,17 @@ function initReminderListeners() {
         : '<i class="ph ph-plus"></i> Nuevo';
     });
   }
-
+  // Guardar recordatorio.
   if (btnSaveReminder)
     btnSaveReminder.addEventListener('click', () => {
       saveReminderFromSettings();
     });
-
+  // Limpiar formulario y enfocar el primer campo.
   if (btnClearReminderForm)
     btnClearReminderForm.addEventListener('click', () => {
       resetReminderForm(true);
     });
-
+  // Delegación de eventos: Filtros (Todos / Pendientes / Vencidos).
   if (reminderFilters)
     reminderFilters.addEventListener('click', (event) => {
       const button = event.target.closest('[data-reminder-filter]');
@@ -1391,7 +1474,7 @@ function initReminderListeners() {
       renderReminderFilterControls();
       renderRemindersList();
     });
-
+  // Delegación de eventos: Acciones individuales en tarjetas de recordatorios.
   if (remindersList)
     remindersList.addEventListener('click', (event) => {
       const button = event.target.closest('[data-action]');
@@ -1415,6 +1498,10 @@ function initReminderListeners() {
     });
 }
 
+// -----------------------------------------------------------------------------
+// SISTEMA DE ICONOGRAFÍA Y COLOR DE CATEGORÍAS
+// -----------------------------------------------------------------------------
+// Mapeo para retrocompatibilidad de identificadores de iconos antiguos (Material Icons) a Emojis.
 const LEGACY_ICON_MAP = {
   payment: '💳',
   payments: '💳',
@@ -1448,11 +1535,12 @@ const LEGACY_ICON_MAP = {
   category: '🧩'
 };
 
+// Reglas de inferencia automática de iconos basadas en palabras clave del nombre.
 const CATEGORY_NAME_ICON_MAP = [
   [/nomina|nómina|salario/i, '💼'],
   [/extra|bonus/i, '✨'],
   [/regalo/i, '🎁'],
-  [/intere/i, '📈'],
+  [/interes/i, '📈'],
   [/venta/i, '🏷️'],
   [/hogar|alquiler|vivienda/i, '🏠'],
   [/suministro|luz|agua/i, '💡'],
@@ -1461,7 +1549,7 @@ const CATEGORY_NAME_ICON_MAP = [
   [/restaurante|desayuno|snack|cena/i, '🍽️'],
   [/ocio|hobb|cine|concierto|evento|viaje/i, '🎨'],
   [/personal|médico|medico|peluquer|deporte|aseo/i, '🧘'],
-  [/compra|ropa|tecnolog/i, '🛍️'],
+  [/compra|ropa|tecnologia/i, '🛍️'],
   [/transporte|gasolina|uber|peaje|coche|moto/i, '🚗'],
   [/invit/i, '🥂'],
   [/suscrip|netflix|spotify|icloud/i, '📱'],
@@ -1473,6 +1561,7 @@ const CATEGORY_NAME_ICON_MAP = [
   [/vario|otro/i, '🧩']
 ];
 
+// Conjunto de validación con todos los emojis soportados en la aplicación.
 const CATEGORY_ICON_SET = new Set([
   '💼',
   '✨',
@@ -1548,6 +1637,7 @@ const CATEGORY_ICON_SET = new Set([
   '✅'
 ]);
 
+// Agrupaciones temáticas de iconos para renderizar el selector en la interfaz.
 const CATEGORY_ICON_GROUPS = [
   {
     label: 'Ingresos y dinero',
@@ -1595,6 +1685,7 @@ const CATEGORY_ICON_GROUPS = [
   }
 ];
 
+// Paleta de colores asociada por defecto a cada icono de categoría.
 const CATEGORY_ICON_COLOR_MAP = {
   '💼': '#16a34a',
   '✨': '#22c55e',
@@ -1670,6 +1761,7 @@ const CATEGORY_ICON_COLOR_MAP = {
   '✅': '#16a34a'
 };
 
+// Resuelve y normaliza el icono de una categoría. Convierte formatos legados a emojis o infiere uno basado en el nombre.
 function normalizeCategoryIcon(rawIcon, categoryName, fallbackIcon = '🧾') {
   const icon = String(rawIcon || '').trim();
   if (!icon) {
@@ -1689,6 +1781,7 @@ function normalizeCategoryIcon(rawIcon, categoryName, fallbackIcon = '🧾') {
   return icon;
 }
 
+// Deduce un emoji adecuado evaluando expresiones regulares contra el nombre de la categoría.
 function inferIconFromCategoryName(categoryName, fallbackIcon = '🧾') {
   const name = String(categoryName || '').trim();
   for (const [pattern, icon] of CATEGORY_NAME_ICON_MAP) {
@@ -1697,6 +1790,7 @@ function inferIconFromCategoryName(categoryName, fallbackIcon = '🧾') {
   return String(fallbackIcon);
 }
 
+// Determina el color cromático de una categoría a partir de su icono o nombre semántico.
 function inferColorFromCategory(category, fallbackColor = '#94a3b8') {
   const icon = normalizeCategoryIcon(category?.icon, category?.name, '🧾');
   const fromIcon = CATEGORY_ICON_COLOR_MAP[icon];
@@ -1717,6 +1811,7 @@ function inferColorFromCategory(category, fallbackColor = '#94a3b8') {
   return fallbackColor;
 }
 
+// Escapa caracteres especiales en cadenas de texto para prevenir inyecciones XSS antes de insertar contenido dinámico en el DOM con innerHTML.
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -1726,6 +1821,7 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
+// Renderiza una tarjeta de estado vacío (Empty State) con soporte de accesibilidad.
 function renderListEmptyState(iconClass, title, hint = '') {
   const hintHtml = hint
     ? `<p class="list-empty-state__hint">${escapeHtml(hint)}</p>`
@@ -1739,16 +1835,19 @@ function renderListEmptyState(iconClass, title, hint = '') {
   `;
 }
 
+// Normaliza un valor de color asegurando que no quede vacío, usando un fallback.
 function normalizeColorValue(value, fallback) {
   const input = String(value || '').trim();
   return input || fallback;
 }
 
+// Restablece el valor de un campo input tipo archivo en el DOM.
 function clearFileInput(inputId) {
   const input = $(inputId);
   if (input) input.value = '';
 }
 
+// Lee un archivo de imagen seleccionado por el usuario y lo convierte a formato Base64 Data URL.
 function readImageFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     if (!file) {
@@ -1765,6 +1864,7 @@ function readImageFileAsDataUrl(file) {
   });
 }
 
+// Valida y normaliza una URL remota de imagen asegurando protocolo http o https.
 function normalizeRemoteImageUrl(value) {
   const trimmed = String(value || '').trim();
   if (!trimmed) return null;
@@ -1779,6 +1879,7 @@ function normalizeRemoteImageUrl(value) {
   }
 }
 
+// Construye el HTML para la vista previa de un icono o imagen de categoría/cuenta.
 function buildVisualPreviewMarkup(imageData, icon, fallbackIcon = '🧾') {
   if (imageData) {
     return `<div class="visual-preview-card"><img class="visual-preview-image" src="${escapeHtml(imageData)}" alt="Vista previa" /></div>`;
@@ -1788,6 +1889,7 @@ function buildVisualPreviewMarkup(imageData, icon, fallbackIcon = '🧾') {
   return `<div class="visual-preview-card visual-preview-card--icon"><span>${escapeHtml(resolvedIcon)}</span></div>`;
 }
 
+// Inyecta la vista previa visual en un contenedor específico del DOM.
 function renderVisualPreview(
   containerId,
   imageData,
@@ -1799,6 +1901,7 @@ function renderVisualPreview(
   container.innerHTML = buildVisualPreviewMarkup(imageData, icon, fallbackIcon);
 }
 
+// Genera el elemento visual interno (etiqueta img optimizada o span con emoji).
 function renderCategoryVisualContent(
   visual,
   imageClass = 'visual-token-image'
@@ -1809,6 +1912,7 @@ function renderCategoryVisualContent(
   return `<span>${escapeHtml(visual.icon)}</span>`;
 }
 
+// Construye la directiva de estilos en línea (CSS variables, fondo y borde) para tokens visuales.
 function buildCategoryVisualStyle(visual, includeColorToken = true) {
   const styles = [];
   if (includeColorToken) styles.push(`--cat-color:${visual.color}`);
@@ -1817,6 +1921,7 @@ function buildCategoryVisualStyle(visual, includeColorToken = true) {
   return styles.join(';');
 }
 
+// Consolida y resuelve todas las propiedades visuales de una categoría.
 function getCategoryVisual(
   category,
   fallbackIcon = '🧾',
@@ -1836,6 +1941,7 @@ function getCategoryVisual(
   };
 }
 
+// Devuelve la configuración visual predeterminada para operaciones de traspaso entre cuentas.
 function getTransferVisual(categoryId) {
   if (categoryId === 'transfer_out') {
     return {
@@ -1860,6 +1966,7 @@ function getTransferVisual(categoryId) {
   return null;
 }
 
+// Comprueba si una categoría o subcategoría tiene un icono o imagen personalizada configurada.
 function hasCustomCategoryVisual(category) {
   if (!category || typeof category !== 'object') return false;
   const icon = String(category.icon || '').trim();
@@ -1867,7 +1974,9 @@ function hasCustomCategoryVisual(category) {
   return Boolean(icon || imageData);
 }
 
+// Resuelve la identidad visual completa (icono, color, imagen), título y subtítulo para una transacción en listas, tablas o tarjetas.
 function resolveTransactionVisual(tx, category, subcategory) {
+  // 1. Caso especial: Operaciones de traspaso entre cuentas.
   const transferVisual = getTransferVisual(tx?.category_id);
   if (transferVisual) {
     return {
@@ -1881,8 +1990,7 @@ function resolveTransactionVisual(tx, category, subcategory) {
     String(tx?.subcategory_id || '').trim()
   );
 
-  // If a subcategory was selected, use its visual only when it actually has one.
-  // Otherwise, fallback to the parent category visual to avoid unexpected icon swaps.
+  // 2. Herencia visual: si la subcategoría no tiene icono propio, hereda el de la categoría padre.
   let sourceForVisual = category || subcategory;
   if (hasSubcategorySelection && subcategory) {
     sourceForVisual = hasCustomCategoryVisual(subcategory)
@@ -1902,12 +2010,14 @@ function resolveTransactionVisual(tx, category, subcategory) {
   };
 }
 
+// Genera el elemento HTML <option> para desplegables de categorías principales.
 function buildCategoryOption(category) {
   const visual = getCategoryVisual(category);
   const label = escapeHtml(visual.icon + ' ' + visual.name);
   return `<option value="${category._id}">${label}</option>`;
 }
 
+// Genera el elemento HTML <option> para desplegables de subcategorías, heredando el icono de la categoría padre si la subcategoría no tiene uno propio.
 function buildSubcategoryOption(category, parentCategory = null) {
   const parentVisual = parentCategory
     ? getCategoryVisual(parentCategory)

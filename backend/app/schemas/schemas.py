@@ -1,9 +1,13 @@
+# backend/app/schemas/schemas.py
 from __future__ import annotations
-from datetime import datetime
+
 import re
-from pydantic import BaseModel, Field, EmailStr, field_validator
-from typing import Optional, Literal
-from app.logic import get_billing_cycle_period
+from datetime import datetime
+from typing import Literal, Optional
+
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+from ..services.finance import get_billing_cycle_period
 
 # Tipos definidos
 TxType = Literal["income", "expense"]
@@ -11,7 +15,6 @@ AccType = Literal["cash", "bank", "credit"]
 
 
 def _validate_password_strength(v: str) -> str:
-    # Validación simple: solo longitud (6-128 caracteres)
     if len(v) < 6:
         raise ValueError("Contraseña debe tener al menos 6 caracteres")
     return v
@@ -19,7 +22,7 @@ def _validate_password_strength(v: str) -> str:
 
 # --- USUARIOS ---
 class UserCreate(BaseModel):
-    """Modelo para crear nuevo usuario"""
+    """Modelo para crear nuevo usuario."""
 
     email: EmailStr = Field(..., description="Correo electrónico único")
     password: str = Field(
@@ -33,7 +36,7 @@ class UserCreate(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
-    """Modelo para cambio de contraseña del usuario autenticado"""
+    """Modelo para cambio de contraseña del usuario autenticado."""
 
     current_password: str = Field(
         ..., min_length=1, max_length=128, description="Contraseña actual"
@@ -84,7 +87,7 @@ class UserSettingsUpdate(BaseModel):
 
 # --- CUENTAS ---
 class AccountCreate(BaseModel):
-    """Modelo para crear nueva cuenta de dinero"""
+    """Modelo para crear nueva cuenta de dinero."""
 
     name: str = Field(
         ..., min_length=1, max_length=50, description="Nombre de la cuenta"
