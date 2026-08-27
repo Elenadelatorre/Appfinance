@@ -573,14 +573,25 @@ export async function saveTx() {
       });
     }
 
+    // 1. Recargar cuentas para refrescar saldos en memoria
+    state.accounts = await api('/accounts');
+
     const form = $('txForm');
     if (form) form.reset();
     editingTxId = null;
     closeModal('modalAddTx');
 
+    // 2. Ejecutar callback si está registrado
     if (typeof refreshAppCallback === 'function') {
       await refreshAppCallback(account_id);
     }
+
+    // 3. Emitir evento global para que las vistas se repinten solas
+    window.dispatchEvent(
+      new CustomEvent('finance:transactions-changed', {
+        detail: { accountId: account_id }
+      })
+    );
   } catch (err) {
     showAlert('Error al guardar: ' + (err?.message || String(err)), 'error');
   }
@@ -591,9 +602,21 @@ export async function deleteTx(txId) {
   try {
     const currentAccountId = ($('txAccount')?.value || '').trim() || null;
     await api(`/transactions/${txId}`, { method: 'DELETE' });
+
+    // 1. Recargar cuentas tras borrar
+    state.accounts = await api('/accounts');
+
+    // 2. Ejecutar callback
     if (typeof refreshAppCallback === 'function') {
       await refreshAppCallback(currentAccountId);
     }
+
+    // 3. Emitir evento global
+    window.dispatchEvent(
+      new CustomEvent('finance:transactions-changed', {
+        detail: { accountId: currentAccountId }
+      })
+    );
   } catch (err) {
     showAlert('Error al eliminar: ' + (err?.message || String(err)), 'error');
   }
