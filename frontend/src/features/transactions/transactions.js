@@ -445,7 +445,13 @@ export function applyCreateModalMode() {
   setFormControlsDisabled(form, false);
   if (form) form.reset();
   const txDate = $('txDate');
-  if (txDate) txDate.value = new Date().toISOString().slice(0, 10);
+  if (txDate) {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    txDate.value = `${year}-${month}-${day}`;
+  }
   editingTxId = null;
   updateCategoriesForType();
 }
