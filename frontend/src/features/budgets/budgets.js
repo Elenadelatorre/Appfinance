@@ -1,4 +1,4 @@
-// js/features/budgets/budgets.js
+// src/features/budgets/budgets.js
 import { state } from '../../state/state.js';
 import { api } from '../../services/api.js';
 import { BUDGET_FILTER_STORAGE_KEY } from '../../config/constants.js';
@@ -22,13 +22,13 @@ export function getBudgetParentCategories() {
 }
 
 export function renderBudgetStatusCard(item) {
-  const limit = Number(item.limit || 0);
-  const spent = Number(item.spent || 0);
+  const limit = Math.max(0, Number(item.limit || 0));
+  const spent = Math.max(0, Number(item.spent || 0));
   const remaining = Number(item.remaining || 0);
   const ratio = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
   const isExceeded = remaining < 0;
   const cardStateClass = isExceeded ? 'is-danger' : 'is-ok';
-  const budgetId = String(item.budget_id || '');
+  const budgetId = String(item.budget_id || item.id || item._id || '');
   const categoryId = String(item.category_id || '');
 
   return `
@@ -73,7 +73,9 @@ export function setBudgetStatusFilter(filterValue = 'all') {
     ? filterValue
     : 'all';
   state.budgetStatusFilter = normalized;
-  localStorage.setItem(BUDGET_FILTER_STORAGE_KEY, normalized);
+  try {
+    localStorage.setItem(BUDGET_FILTER_STORAGE_KEY, normalized);
+  } catch {}
 
   const budgetStatusFilters = $('budgetStatusFilters');
   if (!budgetStatusFilters) return;
@@ -125,7 +127,9 @@ export function resetBudgetForm() {
 }
 
 export function startEditBudget(item) {
-  state.editingBudgetId = String(item?.budget_id || '');
+  state.editingBudgetId = String(
+    item?.budget_id || item?.id || item?._id || ''
+  );
   const categorySelect = $('budgetCategorySelect');
   const limitInput = $('budgetLimitInput');
   const saveBtn = $('budgetSaveBtn');
@@ -221,14 +225,17 @@ export async function populateBudgetCategorySelect() {
   const options = [
     '<option value="">Selecciona categoría</option>',
     ...categories.map((category) => {
+      const catId = String(category.id || category._id || '');
       const visual = getCategoryVisual(category);
       const label = `${visual.icon} ${visual.name}`;
-      return `<option value="${category._id}">${escapeHtml(label)}</option>`;
+      return `<option value="${escapeHtml(catId)}">${escapeHtml(label)}</option>`;
     })
   ];
 
   select.innerHTML = options.join('');
-  select.value = categories.some((category) => category._id === currentValue)
+  select.value = categories.some(
+    (category) => String(category.id || category._id) === currentValue
+  )
     ? currentValue
     : '';
 }
@@ -323,6 +330,7 @@ export async function loadBudgetsView() {
     statusList.innerHTML = filteredItems
       .map((item) => renderBudgetStatusCard(item))
       .join('');
+
     statusList
       .querySelectorAll('[data-action="edit-budget"]')
       .forEach((button) => {
@@ -331,7 +339,9 @@ export async function loadBudgetsView() {
           const categoryId = button.dataset.categoryId || '';
           const limit = Number.parseFloat(button.dataset.limit || '0');
           const selected = filteredItems.find(
-            (item) => String(item.budget_id || '') === String(budgetId)
+            (item) =>
+              String(item.budget_id || item.id || item._id || '') ===
+              String(budgetId)
           ) || {
             budget_id: budgetId,
             category_id: categoryId,
@@ -340,6 +350,7 @@ export async function loadBudgetsView() {
           startEditBudget(selected);
         });
       });
+
     statusList
       .querySelectorAll('[data-action="delete-budget"]')
       .forEach((button) => {
@@ -350,7 +361,9 @@ export async function loadBudgetsView() {
 
     if (state.editingBudgetId) {
       const currentEditing = items.find(
-        (item) => String(item.budget_id || '') === String(state.editingBudgetId)
+        (item) =>
+          String(item.budget_id || item.id || item._id || '') ===
+          String(state.editingBudgetId)
       );
       if (currentEditing) startEditBudget(currentEditing);
       else resetBudgetForm();
@@ -366,11 +379,21 @@ export function initBudgetListeners() {
   const budgetSaveBtn = $('budgetSaveBtn');
   const budgetCancelEditBtn = $('budgetCancelEditBtn');
   const budgetStatusFilters = $('budgetStatusFilters');
+  const budgetLimitInput = $('budgetLimitInput');
 
-  if (budgetSaveBtn)
+  if (budgetSaveBtn) {
     budgetSaveBtn.addEventListener('click', () => saveBudgetFromView());
-  if (budgetCancelEditBtn)
+  }
+  if (budgetCancelEditBtn) {
     budgetCancelEditBtn.addEventListener('click', () => resetBudgetForm());
+  }
+
+  if (budgetLimitInput) {
+    budgetLimitInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') saveBudgetFromView();
+    });
+  }
+
   if (budgetStatusFilters) {
     budgetStatusFilters.addEventListener('click', (event) => {
       const button = event.target.closest('[data-budget-filter]');
@@ -379,5 +402,7 @@ export function initBudgetListeners() {
       loadBudgetsView();
     });
   }
-  setBudgetStatusFilter(state.budgetStatusFilter || 'all');
+
+  const storedFilter = localStorage.getItem(BUDGET_FILTER_STORAGE_KEY);
+  setBudgetStatusFilter(storedFilter || state.budgetStatusFilter || 'all');
 }
