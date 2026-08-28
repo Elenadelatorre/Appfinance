@@ -103,7 +103,13 @@ async def create_indexes() -> None:
 
         # Presupuestos
         await budgets_col().create_index(
-            [("user_id", ASCENDING), ("month", ASCENDING)], unique=True
+            [
+                ("user_id", ASCENDING),
+                ("category_id", ASCENDING),
+                ("year", ASCENDING),
+                ("month", ASCENDING),
+            ],
+            unique=True,
         )
 
         # Metas de ahorro
