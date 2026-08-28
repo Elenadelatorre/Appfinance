@@ -1,5 +1,9 @@
-// js/services/api.js
-import { API_STORAGE_KEY, DEFAULT_LOCAL_API } from '../config/constants.js';
+// src/services/api.js
+import {
+  API_STORAGE_KEY,
+  DEFAULT_LOCAL_API,
+  API_TIMEOUT_MS
+} from '../config/constants.js';
 import { readStartupToken } from './storage.js';
 import { showAlert } from '../utils/toast.js';
 
@@ -37,7 +41,7 @@ let currentToken = readStartupToken();
 let onSessionExpiredCallback = null;
 
 export function setApiToken(token) {
-  currentToken = token;
+  currentToken = token || '';
 }
 
 export function getApiToken() {
@@ -90,57 +94,80 @@ export function extractApiErrorMessage(
 }
 
 export async function readErrorMessage(response, fallback) {
-  const text = await response.text();
-  if (!text) return fallback;
   try {
-    const payload = JSON.parse(text);
-    return extractApiErrorMessage(payload, fallback);
+    const text = await response.text();
+    if (!text) return fallback;
+    try {
+      const payload = JSON.parse(text);
+      return extractApiErrorMessage(payload, fallback);
+    } catch {
+      return text;
+    }
   } catch {
-    return text;
+    return fallback;
   }
 }
 
 export async function fetchJsonSilent(path, opts = {}) {
-  const headers = opts.headers || {};
-  if (currentToken) headers.Authorization = `Bearer ${currentToken}`;
+  const headers = { ...(opts.headers || {}) };
+  if (currentToken) headers['Authorization'] = `Bearer ${currentToken}`;
   if (opts.json) headers['Content-Type'] = 'application/json';
 
-  const res = await fetch(`${API}${path}`, {
-    ...opts,
-    headers,
-    credentials: 'include',
-    mode: 'cors'
-  });
-
-  const text = await res.text();
-  let data = null;
   try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = null;
-  }
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      opts.timeoutMs || API_TIMEOUT_MS || 15000
+    );
 
-  return { ok: res.ok, status: res.status, data };
+    const res = await fetch(`${API}${path}`, {
+      ...opts,
+      headers,
+      signal: opts.signal || controller.signal,
+      credentials: 'include',
+      mode: 'cors'
+    });
+    clearTimeout(timeout);
+
+    const text = await res.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
+    }
+
+    return { ok: res.ok, status: res.status, data };
+  } catch (err) {
+    return { ok: false, status: 0, data: null, error: err };
+  }
 }
 
 export async function api(path, opts = {}) {
   if (!path.startsWith('/')) {
-    console.error('❌ Path debe comenzar con /');
-    throw new Error('Path inválido');
+    throw new Error('Path inválido: debe comenzar con /');
   }
 
-  const headers = opts.headers || {};
+  const headers = { ...(opts.headers || {}) };
   const requestToken = currentToken;
   if (requestToken) headers['Authorization'] = `Bearer ${requestToken}`;
   if (opts.json) headers['Content-Type'] = 'application/json';
+
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    opts.timeoutMs || API_TIMEOUT_MS || 15000
+  );
 
   try {
     const res = await fetch(`${API}${path}`, {
       ...opts,
       headers,
+      signal: opts.signal || controller.signal,
       credentials: 'include',
       mode: 'cors'
     });
+    clearTimeout(timeout);
 
     if (res.status === 401) {
       if (requestToken && requestToken !== currentToken) {
@@ -165,28 +192,43 @@ export async function api(path, opts = {}) {
       throw noAuthErr;
     }
 
+    if (res.status === 204) {
+      return null;
+    }
+
     const text = await res.text();
     let data = null;
 
-    try {
-      data = text ? JSON.parse(text) : null;
-    } catch (e) {
-      console.error('Error parseando respuesta:', e);
-      throw new Error('Respuesta inválida del servidor');
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error('Respuesta inválida del servidor');
+      }
     }
 
     if (!res.ok) {
       const errorMsg = extractApiErrorMessage(data, `Error ${res.status}`);
-      console.error(`❌ API ${res.status}:`, errorMsg);
       throw new Error(errorMsg);
     }
 
     return data;
   } catch (error) {
-    if (error?.code === 'STALE_AUTH_REQUEST' || error?.code === 'NO_AUTH') {
+    clearTimeout(timeout);
+    if (error.name === 'AbortError') {
+      const timeoutErr = new Error(
+        'Tiempo de espera agotado al conectar con el servidor'
+      );
+      showAlert(timeoutErr.message, 'error');
+      throw timeoutErr;
+    }
+    if (
+      error?.code === 'STALE_AUTH_REQUEST' ||
+      error?.code === 'NO_AUTH' ||
+      error?.code === 'SESSION_EXPIRED'
+    ) {
       throw error;
     }
-    console.error('❌ API Error:', error.message);
     showAlert(error.message, 'error');
     throw error;
   }

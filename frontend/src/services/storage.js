@@ -1,4 +1,4 @@
-// js/services/storage.js
+// src/services/storage.js
 import {
   TOKEN_STORAGE_KEY,
   REMEMBER_DEVICE_STORAGE_KEY,
@@ -11,30 +11,67 @@ import {
   PROFILE_AVATAR_CHOICES
 } from '../config/constants.js';
 
+function safeStorageGet(storage, key) {
+  try {
+    return storage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeStorageSet(storage, key, value) {
+  try {
+    storage.setItem(key, value);
+  } catch {}
+}
+
+function safeStorageRemove(storage, key) {
+  try {
+    storage.removeItem(key);
+  } catch {}
+}
+
 export function isRememberDeviceEnabled() {
-  return localStorage.getItem(REMEMBER_DEVICE_STORAGE_KEY) === '1';
+  return safeStorageGet(localStorage, REMEMBER_DEVICE_STORAGE_KEY) === '1';
 }
 
 export function setRememberDevicePreference(enabled) {
   if (enabled) {
-    localStorage.setItem(REMEMBER_DEVICE_STORAGE_KEY, '1');
+    safeStorageSet(localStorage, REMEMBER_DEVICE_STORAGE_KEY, '1');
     return;
   }
-  localStorage.removeItem(REMEMBER_DEVICE_STORAGE_KEY);
+  safeStorageRemove(localStorage, REMEMBER_DEVICE_STORAGE_KEY);
 }
 
 export function readStartupToken() {
   const remembered = isRememberDeviceEnabled();
   const sourceStorage = remembered ? localStorage : sessionStorage;
   const staleStorage = remembered ? sessionStorage : localStorage;
-  staleStorage.removeItem(TOKEN_STORAGE_KEY);
-  return String(sourceStorage.getItem(TOKEN_STORAGE_KEY) || '').trim();
+
+  safeStorageRemove(staleStorage, TOKEN_STORAGE_KEY);
+
+  let token = safeStorageGet(sourceStorage, TOKEN_STORAGE_KEY);
+
+  // Migración retrocompatible por si existía bajo la clave simple 'token'
+  if (!token) {
+    const legacyToken = safeStorageGet(sourceStorage, 'token');
+    if (legacyToken) {
+      token = legacyToken;
+      safeStorageSet(sourceStorage, TOKEN_STORAGE_KEY, legacyToken);
+      safeStorageRemove(sourceStorage, 'token');
+    }
+  }
+
+  return String(token || '').trim();
 }
 
 export function persistAuthToken(nextToken, rememberDevice = false) {
   const normalized = String(nextToken || '').trim();
-  localStorage.removeItem(TOKEN_STORAGE_KEY);
-  sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+
+  safeStorageRemove(localStorage, TOKEN_STORAGE_KEY);
+  safeStorageRemove(sessionStorage, TOKEN_STORAGE_KEY);
+  safeStorageRemove(localStorage, 'token');
+  safeStorageRemove(sessionStorage, 'token');
 
   if (!normalized) {
     setRememberDevicePreference(false);
@@ -43,15 +80,17 @@ export function persistAuthToken(nextToken, rememberDevice = false) {
 
   setRememberDevicePreference(Boolean(rememberDevice));
   if (rememberDevice) {
-    localStorage.setItem(TOKEN_STORAGE_KEY, normalized);
+    safeStorageSet(localStorage, TOKEN_STORAGE_KEY, normalized);
     return;
   }
-  sessionStorage.setItem(TOKEN_STORAGE_KEY, normalized);
+  safeStorageSet(sessionStorage, TOKEN_STORAGE_KEY, normalized);
 }
 
 export function clearPersistedAuthToken() {
-  sessionStorage.removeItem(TOKEN_STORAGE_KEY);
-  localStorage.removeItem(TOKEN_STORAGE_KEY);
+  safeStorageRemove(sessionStorage, TOKEN_STORAGE_KEY);
+  safeStorageRemove(localStorage, TOKEN_STORAGE_KEY);
+  safeStorageRemove(sessionStorage, 'token');
+  safeStorageRemove(localStorage, 'token');
 }
 
 export function normalizeAccentColor(
@@ -59,6 +98,15 @@ export function normalizeAccentColor(
   fallback = DEFAULT_APP_SETTINGS.accentColor
 ) {
   const input = String(value || '').trim();
+
+  // Soporte para #RGB (3 caracteres) expandido a #RRGGBB
+  if (/^#[0-9a-f]{3}$/i.test(input)) {
+    const r = input[1];
+    const g = input[2];
+    const b = input[3];
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+
   return /^#[0-9a-f]{6}$/i.test(input) ? input.toLowerCase() : fallback;
 }
 
@@ -96,28 +144,33 @@ export function normalizeAppSettings(rawSettings = {}) {
 
 export function loadStoredAppSettings() {
   const stored = {
-    defaultView: localStorage.getItem(SETTINGS_DEFAULT_VIEW_KEY),
-    reduceMotion: localStorage.getItem(SETTINGS_REDUCE_MOTION_KEY) === '1',
-    profileAvatar: localStorage.getItem(SETTINGS_PROFILE_AVATAR_KEY),
-    accentColor: localStorage.getItem(SETTINGS_ACCENT_COLOR_KEY)
+    defaultView: safeStorageGet(localStorage, SETTINGS_DEFAULT_VIEW_KEY),
+    reduceMotion:
+      safeStorageGet(localStorage, SETTINGS_REDUCE_MOTION_KEY) === '1',
+    profileAvatar: safeStorageGet(localStorage, SETTINGS_PROFILE_AVATAR_KEY),
+    accentColor: safeStorageGet(localStorage, SETTINGS_ACCENT_COLOR_KEY)
   };
   return normalizeAppSettings(stored);
 }
 
 export function saveStoredAppSettings(settings) {
-  localStorage.setItem(
+  safeStorageSet(
+    localStorage,
     SETTINGS_DEFAULT_VIEW_KEY,
     settings.defaultView || DEFAULT_APP_SETTINGS.defaultView
   );
-  localStorage.setItem(
+  safeStorageSet(
+    localStorage,
     SETTINGS_REDUCE_MOTION_KEY,
     settings.reduceMotion ? '1' : '0'
   );
-  localStorage.setItem(
+  safeStorageSet(
+    localStorage,
     SETTINGS_PROFILE_AVATAR_KEY,
     settings.profileAvatar || DEFAULT_APP_SETTINGS.profileAvatar
   );
-  localStorage.setItem(
+  safeStorageSet(
+    localStorage,
     SETTINGS_ACCENT_COLOR_KEY,
     normalizeAccentColor(settings.accentColor, DEFAULT_APP_SETTINGS.accentColor)
   );
