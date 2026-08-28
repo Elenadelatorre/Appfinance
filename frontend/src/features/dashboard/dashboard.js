@@ -1,4 +1,4 @@
-// js/features/dashboard/dashboard.js
+// src/features/dashboard/dashboard.js
 import { state } from '../../state/state.js';
 import { api } from '../../services/api.js';
 import { $, escapeHtml, renderListEmptyState } from '../ui/dom.js';
@@ -119,7 +119,9 @@ export function buildDashboardAccountSpendCard(
   accounts = [],
   transactions = []
 ) {
-  const selectableAccounts = (accounts || []).filter((acc) => acc?.id);
+  const selectableAccounts = (accounts || []).filter(
+    (acc) => acc?.id || acc?._id
+  );
 
   if (!selectableAccounts.length) {
     return `
@@ -136,7 +138,9 @@ export function buildDashboardAccountSpendCard(
   }
 
   const selectedAccount = selectableAccounts.find(
-    (acc) => String(acc.id) === String(state.dashboardSelectedAccountId || '')
+    (acc) =>
+      String(acc.id || acc._id) ===
+      String(state.dashboardSelectedAccountId || '')
   );
   const isAllAccounts = !selectedAccount;
 
@@ -146,14 +150,14 @@ export function buildDashboardAccountSpendCard(
         isAllAccounts ? ' is-active' : ''
       }" data-dashboard-account-id="__all__">Todas</button>
       ${selectableAccounts
-        .map(
-          (acc) =>
-            `<button type="button" class="account-spend-account-pill${
-              String(acc.id) === String(selectedAccount?.id || '')
-                ? ' is-active'
-                : ''
-            }" data-dashboard-account-id="${escapeHtml(acc.id)}">${escapeHtml(acc.name || 'Cuenta')}</button>`
-        )
+        .map((acc) => {
+          const accId = String(acc.id || acc._id);
+          return `<button type="button" class="account-spend-account-pill${
+            accId === String(selectedAccount?.id || selectedAccount?._id || '')
+              ? ' is-active'
+              : ''
+          }" data-dashboard-account-id="${escapeHtml(accId)}">${escapeHtml(acc.name || 'Cuenta')}</button>`;
+        })
         .join('')}
     </div>
   `;
@@ -167,10 +171,11 @@ export function buildDashboardAccountSpendCard(
     });
   }
 
+  const targetAccId = String(selectedAccount.id || selectedAccount._id);
   const filteredTransactions = (transactions || []).filter((tx) => {
-    const accountRef = String(tx?.account_id || '');
+    const accountRef = String(tx?.account_id || '').trim();
     return (
-      accountRef === String(selectedAccount.id) ||
+      accountRef === targetAccId ||
       accountRef === String(selectedAccount.name || '')
     );
   });
@@ -208,26 +213,28 @@ function enableHomeCardNavigation(homeCard, accountId) {
 
 function syncHomeTransferButton(button, account) {
   if (!button) return;
-  const canTransfer = Boolean(account?.id);
+  const accId = account?.id || account?._id;
+  const canTransfer = Boolean(accId);
   button.disabled = !canTransfer;
   button.onclick = canTransfer
     ? async (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
-        await openTransferModal(account.id);
+        await openTransferModal(accId);
       }
     : null;
 }
 
 function syncHomeResetButton(button, account) {
   if (!button) return;
-  const canReset = Boolean(account?.id);
+  const accId = account?.id || account?._id;
+  const canReset = Boolean(accId);
   button.disabled = !canReset;
   button.onclick = canReset
     ? async (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
-        await confirmAndResetAccount(account.id, account.name, false);
+        await confirmAndResetAccount(accId, account.name, false);
       }
     : null;
 }
@@ -239,10 +246,11 @@ function applyEmptyHomeAccountState(
   homeSpendDistribution
 ) {
   applyAccountTheme(homeCard, { name: 'Cuenta', type: 'bank' });
-  $('homeAccountName').textContent = 'Sin cuenta';
-  $('homeAccountSubtitle').textContent = 'Cuenta principal';
-  $('homeAccountBalance').textContent = '0.00€';
-  $('homeAccountType').textContent = 'Cuenta';
+  if ($('homeAccountName')) $('homeAccountName').textContent = 'Sin cuenta';
+  if ($('homeAccountSubtitle'))
+    $('homeAccountSubtitle').textContent = 'Cuenta principal';
+  if ($('homeAccountBalance')) $('homeAccountBalance').textContent = '0.00€';
+  if ($('homeAccountType')) $('homeAccountType').textContent = 'Cuenta';
 
   disableHomeCardNavigation(homeCard);
   syncHomeTransferButton(homeTransferBtn, null);
@@ -303,6 +311,7 @@ export async function loadHomeAccount(options = {}) {
       return;
     }
 
+    const principalAccId = String(principalAccount.id || principalAccount._id);
     const typeLabel =
       {
         bank: '🏦 Banco',
@@ -310,7 +319,7 @@ export async function loadHomeAccount(options = {}) {
         credit: '💳 Tarjeta crédito'
       }[principalAccount.type] || principalAccount.type;
 
-    $('homeAccountType').textContent = typeLabel;
+    if ($('homeAccountType')) $('homeAccountType').textContent = typeLabel;
     const [mainName, subtitle = 'Principal'] = String(
       principalAccount.name || ''
     )
@@ -337,130 +346,124 @@ export async function loadHomeAccount(options = {}) {
         'account-brand-badge--hero'
       );
     }
-    $('homeAccountName').textContent = mainName || principalAccount.name;
-    $('homeAccountSubtitle').textContent = subtitle;
-    $('homeAccountSubtitle').classList.toggle(
-      'account-subtitle-muted',
-      /ahorro|hucha/i.test(subtitle)
-    );
+    if ($('homeAccountName'))
+      $('homeAccountName').textContent = mainName || principalAccount.name;
+    if ($('homeAccountSubtitle')) {
+      $('homeAccountSubtitle').textContent = subtitle;
+      $('homeAccountSubtitle').classList.toggle(
+        'account-subtitle-muted',
+        /ahorro|hucha/i.test(subtitle)
+      );
+    }
     const balance = Number(principalAccount.current_balance || 0).toFixed(2);
-    $('homeAccountBalance').textContent = `${balance}€`;
+    if ($('homeAccountBalance'))
+      $('homeAccountBalance').textContent = `${balance}€`;
 
-    enableHomeCardNavigation(homeCard, principalAccount.id);
+    enableHomeCardNavigation(homeCard, principalAccId);
     syncHomeTransferButton(homeTransferBtn, principalAccount);
     syncHomeResetButton(homeResetBtn, principalAccount);
 
-    setTimeout(async () => {
-      try {
-        await ensureCategoriesLoaded();
-        if (currentLoadNonce !== homeLoadNonce) return;
+    await ensureCategoriesLoaded();
+    if (currentLoadNonce !== homeLoadNonce) return;
 
-        const filtered = await fetchAllTransactions(
-          { account_id: principalAccount.id },
-          { maxPages: 2, maxRecords: 300 }
-        );
-        if (currentLoadNonce !== homeLoadNonce) return;
+    const filtered = await fetchAllTransactions(
+      { account_id: principalAccId },
+      { maxPages: 2, maxRecords: 300 }
+    );
+    if (currentLoadNonce !== homeLoadNonce) return;
 
-        function renderHomeSpendCard() {
-          if (!homeSpendDistribution) return;
-          let txsForSpend = filtered;
-          if (state.homeSpendSinceDate) {
-            const sinceTime = new Date(
-              `${state.homeSpendSinceDate}T00:00:00`
-            ).getTime();
-            txsForSpend = filtered.filter((tx) => {
-              const txTime = new Date(tx.date).getTime();
-              return !isNaN(txTime) && txTime >= sinceTime;
-            });
-          }
-          const controlsHtml = `
-            <label style="display:flex; align-items:center; gap:6px; font-size:12px; opacity:0.85;">
-              Desde
-              <input
-                type="date"
-                id="homeSpendSinceInput"
-                value="${state.homeSpendSinceDate || ''}"
-                style="font-size:12px; padding:2px 4px;"
-              />
-            </label>
-          `;
-          homeSpendDistribution.innerHTML = buildAccountSpendDistributionCard(
-            txsForSpend,
-            { controlsHtml }
-          );
-          $('homeSpendSinceInput')?.addEventListener('change', (ev) => {
-            state.homeSpendSinceDate = ev.target.value || null;
-            renderHomeSpendCard();
-          });
-        }
-        renderHomeSpendCard();
-
-        let sortedTransactions = sortTransactionsByMostRecent(filtered);
-        if (sortedTransactions.length === 0) {
-          const globalRecent = await fetchAllTransactions(
-            {},
-            { maxPages: 1, maxRecords: 120 }
-          );
-          if (currentLoadNonce !== homeLoadNonce) return;
-          sortedTransactions = sortTransactionsByMostRecent(globalRecent);
-        }
-
-        const transactionsWithRunningBalance =
-          annotateTransactionsWithRunningBalances(sortedTransactions);
-        const HOME_TX_PAGE_SIZE = 10;
-        let homeTxVisibleCount = HOME_TX_PAGE_SIZE;
-
-        function renderHomeTxList() {
-          if (!txList) return;
-          const recentTransactions = transactionsWithRunningBalance.slice(
-            0,
-            homeTxVisibleCount
-          );
-          const html = recentTransactions
-            .map((t) => renderTxItem(t, true))
-            .join('');
-
-          txList.innerHTML =
-            html ||
-            renderListEmptyState(
-              'ph-receipt',
-              'No hay movimientos aún.',
-              'Usa el botón + para registrar el primero.'
-            );
-
-          if (transactionsWithRunningBalance.length > homeTxVisibleCount) {
-            const moreWrap = document.createElement('div');
-            moreWrap.style.display = 'flex';
-            moreWrap.style.justifyContent = 'center';
-            moreWrap.style.marginTop = '10px';
-            moreWrap.innerHTML =
-              '<button type="button" class="btn" id="btnHomeSeeMoreTx">Ver más movimientos</button>';
-            txList.appendChild(moreWrap);
-            $('btnHomeSeeMoreTx')?.addEventListener('click', (ev) => {
-              ev.preventDefault();
-              ev.stopPropagation();
-              homeTxVisibleCount += HOME_TX_PAGE_SIZE;
-              renderHomeTxList();
-            });
-          }
-
-          txList.querySelectorAll('.tx-item').forEach((el) => {
-            el.addEventListener('click', () => {
-              const id = el.dataset.id;
-              openViewTx(id);
-            });
-          });
-        }
-
-        if (txList) renderHomeTxList();
-      } catch (err) {
-        if (
-          err?.code === 'STALE_AUTH_REQUEST' ||
-          err?.message === 'Sesión caducada. Vuelve a iniciar sesión.'
-        )
-          return;
+    function renderHomeSpendCard() {
+      if (!homeSpendDistribution) return;
+      let txsForSpend = filtered || [];
+      if (state.homeSpendSinceDate) {
+        const sinceTime = new Date(
+          `${state.homeSpendSinceDate}T00:00:00`
+        ).getTime();
+        txsForSpend = (filtered || []).filter((tx) => {
+          const txTime = new Date(tx.date).getTime();
+          return !Number.isNaN(txTime) && txTime >= sinceTime;
+        });
       }
-    }, 0);
+      const controlsHtml = `
+        <label style="display:flex; align-items:center; gap:6px; font-size:12px; opacity:0.85;">
+          Desde
+          <input
+            type="date"
+            id="homeSpendSinceInput"
+            value="${state.homeSpendSinceDate || ''}"
+            style="font-size:12px; padding:2px 4px;"
+          />
+        </label>
+      `;
+      homeSpendDistribution.innerHTML = buildAccountSpendDistributionCard(
+        txsForSpend,
+        { controlsHtml }
+      );
+      $('homeSpendSinceInput')?.addEventListener('change', (ev) => {
+        state.homeSpendSinceDate = ev.target.value || null;
+        renderHomeSpendCard();
+      });
+    }
+    renderHomeSpendCard();
+
+    let sortedTransactions = sortTransactionsByMostRecent(filtered || []);
+    if (sortedTransactions.length === 0) {
+      const globalRecent = await fetchAllTransactions(
+        {},
+        { maxPages: 1, maxRecords: 120 }
+      );
+      if (currentLoadNonce !== homeLoadNonce) return;
+      sortedTransactions = sortTransactionsByMostRecent(globalRecent || []);
+    }
+
+    const transactionsWithRunningBalance =
+      annotateTransactionsWithRunningBalances(sortedTransactions);
+    const HOME_TX_PAGE_SIZE = 10;
+    let homeTxVisibleCount = HOME_TX_PAGE_SIZE;
+
+    function renderHomeTxList() {
+      if (!txList) return;
+      const recentTransactions = transactionsWithRunningBalance.slice(
+        0,
+        homeTxVisibleCount
+      );
+      const html = recentTransactions
+        .map((t) => renderTxItem(t, true))
+        .join('');
+
+      txList.innerHTML =
+        html ||
+        renderListEmptyState(
+          'ph-receipt',
+          'No hay movimientos aún.',
+          'Usa el botón + para registrar el primero.'
+        );
+
+      if (transactionsWithRunningBalance.length > homeTxVisibleCount) {
+        const moreWrap = document.createElement('div');
+        moreWrap.style.display = 'flex';
+        moreWrap.style.justifyContent = 'center';
+        moreWrap.style.marginTop = '10px';
+        moreWrap.innerHTML =
+          '<button type="button" class="btn" id="btnHomeSeeMoreTx">Ver más movimientos</button>';
+        txList.appendChild(moreWrap);
+        $('btnHomeSeeMoreTx')?.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          homeTxVisibleCount += HOME_TX_PAGE_SIZE;
+          renderHomeTxList();
+        });
+      }
+
+      txList.querySelectorAll('.tx-item').forEach((el) => {
+        el.addEventListener('click', () => {
+          const id = el.dataset.id;
+          if (id) openViewTx(id);
+        });
+      });
+    }
+
+    if (txList) renderHomeTxList();
   } catch (err) {
     if (
       err?.code === 'STALE_AUTH_REQUEST' ||
@@ -483,17 +486,17 @@ export async function loadDashboardView() {
     if (currentLoadNonce !== dashboardLoadNonce) return;
 
     syncDashboardRangeInputs(ms || {});
-    const cycleLabel = formatDashboardCycle(ms);
+    const cycleLabel = formatDashboardCycle(ms || {});
     const summaryMode =
       state.dashboardSummaryMode === 'compact' ? 'compact' : 'full';
     const periodLabel = state.dashboardUseCustomRange ? 'rango' : 'ciclo';
 
     const dashEl = $('dashboardBalance');
-    if (dashEl) dashEl.textContent = (ms.balance || 0).toFixed(2) + '€';
+    if (dashEl) dashEl.textContent = Number(ms?.balance || 0).toFixed(2) + '€';
 
     const adviceEl = $('dashboardAdvice');
     if (adviceEl) {
-      adviceEl.textContent = `${cycleLabel} · Ingresos: ${Number(ms.total_income || 0).toFixed(2)}€ · Gastos: ${Number(ms.total_expense || 0).toFixed(2)}€`;
+      adviceEl.textContent = `${cycleLabel} · Ingresos: ${Number(ms?.total_income || 0).toFixed(2)}€ · Gastos: ${Number(ms?.total_expense || 0).toFixed(2)}€`;
     }
 
     document
@@ -515,7 +518,7 @@ export async function loadDashboardView() {
       breakdownCard.style.display = summaryMode === 'compact' ? 'none' : '';
     }
 
-    if (details && Object.keys(ms.category_breakdown || {}).length > 0) {
+    if (details && Object.keys(ms?.category_breakdown || {}).length > 0) {
       const breakdown = Object.entries(ms.category_breakdown || {})
         .sort(
           ([, amountA], [, amountB]) =>
@@ -566,7 +569,7 @@ export async function loadDashboardView() {
 
           const rangeTransactions = filterTransactionsByDashboardCycle(
             transactions || [],
-            ms
+            ms || {}
           );
           accountsDistribution.innerHTML = buildDashboardAccountSpendCard(
             accounts || [],
