@@ -39,7 +39,7 @@ export function formatDashboardCycle(summary = {}) {
     return 'Ciclo desde el día 26';
   }
 
-  const options = { day: 'numeric', month: 'short' };
+  const options = { day: 'numeric', month: 'short', timeZone: 'UTC' };
   return `${start.toLocaleDateString('es-ES', options)} - ${end.toLocaleDateString('es-ES', options)}`;
 }
 
@@ -106,7 +106,7 @@ export function filterTransactionsByDashboardCycle(
   }
 
   const inclusiveEnd = new Date(end);
-  inclusiveEnd.setDate(inclusiveEnd.getDate() + 1);
+  inclusiveEnd.setUTCDate(inclusiveEnd.getUTCDate() + 1);
 
   return (transactions || []).filter((tx) => {
     const txDate = tx?.date ? new Date(tx.date) : null;
@@ -377,7 +377,7 @@ export async function loadHomeAccount(options = {}) {
       let txsForSpend = filtered || [];
       if (state.homeSpendSinceDate) {
         const sinceTime = new Date(
-          `${state.homeSpendSinceDate}T00:00:00`
+          `${state.homeSpendSinceDate}T00:00:00Z`
         ).getTime();
         txsForSpend = (filtered || []).filter((tx) => {
           const txTime = new Date(tx.date).getTime();
