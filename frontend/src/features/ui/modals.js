@@ -1,4 +1,4 @@
-// src/ui/modal.js
+// src/ui/modals.js
 import { $ } from './dom.js';
 
 let activeModal = null;
