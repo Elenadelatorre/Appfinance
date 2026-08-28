@@ -1,14 +1,21 @@
-const CACHE = 'finance-app-v3';
+// src/sw.js
+const CACHE = 'finance-app-v4';
 const APP_SHELL = [
   './',
   './index.html',
-  './app.js',
+  './src/main.js',
   './style.css',
   './manifest.webmanifest'
 ];
 
 globalThis.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(APP_SHELL)));
+  e.waitUntil(
+    caches.open(CACHE).then((c) =>
+      c.addAll(APP_SHELL).catch((err) => {
+        console.warn('[ServiceWorker] Error al precachear recursos:', err);
+      })
+    )
+  );
   globalThis.skipWaiting();
 });
 
@@ -32,18 +39,20 @@ globalThis.addEventListener('fetch', (e) => {
   const url = new URL(request.url);
   const isSameOrigin = url.origin === globalThis.location.origin;
 
-  // Do not hijack API/network calls from other origins.
+  // No interceptar peticiones a orígenes externos (ej: backend en Render, fuentes de Google, CDNs)
   if (!isSameOrigin) {
-    e.respondWith(fetch(request));
     return;
   }
 
+  // Si la petición es de navegación HTML
   if (request.mode === 'navigate') {
     e.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put('./index.html', copy));
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put('./index.html', copy));
+          }
           return response;
         })
         .catch(() => caches.match('./index.html'))
@@ -51,10 +60,18 @@ globalThis.addEventListener('fetch', (e) => {
     return;
   }
 
+  // Network-First para scripts y estilos propios con fallback a caché
   e.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request);
-    })
+    fetch(request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE).then((cache) => {
+            cache.put(request, responseToCache);
+          });
+        }
+        return networkResponse;
+      })
+      .catch(() => caches.match(request))
   );
 });
