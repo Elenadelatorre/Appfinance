@@ -1,4 +1,4 @@
-// js/features/accounts/accounts.js
+// src/features/accounts/accounts.js
 import { state } from '../../state/state.js';
 import { api } from '../../services/api.js';
 import { $, escapeHtml, clearFileInput } from '../ui/dom.js';

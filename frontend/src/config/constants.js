@@ -1,37 +1,41 @@
-// js/config/constants.js
+// src/config/constants.js
 
-export const API_STORAGE_KEY = 'financeApiBaseUrl';
+// 1. API & CONECTIVIDAD:
+export const API_STORAGE_KEY = 'financeApp.api.baseUrl';
 export const DEFAULT_LOCAL_API = 'http://127.0.0.1:8000';
+export const API_TIMEOUT_MS = 15000;
+
+// 2. PAGINACIÓN Y LÍMITES:
 export const TRANSACTIONS_PAGE_SIZE = 500;
 export const HISTORY_PAGE_SIZE = 30;
 export const HISTORY_PASTE_UNDO_LIMIT = 3;
 export const HISTORY_FETCH_PAGE_BLOCK = 2;
 
-// Storage Keys
-export const BUDGET_FILTER_STORAGE_KEY = 'budgetStatusFilter';
+// 3. STORAGE KEYS:
+export const TOKEN_STORAGE_KEY = 'financeApp.auth.token';
+export const REMEMBER_DEVICE_STORAGE_KEY = 'financeApp.auth.rememberDevice';
+export const BUDGET_FILTER_STORAGE_KEY = 'financeApp.budgets.statusFilter';
 export const HISTORY_PRESETS_STORAGE_KEY = 'financeApp.history.filterPresets';
 export const HISTORY_PRESET_RECENTS_STORAGE_KEY =
   'financeApp.history.presetRecents';
 export const HISTORY_LAST_STATE_STORAGE_KEY = 'financeApp.history.lastState';
 export const HISTORY_FAVORITE_PRESET_STORAGE_KEY =
   'financeApp.history.favoritePreset';
-export const TOKEN_STORAGE_KEY = 'token';
-export const REMEMBER_DEVICE_STORAGE_KEY = 'financeApp.auth.rememberDevice';
 export const SETTINGS_DEFAULT_VIEW_KEY = 'financeApp.settings.defaultView';
 export const SETTINGS_REDUCE_MOTION_KEY = 'financeApp.settings.reduceMotion';
 export const SETTINGS_OPEN_PANEL_KEY = 'financeApp.settings.openPanel';
 export const SETTINGS_PROFILE_AVATAR_KEY = 'financeApp.settings.profileAvatar';
 export const SETTINGS_ACCENT_COLOR_KEY = 'financeApp.settings.accentColor';
 
-// Configuraciones base
-export const DEFAULT_APP_SETTINGS = {
+// 4. CONFIGURACIÓN DE LA APLICACIÓN y TEMAS:
+export const DEFAULT_APP_SETTINGS = Object.freeze({
   defaultView: 'home',
   reduceMotion: false,
   profileAvatar: 'auto',
   accentColor: '#6366f1'
-};
+});
 
-export const PROFILE_AVATAR_CHOICES = [
+export const PROFILE_AVATAR_CHOICES = Object.freeze([
   'auto',
   '🙂',
   '😎',
@@ -39,16 +43,26 @@ export const PROFILE_AVATAR_CHOICES = [
   '💼',
   '💸',
   '🚀'
-];
+]);
 
-export const START_VIEW_CONFIG = {
+export const UI_COLORS = Object.freeze({
+  income: '#16a34a',
+  expense: '#ef4444',
+  transfer: '#0284c7',
+  warning: '#f59e0b',
+  primary: '#6366f1',
+  neutral: '#64748b'
+});
+
+export const START_VIEW_CONFIG = Object.freeze({
   home: { id: 'home', title: 'Inicio' },
   dashboard: { id: 'dashboard', title: 'Resumen' },
   history: { id: 'history', title: 'Historial' },
   stats: { id: 'stats', title: 'Presupuestos' },
   accounts: { id: 'accounts', title: 'Cuentas' },
-  reminders: { id: 'reminders', title: 'Recordatorios' }
-};
+  reminders: { id: 'reminders', title: 'Recordatorios' },
+  config: { id: 'config', title: 'Ajustes' }
+});
 
 export const REMINDER_TYPE_LABELS = {
   insurance: 'Seguro',
@@ -56,13 +70,14 @@ export const REMINDER_TYPE_LABELS = {
   other: 'Otro'
 };
 
-export const REMINDER_RECURRENCE_LABELS = {
+export const REMINDER_RECURRENCE_LABELS = Object.freeze({
   none: 'Sin repetición',
   monthly: 'Cada mes',
   yearly: 'Cada año'
-};
+});
 
-export const LEGACY_ICON_MAP = {
+// 6. ICONOS DE CATEGORÍAS Y MAPEO DE EMOJIS:
+export const LEGACY_ICON_MAP = Object.freeze({
   payment: '💳',
   payments: '💳',
   work: '💼',
@@ -93,9 +108,9 @@ export const LEGACY_ICON_MAP = {
   shield: '🛡️',
   security: '🛡️',
   category: '🧩'
-};
+});
 
-export const CATEGORY_NAME_ICON_MAP = [
+export const CATEGORY_NAME_ICON_MAP = Object.freeze([
   [/nomina|nómina|salario/i, '💼'],
   [/extra|bonus/i, '✨'],
   [/regalo/i, '🎁'],
@@ -118,7 +133,7 @@ export const CATEGORY_NAME_ICON_MAP = [
   [/traspaso|transfer/i, '🔁'],
   [/seguro/i, '🛡️'],
   [/vario|otro/i, '🧩']
-];
+]);
 
 export const CATEGORY_ICON_SET = new Set([
   '💼',
@@ -195,7 +210,7 @@ export const CATEGORY_ICON_SET = new Set([
   '✅'
 ]);
 
-export const CATEGORY_ICON_GROUPS = [
+export const CATEGORY_ICON_GROUPS = Object.freeze([
   {
     label: 'Ingresos y dinero',
     icons: ['💼', '✨', '🎁', '📈', '💰', '💸', '💱', '🪙', '💳', '👛', '🏦']
@@ -237,9 +252,9 @@ export const CATEGORY_ICON_GROUPS = [
       '🏷️'
     ]
   }
-];
+]);
 
-export const CATEGORY_ICON_COLOR_MAP = {
+export const CATEGORY_ICON_COLOR_MAP = Object.freeze({
   '💼': '#16a34a',
   '✨': '#22c55e',
   '🎁': '#f43f5e',
@@ -312,4 +327,4 @@ export const CATEGORY_ICON_COLOR_MAP = {
   '⏰': '#f59e0b',
   '📌': '#ef4444',
   '✅': '#16a34a'
-};
+});

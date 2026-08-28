@@ -1,4 +1,4 @@
-// js/features/auth/auth.js
+// src/features/auth/auth.js
 import { state } from '../../state/state.js';
 import {
   API,
@@ -20,8 +20,10 @@ import { loadCategoryTree } from '../categories/categories.js';
 import { loadAccounts } from '../accounts/accounts.js';
 
 export function getConfiguredStartView() {
-  const candidate = state.settings.defaultView;
-  if (START_VIEW_CONFIG[candidate]) return START_VIEW_CONFIG[candidate];
+  const candidate = state.settings?.defaultView;
+  if (candidate && START_VIEW_CONFIG[candidate]) {
+    return START_VIEW_CONFIG[candidate];
+  }
   return START_VIEW_CONFIG.home;
 }
 
@@ -30,8 +32,9 @@ export function setAuthSubmitLoading(mode = 'login', isLoading = false) {
   const registerBtn = $('btnRegister');
 
   if (loginBtn) {
-    if (!loginBtn.dataset.defaultLabel)
+    if (!loginBtn.dataset.defaultLabel) {
       loginBtn.dataset.defaultLabel = loginBtn.textContent || 'Entrar';
+    }
     loginBtn.disabled = isLoading;
     loginBtn.classList.toggle('is-loading', isLoading && mode === 'login');
     loginBtn.textContent =
@@ -41,9 +44,10 @@ export function setAuthSubmitLoading(mode = 'login', isLoading = false) {
   }
 
   if (registerBtn) {
-    if (!registerBtn.dataset.defaultLabel)
+    if (!registerBtn.dataset.defaultLabel) {
       registerBtn.dataset.defaultLabel =
         registerBtn.textContent || 'Crear cuenta';
+    }
     registerBtn.disabled = isLoading;
     registerBtn.classList.toggle(
       'is-loading',
@@ -68,7 +72,6 @@ export async function login() {
 
   setAuthSubmitLoading('login', true);
 
-  console.log('Enviando petición a:', `${API}/auth/login`);
   try {
     const res = await fetch(`${API}/auth/login`, {
       method: 'POST',
@@ -76,11 +79,15 @@ export async function login() {
       body: new URLSearchParams({ username: email, password })
     });
 
-    if (!res.ok)
+    if (!res.ok) {
       throw new Error(await readErrorMessage(res, 'Error al autenticar'));
+    }
 
     const data = await res.json();
-    console.log('Código HTTP:', res.status, data);
+    if (!data?.access_token) {
+      throw new Error('Respuesta de autenticación inválida');
+    }
+
     setApiToken(data.access_token);
     persistAuthToken(data.access_token, rememberDevice);
     if ($('loginPassword')) $('loginPassword').value = '';
@@ -93,7 +100,7 @@ export async function login() {
     const msg = err?.message ?? String(err);
     if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
       showAlert(
-        `No se puede conectar con la API (${API}). Verifica que esté levantada.`,
+        `No se puede conectar con el servidor (${API}). Verifica tu conexión.`,
         'error'
       );
       return;
@@ -107,8 +114,14 @@ export async function login() {
 export async function register() {
   const email = $('registerEmail')?.value?.trim();
   const password = $('registerPassword')?.value || '';
+
   if (!email || !password) {
     showAlert('Introduce email y contraseña', 'error');
+    return;
+  }
+
+  if (password.length < 6) {
+    showAlert('La contraseña debe tener al menos 6 caracteres', 'error');
     return;
   }
 
@@ -120,10 +133,15 @@ export async function register() {
       body: JSON.stringify({ email, password })
     });
 
-    if (!res.ok)
+    if (!res.ok) {
       throw new Error(await readErrorMessage(res, 'Registro fallido'));
+    }
 
     const data = await res.json();
+    if (!data?.access_token) {
+      throw new Error('Respuesta de registro inválida');
+    }
+
     setApiToken(data.access_token);
     persistAuthToken(data.access_token, false);
     if ($('registerPassword')) $('registerPassword').value = '';
@@ -150,16 +168,15 @@ export async function refreshSessionMetadataInBackground() {
 }
 
 export function schedulePostAuthHydration(startupViewId = 'home') {
-  setTimeout(() => {
-    refreshSessionMetadataInBackground().catch(() => {});
-  }, 220);
-
-  setTimeout(() => {
-    loadCategoryTree().catch(() => {});
-    if (startupViewId !== 'home' && startupViewId !== 'accounts') {
-      loadAccounts().catch(() => {});
-    }
-  }, 420);
+  queueMicrotask(async () => {
+    try {
+      await refreshSessionMetadataInBackground();
+      await loadCategoryTree();
+      if (startupViewId !== 'home' && startupViewId !== 'accounts') {
+        await loadAccounts();
+      }
+    } catch {}
+  });
 }
 
 export async function hasValidStoredSession() {
@@ -202,11 +219,11 @@ export function toggleAuthForm(isRegister) {
   const loginContainer = $('loginFormContainer');
   const registerContainer = $('registerFormContainer');
   if (isRegister) {
-    loginContainer.style.display = 'none';
-    registerContainer.style.display = 'block';
+    if (loginContainer) loginContainer.style.display = 'none';
+    if (registerContainer) registerContainer.style.display = 'block';
   } else {
-    loginContainer.style.display = 'block';
-    registerContainer.style.display = 'none';
+    if (loginContainer) loginContainer.style.display = 'block';
+    if (registerContainer) registerContainer.style.display = 'none';
   }
 }
 
@@ -215,18 +232,38 @@ export function initAuthListeners() {
   const btnRegister = $('btnRegister');
   const showRegister = $('showRegister');
   const showLogin = $('showLogin');
+  const loginEmail = $('loginEmail');
+  const loginPassword = $('loginPassword');
+  const registerEmail = $('registerEmail');
+  const registerPassword = $('registerPassword');
+
   if (btnLogin) btnLogin.addEventListener('click', login);
   if (btnRegister) btnRegister.addEventListener('click', register);
+
   if (showRegister) {
     showRegister.addEventListener('click', (e) => {
       e.preventDefault();
       toggleAuthForm(true);
     });
   }
+
   if (showLogin) {
     showLogin.addEventListener('click', (e) => {
       e.preventDefault();
       toggleAuthForm(false);
     });
   }
+
+  // Soporte para enviar formularios pulsando Enter
+  const handleKeydownLogin = (e) => {
+    if (e.key === 'Enter') login();
+  };
+  const handleKeydownRegister = (e) => {
+    if (e.key === 'Enter') register();
+  };
+
+  loginEmail?.addEventListener('keydown', handleKeydownLogin);
+  loginPassword?.addEventListener('keydown', handleKeydownLogin);
+  registerEmail?.addEventListener('keydown', handleKeydownRegister);
+  registerPassword?.addEventListener('keydown', handleKeydownRegister);
 }
