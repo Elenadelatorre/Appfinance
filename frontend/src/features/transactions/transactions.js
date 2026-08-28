@@ -1,4 +1,4 @@
-// js/features/transactions/transactions.js
+// src/features/transactions/transactions.js
 import { state } from '../../state/state.js';
 import { api } from '../../services/api.js';
 import { $, escapeHtml } from '../../utils/dom.js';
@@ -47,8 +47,8 @@ export function sortTransactionsByMostRecent(transactions = []) {
     const leftTime = new Date(left?.date || 0).getTime();
     const rightTime = new Date(right?.date || 0).getTime();
     if (rightTime !== leftTime) return rightTime - leftTime;
-    const leftId = String(left?._id || '');
-    const rightId = String(right?._id || '');
+    const leftId = String(left?._id || left?.id || '');
+    const rightId = String(right?._id || right?.id || '');
     if (rightId > leftId) return 1;
     if (rightId < leftId) return -1;
     return 0;
@@ -65,7 +65,9 @@ export function annotateTransactionsWithRunningBalances(transactions = []) {
 
   return transactions.map((tx) => {
     const account = findAccountForTransaction(tx);
-    const accountKey = String(account?.id || tx?.account_id || '').trim();
+    const accountKey = String(
+      account?.id || account?._id || tx?.account_id || ''
+    ).trim();
 
     if (!account || !accountKey) {
       return { ...tx, running_balance_after: null };
@@ -160,7 +162,6 @@ export function renderTxAccountMeta(tx, getAccountBadgeMarkup) {
     `;
   }
 
-  // Si no se encuentra la cuenta, no mostrar el hash de MongoDB
   return '';
 }
 
@@ -170,11 +171,12 @@ export function renderTxItem(
   options = {},
   getAccountBadgeMarkup = null
 ) {
-  const cat = state.catsById.get(tx.category_id);
-  const sub = tx.subcategory_id ? state.catsById.get(tx.subcategory_id) : null;
+  const txId = String(tx?._id || tx?.id || '');
+  const cat = state.catsById?.get(tx.category_id);
+  const sub = tx.subcategory_id ? state.catsById?.get(tx.subcategory_id) : null;
   const txVisual = resolveTransactionVisual(tx, cat, sub);
   const visual = txVisual.visual;
-  const date = new Date(tx.date).toLocaleDateString();
+  const date = tx.date ? new Date(tx.date).toLocaleDateString('es-ES') : '';
   const accountMeta = renderTxAccountMeta(tx, getAccountBadgeMarkup);
   const note = (tx.note || '').trim();
   const sign = tx.type === 'expense' ? '-' : '+';
@@ -188,15 +190,15 @@ export function renderTxItem(
   const isSelectable = Boolean(options.selectable);
   const isSelected =
     isSelectable &&
-    (options.selectedIds?.has(String(tx._id)) ||
-      globalThis.historySelectedTxIds?.has(String(tx._id)));
+    (options.selectedIds?.has(txId) ||
+      globalThis.historySelectedTxIds?.has(txId));
   const checkedAttribute = isSelected ? 'checked' : '';
   const quickEditButtonHtml = isSelectable
     ? `
       <button
         type="button"
         class="tx-inline-edit-btn"
-        data-history-edit-id="${tx._id}"
+        data-history-edit-id="${escapeHtml(txId)}"
         title="Editar movimiento"
         aria-label="Editar movimiento"
       >
@@ -210,7 +212,7 @@ export function renderTxItem(
         <input
           type="checkbox"
           class="tx-select-input"
-          data-history-select="${tx._id}"
+          data-history-select="${escapeHtml(txId)}"
           ${checkedAttribute}
         />
         <span class="tx-select-mark" aria-hidden="true"></span>
@@ -219,7 +221,7 @@ export function renderTxItem(
     : '';
 
   return `
-    <div class="tx-item${isSelected ? ' is-selected' : ''}" data-id="${tx._id}">
+    <div class="tx-item${isSelected ? ' is-selected' : ''}" data-id="${escapeHtml(txId)}">
       ${selectorHtml}
       <div class="tx-main">
         <div class="tx-icon-badge" style="${buildCategoryVisualStyle(visual)}">
@@ -245,10 +247,11 @@ export function renderTxItem(
 }
 
 export function renderBreakdownItem(categoryId, amount, totalExpense = 0) {
-  const category = state.catsById.get(categoryId);
+  const category = state.catsById?.get(categoryId);
   const visual = getCategoryVisual(category, '📊', '#818cf8');
+  const numericAmount = Number(amount || 0);
   const percentage =
-    totalExpense > 0 ? (Number(amount || 0) / totalExpense) * 100 : 0;
+    totalExpense > 0 ? (numericAmount / totalExpense) * 100 : 0;
   const width = Math.max(0, Math.min(percentage, 100));
   return `
     <div class="summary-row summary-row--clickable" role="button" tabindex="0" data-cat-id="${escapeHtml(categoryId)}" title="Ver gastos de ${escapeHtml(visual.name)}">
@@ -262,7 +265,7 @@ export function renderBreakdownItem(categoryId, amount, totalExpense = 0) {
         </div>
       </div>
       <div class="summary-values">
-        <span class="summary-value">${Number(amount || 0).toFixed(2)}€</span>
+        <span class="summary-value">${numericAmount.toFixed(2)}€</span>
         <span class="summary-percent">${percentage.toFixed(1)}%</span>
       </div>
     </div>
@@ -294,7 +297,7 @@ export function buildAccountSpendDistributionCard(
 
   const items = Array.from(totalsByCategory.entries())
     .map(([categoryId, amount]) => {
-      const category = state.catsById.get(categoryId);
+      const category = state.catsById?.get(categoryId);
       const visual = getCategoryVisual(category, '📊', '#818cf8');
       return {
         categoryId,
@@ -499,13 +502,14 @@ export async function populateTxAccountSelect(selectedAccountId = null) {
     let accounts = state.accounts || [];
     if (!accounts.length) {
       accounts = await api('/accounts');
-      state.accounts = accounts;
+      state.accounts = Array.isArray(accounts) ? accounts : [];
     }
 
     sel.innerHTML = '<option value="">(Opcional) Cuenta</option>';
     accounts.forEach((a) => {
+      const accId = String(a.id || a._id || '');
       const opt = document.createElement('option');
-      opt.value = a.id;
+      opt.value = accId;
       opt.textContent = `${a.name}`;
       sel.appendChild(opt);
     });
@@ -525,7 +529,8 @@ export async function openCreateTxModal(preselectedAccountId = null) {
     if (state.currentViewId === 'account-detail' && state.currentAccountId) {
       defaultAccountId = state.currentAccountId;
     } else if (state.currentViewId === 'home') {
-      defaultAccountId = state.accounts[0]?.id || null;
+      defaultAccountId =
+        state.accounts[0]?.id || state.accounts[0]?._id || null;
     }
   }
   await populateTxAccountSelect(defaultAccountId);
@@ -579,15 +584,14 @@ export async function saveTx() {
       });
     }
 
-    // 1. Recargar cuentas para refrescar saldos en memoria
-    state.accounts = await api('/accounts');
+    const freshAccounts = await api('/accounts');
+    state.accounts = Array.isArray(freshAccounts) ? freshAccounts : [];
 
     const form = $('txForm');
     if (form) form.reset();
     editingTxId = null;
     closeModal('modalAddTx');
 
-    // 2. Ejecutar callback si está registrado
     if (typeof refreshAppCallback === 'function') {
       await refreshAppCallback(account_id);
     }
@@ -602,20 +606,12 @@ export async function deleteTx(txId) {
     const currentAccountId = ($('txAccount')?.value || '').trim() || null;
     await api(`/transactions/${txId}`, { method: 'DELETE' });
 
-    // 1. Recargar cuentas tras borrar
-    state.accounts = await api('/accounts');
+    const freshAccounts = await api('/accounts');
+    state.accounts = Array.isArray(freshAccounts) ? freshAccounts : [];
 
-    // 2. Ejecutar callback
     if (typeof refreshAppCallback === 'function') {
       await refreshAppCallback(currentAccountId);
     }
-
-    // 3. Emitir evento global
-    window.dispatchEvent(
-      new CustomEvent('finance:transactions-changed', {
-        detail: { accountId: currentAccountId }
-      })
-    );
   } catch (err) {
     showAlert('Error al eliminar: ' + (err?.message || String(err)), 'error');
   }
@@ -636,7 +632,11 @@ export async function openViewTx(txId) {
     }, 50);
     $('txDesc').value = tx.note || '';
     if ($('txDate') && tx.date) {
-      $('txDate').value = new Date(tx.date).toISOString().slice(0, 10);
+      const txDateObj = new Date(tx.date);
+      const year = txDateObj.getFullYear();
+      const month = String(txDateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(txDateObj.getDate()).padStart(2, '0');
+      $('txDate').value = `${year}-${month}-${day}`;
     }
     if ($('txAccount')) {
       await populateTxAccountSelect();
