@@ -1,4 +1,4 @@
-// js/features/auth/profile.js
+// src/features/auth/profile.js
 import { state } from '../../state/state.js';
 import { API, getApiToken, setApiToken } from '../../services/api.js';
 import {
@@ -21,9 +21,10 @@ let supportsRemoteSettingsApi = true;
 
 export function getAccentCssTokens(color) {
   const accent = normalizeAccentColor(color, DEFAULT_APP_SETTINGS.accentColor);
-  const r = Number.parseInt(accent.slice(1, 3), 16);
-  const g = Number.parseInt(accent.slice(3, 5), 16);
-  const b = Number.parseInt(accent.slice(5, 7), 16);
+  const cleanHex = accent.replace('#', '');
+  const r = Number.parseInt(cleanHex.slice(0, 2), 16) || 99;
+  const g = Number.parseInt(cleanHex.slice(2, 4), 16) || 102;
+  const b = Number.parseInt(cleanHex.slice(4, 6), 16) || 241;
 
   const dark = `#${[r, g, b]
     .map((channel) =>
@@ -115,7 +116,7 @@ export function scheduleRemoteSettingsSync() {
   appSettingsSyncTimer = setTimeout(() => {
     appSettingsSyncTimer = null;
     persistRemoteAppSettings();
-  }, 250);
+  }, 300);
 }
 
 export function flushRemoteSettingsSync() {
@@ -130,7 +131,7 @@ export function flushRemoteSettingsSync() {
 
 export function applyAppSettings() {
   const root = document.documentElement;
-  const accentTokens = getAccentCssTokens(state.settings.accentColor);
+  const accentTokens = getAccentCssTokens(state.settings?.accentColor);
 
   root.style.setProperty('--accent', accentTokens.accent);
   root.style.setProperty('--accent-dark', accentTokens.dark);
@@ -141,7 +142,7 @@ export function applyAppSettings() {
 
   document.body.classList.toggle(
     'reduced-motion',
-    Boolean(state.settings.reduceMotion)
+    Boolean(state.settings?.reduceMotion)
   );
   syncAppSettingsControls();
   renderProfileIdentity();
@@ -154,14 +155,16 @@ export function syncAppSettingsControls() {
   const accentColor = $('settingAccentColor');
 
   if (defaultView) {
-    defaultView.value = START_VIEW_CONFIG[state.settings.defaultView]
+    defaultView.value = START_VIEW_CONFIG[state.settings?.defaultView]
       ? state.settings.defaultView
       : DEFAULT_APP_SETTINGS.defaultView;
   }
-  if (reduceMotion) reduceMotion.checked = Boolean(state.settings.reduceMotion);
+  if (reduceMotion) {
+    reduceMotion.checked = Boolean(state.settings?.reduceMotion);
+  }
   if (accentColor) {
     accentColor.value = normalizeAccentColor(
-      state.settings.accentColor,
+      state.settings?.accentColor,
       DEFAULT_APP_SETTINGS.accentColor
     );
   }
@@ -173,11 +176,11 @@ export function getUserEmail() {
 
 export function getFallbackInitial() {
   const email = getUserEmail();
-  return email ? email.charAt(0).toUpperCase() : 'U';
+  return email ? email.charAt(0).toUpperCase() : 'E';
 }
 
 export function getActiveAvatarSymbol() {
-  const chosen = state.settings.profileAvatar || 'auto';
+  const chosen = state.settings?.profileAvatar || 'auto';
   return chosen === 'auto' ? getFallbackInitial() : chosen;
 }
 
@@ -198,7 +201,7 @@ export function renderProfileIdentity() {
 export function renderProfileAvatarChoices() {
   const container = $('profileAvatarChoices');
   if (!container) return;
-  const selected = state.settings.profileAvatar || 'auto';
+  const selected = state.settings?.profileAvatar || 'auto';
 
   container.innerHTML = PROFILE_AVATAR_CHOICES.map((choice) => {
     const active = choice === selected ? ' is-active' : '';
@@ -258,24 +261,24 @@ export function updateProfilePasswordFormState() {
   if (hint) {
     if (!nextPassword && !confirmPassword) {
       hint.textContent =
-        'Minimo 8 caracteres, una mayuscula, un numero y que coincidan.';
+        'Mínimo 8 caracteres, una mayúscula, un número y que coincidan.';
       hint.classList.remove('is-error', 'is-ok');
       return;
     }
     if (!strongEnough) {
       hint.textContent =
-        'La nueva contrasena debe tener minimo 8 caracteres, una mayuscula y un numero.';
+        'La nueva contraseña debe tener mínimo 8 caracteres, una mayúscula y un número.';
       hint.classList.add('is-error');
       hint.classList.remove('is-ok');
       return;
     }
     if (!matches) {
-      hint.textContent = 'La confirmacion no coincide con la nueva contrasena.';
+      hint.textContent = 'La confirmación no coincide con la nueva contraseña.';
       hint.classList.add('is-error');
       hint.classList.remove('is-ok');
       return;
     }
-    hint.textContent = 'Contrasena valida. Puedes actualizarla.';
+    hint.textContent = 'Contraseña válida. Puedes actualizarla.';
     hint.classList.remove('is-error');
     hint.classList.add('is-ok');
   }
@@ -286,12 +289,14 @@ export function clearProfilePasswordForm(resetShowPasswords = false) {
   const next = $('profileNextPassword');
   const confirm = $('profileConfirmPassword');
   const show = $('profileShowPasswords');
+  const capsHint = $('profileCapsLockHint');
 
   if (current) current.value = '';
   if (next) next.value = '';
   if (confirm) confirm.value = '';
 
   if (show && resetShowPasswords) show.checked = false;
+  if (capsHint) capsHint.style.display = 'none';
 
   const nextType = show?.checked ? 'text' : 'password';
   if (current) current.type = nextType;
@@ -348,6 +353,7 @@ export async function changePasswordFromProfile() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
       },
+      credentials: 'include',
       body: JSON.stringify({
         current_password: currentPassword,
         new_password: nextPassword
@@ -355,7 +361,7 @@ export async function changePasswordFromProfile() {
     });
 
     if (res.status === 404) {
-      showAlert('Cambio de contraseña pendiente en backend', 'info');
+      showAlert('Cambio de contraseña no implementado en backend', 'info');
       return;
     }
     if (!res.ok) {
@@ -363,7 +369,7 @@ export async function changePasswordFromProfile() {
       throw new Error(data?.detail || 'No se pudo cambiar la contraseña');
     }
     clearProfilePasswordForm();
-    showAlert('Contraseña actualizada', 'info');
+    showAlert('Contraseña actualizada con éxito', 'info');
   } catch (err) {
     showAlert(err?.message || 'Error actualizando contraseña', 'error');
   } finally {
@@ -437,6 +443,7 @@ export function initProfileListeners() {
   const settingReduceMotion = $('settingReduceMotion');
   const settingAccentColor = $('settingAccentColor');
   const btnLogoutFromSettings = $('btnLogoutFromSettings');
+  const capsLockHint = $('profileCapsLockHint');
 
   if (profileAvatarChoices) {
     profileAvatarChoices.addEventListener('click', (event) => {
@@ -445,31 +452,44 @@ export function initProfileListeners() {
       updateAppSetting('profileAvatar', button.dataset.avatarChoice || 'auto');
     });
   }
-  if (btnProfileChangePassword)
+  if (btnProfileChangePassword) {
     btnProfileChangePassword.addEventListener(
       'click',
       changePasswordFromProfile
     );
-  if (btnProfileClearPasswords)
+  }
+  if (btnProfileClearPasswords) {
     btnProfileClearPasswords.addEventListener('click', () =>
       clearProfilePasswordForm(true)
     );
+  }
 
-  if (profileCurrentPassword)
-    profileCurrentPassword.addEventListener(
-      'input',
-      updateProfilePasswordFormState
-    );
-  if (profileNextPassword)
-    profileNextPassword.addEventListener(
-      'input',
-      updateProfilePasswordFormState
-    );
-  if (profileConfirmPassword)
-    profileConfirmPassword.addEventListener(
-      'input',
-      updateProfilePasswordFormState
-    );
+  // Detección de Bloq Mayús y envío con Enter
+  const passwordInputs = [
+    profileCurrentPassword,
+    profileNextPassword,
+    profileConfirmPassword
+  ].filter(Boolean);
+
+  passwordInputs.forEach((input) => {
+    input.addEventListener('input', updateProfilePasswordFormState);
+
+    input.addEventListener('keyup', (e) => {
+      if (capsLockHint && typeof e.getModifierState === 'function') {
+        const isCaps = e.getModifierState('CapsLock');
+        capsLockHint.style.display = isCaps ? 'block' : 'none';
+      }
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const submitBtn = $('btnProfileChangePassword');
+        if (submitBtn && !submitBtn.disabled) {
+          changePasswordFromProfile();
+        }
+      }
+    });
+  });
 
   if (profileShowPasswords) {
     profileShowPasswords.addEventListener('change', () => {

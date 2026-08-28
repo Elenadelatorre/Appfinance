@@ -1,4 +1,4 @@
-// js/features/automations/automations.js
+// src/features/automations/automations.js
 import { state } from '../../state/state.js';
 import { api, API, getApiToken, fetchJsonSilent } from '../../services/api.js';
 import { $, escapeHtml } from '../ui/dom.js';
@@ -113,20 +113,20 @@ export function fillAutomationSelectors() {
     recurringAccount.innerHTML =
       `<option value="">Sin cuenta (global)</option>` +
       accounts
-        .map(
-          (acc) =>
-            `<option value="${escapeHtml(acc.id || '')}">${escapeHtml(acc.name || 'Cuenta')}</option>`
-        )
+        .map((acc) => {
+          const accId = String(acc.id || acc._id || '');
+          return `<option value="${escapeHtml(accId)}">${escapeHtml(acc.name || 'Cuenta')}</option>`;
+        })
         .join('');
   }
   if (ruleAccount) {
     ruleAccount.innerHTML =
       `<option value="">Sin cambio de cuenta</option>` +
       accounts
-        .map(
-          (acc) =>
-            `<option value="${escapeHtml(acc.id || '')}">${escapeHtml(acc.name || 'Cuenta')}</option>`
-        )
+        .map((acc) => {
+          const accId = String(acc.id || acc._id || '');
+          return `<option value="${escapeHtml(accId)}">${escapeHtml(acc.name || 'Cuenta')}</option>`;
+        })
         .join('');
   }
 
@@ -136,7 +136,12 @@ export function fillAutomationSelectors() {
 
 export function clearRecurringForm() {
   editingRecurringId = null;
-  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const today = `${year}-${month}-${day}`;
+
   if ($('recurringName')) $('recurringName').value = '';
   if ($('recurringType')) $('recurringType').value = 'expense';
   if ($('recurringAmount')) $('recurringAmount').value = '';
@@ -147,7 +152,7 @@ export function clearRecurringForm() {
   if ($('recurringAccount')) $('recurringAccount').value = '';
   if ($('recurringDay')) $('recurringDay').value = '1';
   if ($('recurringMonth'))
-    $('recurringMonth').value = String(new Date().getMonth() + 1);
+    $('recurringMonth').value = String(now.getMonth() + 1);
   if ($('recurringNote')) $('recurringNote').value = '';
   if ($('recurringStart')) $('recurringStart').value = today;
   if ($('recurringEnd')) $('recurringEnd').value = '';
@@ -182,16 +187,18 @@ export function renderRecurringTemplates() {
     .map((item) => {
       const cadence = item.cadence === 'yearly' ? 'Anual' : 'Mensual';
       const status = item.is_active ? 'Activa' : 'Pausada';
+      const amount = Number(item.amount || 0).toFixed(2);
+      const itemId = String(item.id || item._id || '');
       return `
         <article class="automation-item">
           <div class="automation-item-head">
             <h5 class="automation-item-title">${escapeHtml(item.name || 'Recurrente')}</h5>
             <div class="automation-item-actions">
-              <button class="automation-action-btn" data-automation-action="edit-recurring" data-id="${escapeHtml(item.id || item._id || '')}" title="Editar"><i class="ph ph-pencil"></i></button>
-              <button class="automation-action-btn" data-automation-action="delete-recurring" data-id="${escapeHtml(item.id || item._id || '')}" title="Eliminar"><i class="ph ph-trash"></i></button>
+              <button class="automation-action-btn" data-automation-action="edit-recurring" data-id="${escapeHtml(itemId)}" title="Editar"><i class="ph ph-pencil"></i></button>
+              <button class="automation-action-btn" data-automation-action="delete-recurring" data-id="${escapeHtml(itemId)}" title="Eliminar"><i class="ph ph-trash"></i></button>
             </div>
           </div>
-          <p class="automation-item-meta">${escapeHtml(cadence)} · Día ${escapeHtml(String(item.day_of_month || 1))} · ${escapeHtml(status)} · ${escapeHtml(String(item.amount || 0))}€</p>
+          <p class="automation-item-meta">${escapeHtml(cadence)} · Día ${escapeHtml(String(item.day_of_month || 1))} · ${escapeHtml(status)} · ${amount}€</p>
         </article>
       `;
     })
@@ -210,13 +217,14 @@ export function renderAutomationRules() {
   container.innerHTML = items
     .map((item) => {
       const status = item.is_active ? 'Activa' : 'Pausada';
+      const itemId = String(item.id || item._id || '');
       return `
         <article class="automation-item">
           <div class="automation-item-head">
             <h5 class="automation-item-title">${escapeHtml(item.name || 'Regla')}</h5>
             <div class="automation-item-actions">
-              <button class="automation-action-btn" data-automation-action="edit-rule" data-id="${escapeHtml(item.id || item._id || '')}" title="Editar"><i class="ph ph-pencil"></i></button>
-              <button class="automation-action-btn" data-automation-action="delete-rule" data-id="${escapeHtml(item.id || item._id || '')}" title="Eliminar"><i class="ph ph-trash"></i></button>
+              <button class="automation-action-btn" data-automation-action="edit-rule" data-id="${escapeHtml(itemId)}" title="Editar"><i class="ph ph-pencil"></i></button>
+              <button class="automation-action-btn" data-automation-action="delete-rule" data-id="${escapeHtml(itemId)}" title="Eliminar"><i class="ph ph-trash"></i></button>
             </div>
           </div>
           <p class="automation-item-meta">${escapeHtml(item.match_mode || 'contains')} "${escapeHtml(item.keyword || '')}" · Prioridad ${escapeHtml(String(item.priority || 100))} · ${escapeHtml(status)}</p>
@@ -509,13 +517,18 @@ export async function exportAllTransactionsCsv() {
     credentials: 'include',
     mode: 'cors'
   });
-  if (!res.ok) throw new Error('No se pudo exportar CSV');
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || 'No se pudo exportar el archivo CSV');
+  }
 
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `movimientos-${new Date().toISOString().slice(0, 10)}.csv`;
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  a.download = `movimientos-${dateStr}.csv`;
   document.body.appendChild(a);
   a.click();
   a.remove();
