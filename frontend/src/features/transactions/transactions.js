@@ -95,19 +95,17 @@ export function annotateTransactionsWithRunningBalances(transactions = []) {
 export function buildTransactionIsoDate(dateValue) {
   if (!dateValue) return new Date().toISOString();
 
-  const selectedDate = new Date(dateValue + 'T00:00:00Z');
-  if (!selectedDate || Number.isNaN(selectedDate.getTime())) {
-    return new Date().toISOString();
+  const rawDate = String(dateValue).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+    const now = new Date();
+    const timePart = now.toISOString().slice(11); // HH:mm:ss.sssZ
+    return `${rawDate}T${timePart}`;
   }
 
-  const now = new Date();
-  selectedDate.setUTCHours(
-    now.getUTCHours(),
-    now.getUTCMinutes(),
-    now.getUTCSeconds(),
-    now.getUTCMilliseconds()
-  );
-  return selectedDate.toISOString();
+  const parsed = new Date(rawDate);
+  return Number.isNaN(parsed.getTime())
+    ? new Date().toISOString()
+    : parsed.toISOString();
 }
 
 export function resolveTransactionVisual(tx, category, subcategory) {
@@ -176,7 +174,9 @@ export function renderTxItem(
   const sub = tx.subcategory_id ? state.catsById?.get(tx.subcategory_id) : null;
   const txVisual = resolveTransactionVisual(tx, cat, sub);
   const visual = txVisual.visual;
-  const date = tx.date ? new Date(tx.date).toLocaleDateString('es-ES') : '';
+  const date = tx.date
+    ? new Date(tx.date).toLocaleDateString('es-ES', { timeZone: 'UTC' })
+    : '';
   const accountMeta = renderTxAccountMeta(tx, getAccountBadgeMarkup);
   const note = (tx.note || '').trim();
   const sign = tx.type === 'expense' ? '-' : '+';
@@ -430,6 +430,7 @@ export async function fetchAllTransactions(filters = {}, options = {}) {
 }
 
 function setFormControlsDisabled(form, disabled) {
+  if (!form) return;
   Array.from(form.querySelectorAll('input,select,textarea')).forEach(
     (i) => (i.disabled = disabled)
   );
@@ -450,9 +451,9 @@ export function applyCreateModalMode() {
   const txDate = $('txDate');
   if (txDate) {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
+    const year = now.getUTCFullYear();
+    const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(now.getUTCDate()).padStart(2, '0');
     txDate.value = `${year}-${month}-${day}`;
   }
   editingTxId = null;
@@ -561,7 +562,7 @@ export async function saveTx() {
 
   const payload = {
     type,
-    amount,
+    amount: Number(amount.toFixed(2)),
     category_id,
     subcategory_id: subcategory_id || null,
     note,
@@ -627,15 +628,17 @@ export async function openViewTx(txId) {
     updateCategoriesForType();
     $('txCategory').value = tx.category_id || '';
     onCategoryChange();
-    setTimeout(() => {
-      if (tx.subcategory_id) $('txSubcategory').value = tx.subcategory_id;
-    }, 50);
+
+    if (tx.subcategory_id && $('txSubcategory')) {
+      $('txSubcategory').value = tx.subcategory_id;
+    }
+
     $('txDesc').value = tx.note || '';
     if ($('txDate') && tx.date) {
       const txDateObj = new Date(tx.date);
-      const year = txDateObj.getFullYear();
-      const month = String(txDateObj.getMonth() + 1).padStart(2, '0');
-      const day = String(txDateObj.getDate()).padStart(2, '0');
+      const year = txDateObj.getUTCFullYear();
+      const month = String(txDateObj.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(txDateObj.getUTCDate()).padStart(2, '0');
       $('txDate').value = `${year}-${month}-${day}`;
     }
     if ($('txAccount')) {

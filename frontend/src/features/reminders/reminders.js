@@ -31,21 +31,22 @@ export function reminderDueInputValue(value) {
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return '';
 
-  const yyyy = parsed.getFullYear();
-  const mm = String(parsed.getMonth() + 1).padStart(2, '0');
-  const dd = String(parsed.getDate()).padStart(2, '0');
+  const yyyy = parsed.getUTCFullYear();
+  const mm = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(parsed.getUTCDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
 
 export function reminderDueLabel(value) {
   const inputValue = reminderDueInputValue(value);
   if (!inputValue) return 'Sin fecha';
-  const parsed = new Date(`${inputValue}T12:00:00`);
+  const parsed = new Date(`${inputValue}T00:00:00Z`);
   if (Number.isNaN(parsed.getTime())) return 'Sin fecha';
   return parsed.toLocaleDateString('es-ES', {
     day: '2-digit',
     month: 'short',
-    year: 'numeric'
+    year: 'numeric',
+    timeZone: 'UTC'
   });
 }
 
@@ -53,7 +54,7 @@ export function isReminderOverdue(reminder) {
   if (reminder?.is_completed) return false;
   const dueInput = reminderDueInputValue(reminder?.due_date);
   if (!dueInput) return false;
-  const dueDate = new Date(`${dueInput}T23:59:59`);
+  const dueDate = new Date(`${dueInput}T23:59:59Z`);
   if (Number.isNaN(dueDate.getTime())) return false;
   return dueDate.getTime() < Date.now();
 }
@@ -89,22 +90,16 @@ export function notifyReminderAdvanceAlert() {
   const reminders = Array.isArray(state.reminders) ? state.reminders : [];
   const now = new Date();
   const todayStart = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-    0,
-    0,
-    0,
-    0
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)
   );
   const threshold = new Date(todayStart);
-  threshold.setMonth(threshold.getMonth() + 2);
+  threshold.setUTCMonth(threshold.getUTCMonth() + 2);
 
   const upcoming = reminders.filter((item) => {
     if (item?.is_completed) return false;
     const dueInput = reminderDueInputValue(item?.due_date);
     if (!dueInput) return false;
-    const due = new Date(`${dueInput}T00:00:00`);
+    const due = new Date(`${dueInput}T00:00:00Z`);
     if (Number.isNaN(due.getTime())) return false;
     return due >= todayStart && due <= threshold;
   });
@@ -337,7 +332,7 @@ export function buildReminderPayloadFromForm() {
 
   return {
     title: titleRaw,
-    due_date: `${dueDate}T00:00:00`,
+    due_date: `${dueDate}T00:00:00Z`,
     amount: amountValue,
     type: REMINDER_TYPE_LABELS[type] ? type : 'other',
     recurrence: REMINDER_RECURRENCE_LABELS[recurrence] ? recurrence : 'none',
