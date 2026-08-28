@@ -3,7 +3,7 @@ import { state } from '../../state/state.js';
 import { api } from '../../services/api.js';
 import { $, escapeHtml, clearFileInput } from '../ui/dom.js';
 import { showAlert } from '../../utils/toast.js';
-import { openModal, closeModal } from '../ui/modals.js';
+import { openModal, closeModal } from '../ui/modal.js';
 import {
   normalizeColorValue,
   normalizeRemoteImageUrl,
@@ -31,51 +31,35 @@ export function getAccountAccent(account) {
   const name = String(account?.name || '').toLowerCase();
   const type = String(account?.type || '').toLowerCase();
 
-  if (name.includes('trade republic')) return '#86efac';
+  if (name.includes('trade republic')) return '#10b981';
   if (name.includes('hucha') || name.includes('ahorro')) return '#ec4899';
-  if (name.includes('santander')) return '#fecaca';
-  if (name.includes('imagin')) return '#93c5fd';
-  if (type === 'credit') return '#c4b5fd';
-  if (type === 'cash') return '#fde68a';
+  if (name.includes('santander')) return '#ef4444';
+  if (name.includes('imagin')) return '#3b82f6';
+  if (type === 'credit') return '#8b5cf6';
+  if (type === 'cash') return '#f59e0b';
 
-  return 'rgba(255, 255, 255, 0.78)';
+  return '#6366f1';
 }
 
 export function getAccountSurface(account) {
-  const customBg = normalizeColorValue(account?.bg_color);
-  if (customBg) return customBg;
-
-  const name = String(account?.name || '').toLowerCase();
-  const type = String(account?.type || '').toLowerCase();
-
-  if (name.includes('trade republic')) return 'rgba(17, 24, 39, 0.06)';
-  if (name.includes('hucha') || name.includes('ahorro'))
-    return 'rgba(236, 72, 153, 0.12)';
-  if (name.includes('santander')) return 'rgba(254, 202, 202, 0.16)';
-  if (name.includes('imagin')) return 'rgba(96, 165, 250, 0.12)';
-  if (type === 'credit') return 'rgba(167, 139, 250, 0.12)';
-  if (type === 'cash') return 'rgba(251, 191, 36, 0.12)';
-
-  return 'rgba(203, 213, 225, 0.12)';
+  const accent = getAccountAccent(account);
+  // Difuminado suave: 10% del color mezclado con 90% de blanco puro
+  return `color-mix(in srgb, ${accent} 10%, #ffffff)`;
 }
 
 export function getAccountBorder(account) {
   const customBorder = normalizeColorValue(account?.border_color);
   if (customBorder) return customBorder;
 
-  const name = String(account?.name || '').toLowerCase();
-
-  if (name.includes('trade republic')) return '#111111';
-  if (name.includes('imagin')) return '#60a5fa';
-  if (name.includes('santander')) return '#fecaca';
-
-  return 'color-mix(in srgb, var(--account-accent) 44%, white)';
+  const accent = getAccountAccent(account);
+  // Borde sutil y elegante a juego con el color
+  return `color-mix(in srgb, ${accent} 30%, rgba(148, 163, 184, 0.25))`;
 }
 
 export function getAccountBrand(account) {
   const customIcon = String(account?.icon || '').trim();
   const customImage = String(account?.image_data || '').trim();
-  const customAccent = normalizeColorValue(account?.bg_color);
+  const customAccent = normalizeColorValue(account?.bg_color || account?.color);
   const customBorder = normalizeColorValue(account?.border_color);
 
   if (customIcon || customImage) {
@@ -160,27 +144,17 @@ export function getAccountBadgeMarkup(account, sizeClass = '') {
 export function applyAccountTheme(cardElement, account = {}) {
   if (!cardElement) return;
 
-  const bgColor = account.bg_color || account.color || '';
-  const borderColor = account.border_color || '';
-  const accentColor = account.color || account.bg_color || '#6366f1';
+  const accent = getAccountAccent(account);
+  const surface = getAccountSurface(account);
+  const border = getAccountBorder(account);
 
-  if (bgColor) {
-    cardElement.style.setProperty('--account-surface', bgColor);
-    cardElement.style.background = bgColor;
-  } else {
-    cardElement.style.removeProperty('--account-surface');
-    cardElement.style.background = '';
-  }
+  cardElement.style.setProperty('--account-accent', accent);
+  cardElement.style.setProperty('--account-surface', surface);
+  cardElement.style.setProperty('--account-border', border);
 
-  if (borderColor) {
-    cardElement.style.setProperty('--account-border', borderColor);
-    cardElement.style.borderColor = borderColor;
-  } else {
-    cardElement.style.removeProperty('--account-border');
-    cardElement.style.borderColor = '';
-  }
-
-  cardElement.style.setProperty('--account-accent', accentColor);
+  // Fondo degradado difuminado: alta legibilidad
+  cardElement.style.background = `linear-gradient(145deg, ${surface} 0%, #ffffff 100%)`;
+  cardElement.style.borderColor = border;
 }
 
 export function getSortedAccounts(accounts = []) {
@@ -306,13 +280,13 @@ export async function loadAccounts() {
         const safeTitle = escapeHtml(mainName || acc.name || '');
         const safeSubtitle = escapeHtml(subtitle);
 
-        const customBg = acc.bg_color ? `background: ${acc.bg_color};` : '';
-        const customBorder = acc.border_color
-          ? `border-color: ${acc.border_color};`
-          : '';
+        // Degradado suave y estilizado con contraste óptimo
+        const cardBgStyle = `background: linear-gradient(145deg, ${surface} 0%, #ffffff 100%);`;
+        const cardBorderStyle = `border: 1px solid ${border};`;
+        const cardGlow = `box-shadow: 0 4px 20px color-mix(in srgb, ${accent} 8%, rgba(15, 23, 42, 0.04));`;
 
         return `
-          <div class="account-card" data-account-id="${acc.id}" draggable="true" style="margin-bottom: 12px; ${customBg} ${customBorder} --account-accent: ${accent}; --account-surface: ${surface}; --account-border: ${border};">
+          <div class="account-card" data-account-id="${acc.id}" draggable="true" style="margin-bottom: 12px; ${cardBgStyle} ${cardBorderStyle} ${cardGlow} --account-accent: ${accent}; --account-surface: ${surface}; --account-border: ${border};">
             <div class="account-card-top">
               <div class="account-card-top-main">
                 ${getAccountBadgeMarkup(acc, 'account-brand-badge--small')}
