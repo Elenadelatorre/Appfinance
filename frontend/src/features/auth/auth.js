@@ -19,6 +19,10 @@ import { ensureBackendCapabilities } from '../automations/automations.js';
 import { loadCategoryTree } from '../categories/categories.js';
 import { loadAccounts } from '../accounts/accounts.js';
 
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 export function getConfiguredStartView() {
   const candidate = state.settings?.defaultView;
   if (candidate && START_VIEW_CONFIG[candidate]) {
@@ -61,12 +65,19 @@ export function setAuthSubmitLoading(mode = 'login', isLoading = false) {
 }
 
 export async function login() {
-  const email = $('loginEmail')?.value?.trim();
-  const password = $('loginPassword')?.value || '';
+  const emailInput = $('loginEmail');
+  const passwordInput = $('loginPassword');
+  const email = (emailInput?.value || '').trim().toLowerCase();
+  const password = passwordInput?.value || '';
   const rememberDevice = Boolean($('loginRememberDevice')?.checked);
 
   if (!email || !password) {
     showAlert('Introduce email y contraseña', 'error');
+    return;
+  }
+
+  if (!isValidEmail(email)) {
+    showAlert('Por favor, introduce un correo electrónico válido', 'error');
     return;
   }
 
@@ -90,8 +101,10 @@ export async function login() {
 
     setApiToken(data.access_token);
     persistAuthToken(data.access_token, rememberDevice);
-    if ($('loginPassword')) $('loginPassword').value = '';
+    if (passwordInput) passwordInput.value = '';
 
+    // Cargar perfil y configuración antes de decidir la vista inicial
+    await fetchRemoteAppSettings().catch(() => {});
     const startupView = getConfiguredStartView();
     globalThis.switchView?.(startupView.id, startupView.title);
     schedulePostAuthHydration(startupView.id);
@@ -112,11 +125,18 @@ export async function login() {
 }
 
 export async function register() {
-  const email = $('registerEmail')?.value?.trim();
-  const password = $('registerPassword')?.value || '';
+  const emailInput = $('registerEmail');
+  const passwordInput = $('registerPassword');
+  const email = (emailInput?.value || '').trim().toLowerCase();
+  const password = passwordInput?.value || '';
 
   if (!email || !password) {
     showAlert('Introduce email y contraseña', 'error');
+    return;
+  }
+
+  if (!isValidEmail(email)) {
+    showAlert('Por favor, introduce un correo electrónico válido', 'error');
     return;
   }
 
@@ -144,8 +164,9 @@ export async function register() {
 
     setApiToken(data.access_token);
     persistAuthToken(data.access_token, false);
-    if ($('registerPassword')) $('registerPassword').value = '';
+    if (passwordInput) passwordInput.value = '';
 
+    await fetchRemoteAppSettings().catch(() => {});
     const startupView = getConfiguredStartView();
     globalThis.switchView?.(startupView.id, startupView.title);
     schedulePostAuthHydration(startupView.id);
@@ -254,7 +275,6 @@ export function initAuthListeners() {
     });
   }
 
-  // Soporte para enviar formularios pulsando Enter
   const handleKeydownLogin = (e) => {
     if (e.key === 'Enter') login();
   };
