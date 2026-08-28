@@ -1,12 +1,10 @@
 # backend/app/services/finance.py
 import asyncio
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
 
-from bson import ObjectId
-
-from app.db.database import (
+from ..db.database import (
     accounts_col,
     budgets_col,
     cat_sections_col,
@@ -22,18 +20,28 @@ GLOBAL_CATEGORY_QUERY: Dict[str, Any] = {
 }
 
 
+def _to_utc_datetime(dt: Optional[datetime]) -> datetime:
+    """Garantiza formato datetime timezone-aware en UTC."""
+    if dt is None:
+        return datetime.now(timezone.utc)
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def parse_date_only(value: str) -> datetime:
     cleaned = str(value or "").strip()
     if not cleaned:
         raise ValueError("La fecha no puede estar vacía")
     try:
-        return datetime.fromisoformat(f"{cleaned}T00:00:00")
+        dt = datetime.fromisoformat(f"{cleaned}T00:00:00")
+        return _to_utc_datetime(dt)
     except ValueError as exc:
         raise ValueError("Formato de fecha inválido (usa YYYY-MM-DD)") from exc
 
 
 # --- FUNCIONES AUXILIARES ---
-def fix_id(obj):
+def fix_id(obj: Any) -> Any:
     if obj is None:
         return None
     if isinstance(obj, list):
@@ -54,19 +62,25 @@ def fix_id(obj):
 def get_billing_cycle_bounds(
     reference: Optional[datetime] = None,
     start_day: int = BILLING_CYCLE_START_DAY,
-) -> tuple[datetime, datetime]:
-    current = reference or datetime.now()
+) -> Tuple[datetime, datetime]:
+    current = _to_utc_datetime(reference)
     if current.day >= start_day:
-        cycle_start = datetime(current.year, current.month, start_day)
+        cycle_start = datetime(
+            current.year, current.month, start_day, tzinfo=timezone.utc
+        )
     elif current.month == 1:
-        cycle_start = datetime(current.year - 1, 12, start_day)
+        cycle_start = datetime(current.year - 1, 12, start_day, tzinfo=timezone.utc)
     else:
-        cycle_start = datetime(current.year, current.month - 1, start_day)
+        cycle_start = datetime(
+            current.year, current.month - 1, start_day, tzinfo=timezone.utc
+        )
 
     if cycle_start.month == 12:
-        cycle_end = datetime(cycle_start.year + 1, 1, start_day)
+        cycle_end = datetime(cycle_start.year + 1, 1, start_day, tzinfo=timezone.utc)
     else:
-        cycle_end = datetime(cycle_start.year, cycle_start.month + 1, start_day)
+        cycle_end = datetime(
+            cycle_start.year, cycle_start.month + 1, start_day, tzinfo=timezone.utc
+        )
 
     return cycle_start, cycle_end
 
@@ -74,7 +88,7 @@ def get_billing_cycle_bounds(
 def get_billing_cycle_period(
     reference: Optional[datetime] = None,
     start_day: int = BILLING_CYCLE_START_DAY,
-) -> tuple[int, int]:
+) -> Tuple[int, int]:
     cycle_start, _ = get_billing_cycle_bounds(reference, start_day)
     return cycle_start.month, cycle_start.year
 
@@ -90,116 +104,142 @@ async def get_summary_for_period(
     start_date: datetime,
     end_date_exclusive: datetime,
     user_id: Optional[str] = None,
-):
+) -> Dict[str, Any]:
+    start_utc = _to_utc_datetime(start_date)
+    end_utc = _to_utc_datetime(end_date_exclusive)
+
     query: Dict[str, Any] = {
-        "date": {"$gte": start_date, "$lt": end_date_exclusive},
+        "date": {"$gte": start_utc, "$lt": end_utc},
         "category_id": {"$nin": ["transfer_out", "transfer_in"]},
     }
     if user_id:
         query["user_id"] = str(user_id)
+
     cursor = tx_col().find(query)
-    transactions = await cursor.to_list(length=1000)
+    transactions = await cursor.to_list(length=2000)
+
     total_income = 0.0
     total_expense = 0.0
-    category_breakdown = {}
+    category_breakdown: Dict[str, float] = {}
+
     for tx in transactions:
-        amount = tx.get("amount", 0)
+        amount = float(tx.get("amount", 0.0))
         tx_type = tx.get("type", "expense")
-        cat_id = tx.get("category_id", "sin_categoria")
+        cat_id = str(tx.get("category_id", "sin_categoria"))
         if tx_type == "income":
             total_income += amount
         else:
             total_expense += amount
-            category_breakdown[cat_id] = category_breakdown.get(cat_id, 0) + amount
+            category_breakdown[cat_id] = round(
+                category_breakdown.get(cat_id, 0.0) + amount, 2
+            )
 
-    period_end = end_date_exclusive - timedelta(days=1)
+    period_end = end_utc - timedelta(days=1)
     return {
-        "month": start_date.strftime("%B"),
+        "month": start_utc.strftime("%B"),
         "total_income": round(total_income, 2),
         "total_expense": round(total_expense, 2),
         "balance": round(total_income - total_expense, 2),
         "category_breakdown": category_breakdown,
-        "period_start": start_date.isoformat(),
+        "period_start": start_utc.isoformat(),
         "period_end": period_end.isoformat(),
         "cycle_start_day": BILLING_CYCLE_START_DAY,
     }
 
 
-async def get_monthly_summary(user_id: Optional[str] = None):
+async def get_monthly_summary(user_id: Optional[str] = None) -> Dict[str, Any]:
     start_of_cycle, end_of_cycle = get_billing_cycle_bounds()
     return await get_summary_for_period(start_of_cycle, end_of_cycle, user_id)
 
 
-async def get_accounts_balances(user_id: Optional[str] = None):
+async def get_accounts_balances(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Calcula el balance de todas las cuentas usando una sola agregación de MongoDB."""
     query = {} if not user_id else {"user_id": str(user_id)}
-    accounts = await accounts_col().find(query).to_list(100)
-    user_filter = {"user_id": str(user_id)} if user_id else {}
+    accounts = await accounts_col().find(query).to_list(length=300)
 
-    async def compute_account_balance(account: Dict[str, Any]) -> Dict[str, Any]:
-        acc_id = str(account["_id"])
-        txs = (
-            await tx_col()
-            .find({"account_id": acc_id, **user_filter})
-            .to_list(length=1000)
-        )
-        total = float(account.get("balance_inicial", 0))
-        for tx in txs:
-            amount = float(tx.get("amount", 0))
-            total += amount if tx.get("type") == "income" else -amount
-        return {
-            "account_id": acc_id,
-            "account_name": account["name"],
-            "current_balance": round(total, 2),
-        }
+    # Pipeline de agregación para sumar movimientos agrupados por account_id
+    pipeline = [
+        {"$match": query},
+        {
+            "$group": {
+                "_id": "$account_id",
+                "net_change": {
+                    "$sum": {
+                        "$cond": [
+                            {"$eq": ["$type", "income"]},
+                            "$amount",
+                            {"$multiply": ["$amount", -1]},
+                        ]
+                    }
+                },
+            }
+        },
+    ]
 
-    balances_reales = [await compute_account_balance(acc) for acc in accounts]
-
-    unassigned_query: Dict[str, Any] = {
-        **user_filter,
-        "$or": [
-            {"account_id": {"$exists": False}},
-            {"account_id": None},
-            {"account_id": ""},
-        ],
+    agg_results = await tx_col().aggregate(pipeline).to_list(length=500)
+    deltas_by_account = {
+        str(r["_id"]): float(r.get("net_change", 0.0))
+        for r in agg_results
+        if r["_id"] is not None and str(r["_id"]).strip() != ""
     }
-    unassigned_txs = await tx_col().find(unassigned_query).to_list(length=1000)
-    net_unassigned = 0.0
-    for tx in unassigned_txs:
-        amount = float(tx.get("amount", 0))
-        net_unassigned += amount if tx.get("type") == "income" else -amount
 
-    if net_unassigned != 0 or not balances_reales:
+    # Transacciones no asignadas a ninguna cuenta
+    unassigned_net = next(
+        (
+            float(r.get("net_change", 0.0))
+            for r in agg_results
+            if r["_id"] is None or str(r["_id"]).strip() == ""
+        ),
+        0.0,
+    )
+
+    balances_reales = []
+    for account in accounts:
+        acc_id = str(account["_id"])
+        initial = float(account.get("balance_inicial", 0.0))
+        delta = deltas_by_account.get(acc_id, 0.0)
+        balances_reales.append(
+            {
+                "account_id": acc_id,
+                "account_name": account.get("name", "Cuenta"),
+                "current_balance": round(initial + delta, 2),
+            }
+        )
+
+    if unassigned_net != 0.0 or not balances_reales:
         balances_reales.append(
             {
                 "account_id": None,
                 "account_name": "Sin cuenta",
-                "current_balance": round(net_unassigned, 2),
+                "current_balance": round(unassigned_net, 2),
             }
         )
 
     return balances_reales
 
 
-async def check_budgets_logic(user_id: Optional[str] = None):
+async def check_budgets_logic(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
     start_of_cycle, _ = get_billing_cycle_bounds()
     query: Dict[str, Any] = {"month": start_of_cycle.month, "year": start_of_cycle.year}
     if user_id:
         query["user_id"] = str(user_id)
-    budgets = await budgets_col().find(query).to_list(100)
+
+    budgets = await budgets_col().find(query).to_list(length=200)
     summary = await get_monthly_summary(user_id)
     expenses_by_cat = summary.get("category_breakdown", {})
     category_scope = get_category_scope_query(user_id)
-    if user_id:
-        await seed_categories_for_user(str(user_id))
-    all_cats = await categories_col().find(category_scope).to_list(500)
-    cat_map = {str(c["_id"]): c["name"] for c in all_cats}
+
+    all_cats = await categories_col().find(category_scope).to_list(length=500)
+    cat_map = {str(c["_id"]): c.get("name", "Desconocida") for c in all_cats}
+
     analysis = []
     for b in budgets:
-        cat_id = b["category_id"]
-        spent = expenses_by_cat.get(cat_id, 0)
-        limit = b["limit_amount"]
+        cat_id = str(b.get("category_id", ""))
+        spent = float(expenses_by_cat.get(cat_id, 0.0))
+        limit = float(b.get("limit_amount", 0.0))
         remaining = limit - spent
-        percentage = (spent / limit) * 100 if limit > 0 else 0
+        percentage = (spent / limit) * 100 if limit > 0 else 0.0
+
         analysis.append(
             {
                 "budget_id": str(b.get("_id")),
@@ -340,7 +380,7 @@ async def seed_initial_categories() -> None:
     except asyncio.CancelledError:
         raise
     except Exception as exc:
-        logger.warning("seed_initial_categories failed: %s", exc)
+        logger.warning("seed_initial_categories falló: %s", exc)
 
 
 async def seed_categories_for_user(user_id: str) -> None:
@@ -352,12 +392,12 @@ async def seed_categories_for_user(user_id: str) -> None:
         return
 
     global_categories = (
-        await categories_col().find(get_category_scope_query()).to_list(1000)
+        await categories_col().find(get_category_scope_query()).to_list(length=1000)
     )
     if not global_categories:
         await seed_initial_categories()
         global_categories = (
-            await categories_col().find(get_category_scope_query()).to_list(1000)
+            await categories_col().find(get_category_scope_query()).to_list(length=1000)
         )
 
     if not global_categories:
@@ -450,4 +490,4 @@ async def seed_default_accounts_for_user(user_id: str) -> None:
     except asyncio.CancelledError:
         raise
     except Exception as exc:
-        logger.warning("seed_default_accounts_for_user(%s) failed: %s", user_id, exc)
+        logger.warning("seed_default_accounts_for_user(%s) falló: %s", user_id, exc)
