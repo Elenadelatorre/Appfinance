@@ -1,45 +1,77 @@
-// js/utils/modal.js
+// src/ui/modal.js
 import { $ } from './dom.js';
 
 let activeModal = null;
+let modalTransitionTimer = null;
 
 export function openModal(modalId = 'modalAddTx') {
   const m = $(modalId);
   if (!m) return;
+
+  if (modalTransitionTimer) {
+    clearTimeout(modalTransitionTimer);
+    modalTransitionTimer = null;
+  }
+
   activeModal = m;
   m.style.display = 'flex';
-  history.pushState({ modalOpen: true }, '');
-  setTimeout(() => m.classList.add('active'), 10);
+  document.body.style.overflow = 'hidden';
+
+  try {
+    history.pushState({ modalOpen: true, modalId }, '');
+  } catch {}
+
+  requestAnimationFrame(() => {
+    m.classList.add('active');
+  });
 }
 
 export function closeModal(modalId = 'modalAddTx', skipHistoryBack = false) {
-  const m = $(modalId);
+  const m = $(modalId) || activeModal;
   if (!m) return;
+
   m.classList.remove('active');
+
   if (!skipHistoryBack && history.state?.modalOpen) {
-    history.back();
+    try {
+      history.back();
+    } catch {}
   }
-  setTimeout(() => {
+
+  if (modalTransitionTimer) {
+    clearTimeout(modalTransitionTimer);
+  }
+
+  modalTransitionTimer = setTimeout(() => {
     m.style.display = 'none';
-    if (activeModal === m) activeModal = null;
+    if (activeModal === m) {
+      activeModal = null;
+      document.body.style.overflow = '';
+    }
   }, 250);
 }
 
 export function attachModalOutsideClose() {
   globalThis.addEventListener('click', (ev) => {
-    const txModal = $('modalAddTx');
-    const accModal = $('modalAddAccount');
-    const transferModal = $('modalTransfer');
+    const target = ev.target;
+    if (target && target.classList && target.classList.contains('modal')) {
+      closeModal(target.id || 'modalAddTx');
+    }
+  });
 
-    if (txModal && ev.target === txModal) closeModal('modalAddTx');
-    if (accModal && ev.target === accModal) closeModal('modalAddAccount');
-    if (transferModal && ev.target === transferModal)
-      closeModal('modalTransfer');
+  globalThis.addEventListener('keydown', (ev) => {
+    if (
+      ev.key === 'Escape' &&
+      activeModal &&
+      activeModal.style.display === 'flex'
+    ) {
+      closeModal(activeModal.id);
+    }
   });
 }
 
 globalThis.addEventListener('popstate', () => {
-  if (activeModal?.style.display === 'flex') {
+  if (activeModal && activeModal.style.display === 'flex') {
     closeModal(activeModal.id, true);
   }
 });
