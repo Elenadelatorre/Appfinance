@@ -1,4 +1,4 @@
-// src/ui/dom.js
+// src/ui/dom.js (o src/utils/dom.js)
 
 export const $ = (id) =>
   typeof id === 'string' ? document.getElementById(id) : id;
@@ -20,10 +20,15 @@ export function escapeHtml(value) {
 
 export function renderListEmptyState(iconClass, title, hint = '') {
   const cleanIconClass = String(iconClass || 'ph-receipt').trim();
-  const fullIconClass =
-    cleanIconClass.startsWith('ph ') || cleanIconClass.startsWith('ph-')
-      ? cleanIconClass
-      : `ph-${cleanIconClass}`;
+
+  // Normalizar clases para Phosphor Icons sin duplicar prefijos
+  let formattedClass = cleanIconClass;
+  if (!formattedClass.startsWith('ph ') && !formattedClass.startsWith('ph-')) {
+    formattedClass = `ph-${formattedClass}`;
+  }
+  if (!formattedClass.startsWith('ph ')) {
+    formattedClass = `ph ${formattedClass}`;
+  }
 
   const hintHtml = hint
     ? `<p class="list-empty-state__hint">${escapeHtml(hint)}</p>`
@@ -31,7 +36,7 @@ export function renderListEmptyState(iconClass, title, hint = '') {
 
   return `
     <div class="list-empty-state" role="status" aria-live="polite">
-      <span class="list-empty-state__icon" aria-hidden="true"><i class="ph ${escapeHtml(fullIconClass)}"></i></span>
+      <span class="list-empty-state__icon" aria-hidden="true"><i class="${escapeHtml(formattedClass)}"></i></span>
       <p class="list-empty-state__msg">${escapeHtml(title)}</p>
       ${hintHtml}
     </div>

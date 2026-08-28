@@ -3,6 +3,7 @@ import { $ } from './dom.js';
 
 let activeModal = null;
 let modalTransitionTimer = null;
+let lastFocusedElement = null;
 
 export function openModal(modalId = 'modalAddTx') {
   const m = $(modalId);
@@ -13,6 +14,7 @@ export function openModal(modalId = 'modalAddTx') {
     modalTransitionTimer = null;
   }
 
+  lastFocusedElement = document.activeElement;
   activeModal = m;
   m.style.display = 'flex';
   document.body.style.overflow = 'hidden';
@@ -23,6 +25,12 @@ export function openModal(modalId = 'modalAddTx') {
 
   requestAnimationFrame(() => {
     m.classList.add('active');
+    const firstInput = m.querySelector(
+      'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
+    );
+    if (firstInput && typeof firstInput.focus === 'function') {
+      firstInput.focus();
+    }
   });
 }
 
@@ -32,7 +40,11 @@ export function closeModal(modalId = 'modalAddTx', skipHistoryBack = false) {
 
   m.classList.remove('active');
 
-  if (!skipHistoryBack && history.state?.modalOpen) {
+  if (
+    !skipHistoryBack &&
+    history.state?.modalOpen &&
+    history.state?.modalId === m.id
+  ) {
     try {
       history.back();
     } catch {}
@@ -47,6 +59,14 @@ export function closeModal(modalId = 'modalAddTx', skipHistoryBack = false) {
     if (activeModal === m) {
       activeModal = null;
       document.body.style.overflow = '';
+      if (
+        lastFocusedElement &&
+        typeof lastFocusedElement.focus === 'function'
+      ) {
+        try {
+          lastFocusedElement.focus();
+        } catch {}
+      }
     }
   }, 250);
 }
