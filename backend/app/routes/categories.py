@@ -1,6 +1,7 @@
 # backend/app/routers/categories.py
 from typing import Annotated, Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from bson.errors import InvalidId
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..core.security import get_current_user_id, get_current_user_id_optional
 from ..db.database import cat_sections_col, categories_col, tx_col
@@ -8,7 +9,6 @@ from ..schemas.schemas import CategoryCreate, CategoryUpdate
 from ..services.finance import (
     fix_id,
     get_category_scope_query,
-    seed_categories_for_user,
 )
 from ..utils.helpers import oid
 
@@ -17,14 +17,24 @@ CurrentUserId = Annotated[str, Depends(get_current_user_id)]
 OptionalCurrentUserId = Annotated[Optional[str], Depends(get_current_user_id_optional)]
 
 
+def _safe_oid(val: str) -> Any:
+    """Convierte a ObjectId o levanta 404 si el formato es inválido."""
+    try:
+        return oid(val)
+    except (InvalidId, ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Identificador de categoría inválido.",
+        )
+
+
 @router.get("/tree")
 async def get_category_tree(user_id: OptionalCurrentUserId = None):
-    if user_id:
-        await seed_categories_for_user(str(user_id))
-
-    sections_raw = await cat_sections_col().find({}).to_list(100)
+    sections_raw = await cat_sections_col().find({}).to_list(length=100)
     all_cats_raw = (
-        await categories_col().find(get_category_scope_query(user_id)).to_list(1000)
+        await categories_col()
+        .find(get_category_scope_query(user_id))
+        .to_list(length=1000)
     )
     all_cats: List[Dict[str, Any]] = [
         c for c in [fix_id(raw) for raw in all_cats_raw] if isinstance(c, dict)
@@ -69,18 +79,21 @@ async def get_category_tree(user_id: OptionalCurrentUserId = None):
     return result
 
 
-@router.post("/")
+@router.post("", status_code=status.HTTP_201_CREATED)
 async def create_category(payload: CategoryCreate, user_id: CurrentUserId):
-    await seed_categories_for_user(str(user_id))
     doc = payload.model_dump()
     doc["user_id"] = str(user_id)
 
     if doc.get("parent_id"):
+        parent_oid = _safe_oid(doc["parent_id"])
         parent = await categories_col().find_one(
-            {"_id": oid(doc["parent_id"]), **get_category_scope_query(user_id)}
+            {"_id": parent_oid, **get_category_scope_query(user_id)}
         )
         if not parent:
-            raise HTTPException(status_code=404, detail="Categoría padre no encontrada")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Categoría padre no encontrada.",
+            )
         doc["section_id"] = str(parent.get("section_id"))
 
     res = await categories_col().insert_one(doc)
@@ -92,12 +105,15 @@ async def create_category(payload: CategoryCreate, user_id: CurrentUserId):
 async def update_category(
     category_id: str, payload: CategoryUpdate, user_id: CurrentUserId
 ):
-    await seed_categories_for_user(str(user_id))
+    target_oid = _safe_oid(category_id)
     existing = await categories_col().find_one(
-        {"_id": oid(category_id), **get_category_scope_query(user_id)}
+        {"_id": target_oid, **get_category_scope_query(user_id)}
     )
     if not existing:
-        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Categoría no encontrada.",
+        )
 
     update_doc = payload.model_dump(exclude_unset=True)
     if not update_doc:
@@ -106,63 +122,65 @@ async def update_category(
     if update_doc.get("parent_id"):
         if str(update_doc["parent_id"]) == str(category_id):
             raise HTTPException(
-                status_code=400, detail="Una categoría no puede ser su propio padre"
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Una categoría no puede ser su propio padre.",
             )
+        parent_oid = _safe_oid(update_doc["parent_id"])
         parent = await categories_col().find_one(
-            {"_id": oid(update_doc["parent_id"]), **get_category_scope_query(user_id)}
+            {"_id": parent_oid, **get_category_scope_query(user_id)}
         )
         if not parent:
-            raise HTTPException(status_code=404, detail="Categoría padre no encontrada")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Categoría padre no encontrada.",
+            )
         update_doc["section_id"] = str(parent.get("section_id"))
 
     await categories_col().update_one(
-        {"_id": oid(category_id), **get_category_scope_query(user_id)},
+        {"_id": target_oid, **get_category_scope_query(user_id)},
         {"$set": update_doc},
     )
     updated = await categories_col().find_one(
-        {"_id": oid(category_id), **get_category_scope_query(user_id)}
+        {"_id": target_oid, **get_category_scope_query(user_id)}
     )
     return fix_id(updated)
 
 
 @router.delete("/{category_id}")
 async def delete_category(category_id: str, user_id: CurrentUserId):
-    await seed_categories_for_user(str(user_id))
+    target_oid = _safe_oid(category_id)
     category = await categories_col().find_one(
-        {"_id": oid(category_id), **get_category_scope_query(user_id)}
+        {"_id": target_oid, **get_category_scope_query(user_id)}
     )
     if not category:
-        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Categoría no encontrada.",
+        )
 
     child_categories = (
         await categories_col()
         .find({"parent_id": str(category_id), **get_category_scope_query(user_id)})
-        .to_list(200)
+        .to_list(length=200)
     )
     child_ids = [str(item["_id"]) for item in child_categories]
+    all_target_ids = [str(category_id)] + child_ids
 
-    category_tx_count = await tx_col().count_documents(
-        {"category_id": str(category_id), "user_id": str(user_id)}
-    )
-    subcategory_tx_count = (
-        await tx_col().count_documents(
-            {"subcategory_id": {"$in": child_ids}, "user_id": str(user_id)}
-        )
-        if child_ids
-        else 0
-    )
-    own_subcategory_tx_count = await tx_col().count_documents(
-        {"subcategory_id": str(category_id), "user_id": str(user_id)}
+    # Consulta unificada para proteger transacciones pasadas
+    associated_tx_count = await tx_col().count_documents(
+        {
+            "user_id": str(user_id),
+            "$or": [
+                {"category_id": {"$in": all_target_ids}},
+                {"subcategory_id": {"$in": all_target_ids}},
+            ],
+        }
     )
 
-    if (
-        category_tx_count > 0
-        or subcategory_tx_count > 0
-        or own_subcategory_tx_count > 0
-    ):
+    if associated_tx_count > 0:
         raise HTTPException(
-            status_code=409,
-            detail="No puedes eliminar una categoría o subcategoría con movimientos asociados",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No puedes eliminar una categoría con movimientos históricos asociados.",
         )
 
     if child_ids:
@@ -171,6 +189,6 @@ async def delete_category(category_id: str, user_id: CurrentUserId):
         )
 
     await categories_col().delete_one(
-        {"_id": oid(category_id), **get_category_scope_query(user_id)}
+        {"_id": target_oid, **get_category_scope_query(user_id)}
     )
-    return {"status": "success", "message": "Categoría eliminada"}
+    return {"status": "success", "message": "Categoría eliminada correctamente"}
