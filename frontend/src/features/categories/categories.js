@@ -465,62 +465,73 @@ export function renderCategoryManager() {
 }
 
 export function updateCategoriesForType() {
-  const type = $('txType')?.value || 'expense';
-  const categoryMap = {
-    expense: ['Gastos', 'Ahorro e Inversión'],
-    income: ['Ingresos', 'Ahorro e Inversión']
-  };
+  const typeSelect = $('txType');
+  const catSelect = $('txCategory');
+  const subcatSelect = $('txSubcategory');
+  if (!catSelect) return;
 
-  const allowedSections = categoryMap[type] || [];
-  const flatCats = [];
+  const currentType = typeSelect?.value || 'expense';
+  const sectionKey = currentType === 'income' ? 'income' : 'expense';
+  const section = (state.tree || []).find((s) => s.section === sectionKey);
 
-  for (const section of state.tree || []) {
-    if (allowedSections.includes(section.section)) {
-      for (const cat of section.categories || []) {
-        flatCats.push(cat);
-      }
-    }
-  }
+  // Obtener categorías y ordenarlas alfabéticamente por nombre
+  const categories = [...(section?.categories || [])].sort((a, b) =>
+    (a.name || '').localeCompare(b.name || '', 'es-ES', { sensitivity: 'base' })
+  );
 
-  const catSel = $('txCategory');
-  if (catSel) {
-    catSel.innerHTML =
-      `<option value="">Seleccionar Categoría</option>` +
-      flatCats.map((c) => buildCategoryOption(c)).join('');
-    catSel.value = '';
-  }
+  catSelect.innerHTML = '<option value="">Selecciona categoría</option>';
 
-  const subSel = $('txSubcategory');
-  if (subSel) {
-    subSel.innerHTML = `<option value="">(Opcional) Subcategoría</option>`;
-    subSel.disabled = true;
+  categories.forEach((cat) => {
+    const catId = String(cat.id || cat._id || '');
+    const opt = document.createElement('option');
+    opt.value = catId;
+    opt.textContent = `${cat.icon ? cat.icon + ' ' : ''}${cat.name}`;
+    catSelect.appendChild(opt);
+  });
+
+  if (subcatSelect) {
+    subcatSelect.innerHTML =
+      '<option value="">(Opcional) Subcategoría</option>';
+    subcatSelect.disabled = true;
   }
 }
 
 export function onCategoryChange() {
-  const catId = $('txCategory')?.value;
-  const subSel = $('txSubcategory');
-  if (!subSel) return;
+  const catSelect = $('txCategory');
+  const subcatSelect = $('txSubcategory');
+  if (!catSelect || !subcatSelect) return;
 
-  if (!catId) {
-    subSel.innerHTML = `<option value="">(Opcional) Subcategoría</option>`;
-    subSel.disabled = true;
+  const selectedCatId = catSelect.value;
+  if (!selectedCatId) {
+    subcatSelect.innerHTML =
+      '<option value="">(Opcional) Subcategoría</option>';
+    subcatSelect.disabled = true;
     return;
   }
 
-  const parent = state.catsById.get(catId);
-  const subs = parent?.subcategories || [];
+  const category = state.catsById?.get(selectedCatId);
 
-  if (!subs.length) {
-    subSel.innerHTML = `<option value="">(Opcional) Subcategoría</option>`;
-    subSel.disabled = true;
+  // Obtener subcategorías y ordenarlas alfabéticamente
+  const subcategories = [...(category?.subcategories || [])].sort((a, b) =>
+    (a.name || '').localeCompare(b.name || '', 'es-ES', { sensitivity: 'base' })
+  );
+
+  if (!subcategories.length) {
+    subcatSelect.innerHTML = '<option value="">(Sin subcategorías)</option>';
+    subcatSelect.disabled = true;
     return;
   }
 
-  subSel.disabled = false;
-  subSel.innerHTML =
-    `<option value="">(Opcional) Subcategoría</option>` +
-    subs.map((sc) => buildSubcategoryOption(sc, parent)).join('');
+  subcatSelect.innerHTML = '<option value="">(Opcional) Subcategoría</option>';
+  subcategories.forEach((sub) => {
+    const subId = String(sub.id || sub._id || '');
+    const opt = document.createElement('option');
+    opt.value = subId;
+    opt.textContent = `${sub.icon ? sub.icon + ' ' : ''}${sub.name}`;
+    subcatSelect.appendChild(opt);
+  });
+
+  subcatSelect.disabled = false;
 }
 
 export async function loadCategoryTree() {
