@@ -2,7 +2,7 @@
 import {
   API_STORAGE_KEY,
   DEFAULT_LOCAL_API,
-  API_TIMEOUT_MS
+  API_TIMEOUT_MS,
 } from '../config/constants.js';
 import { readStartupToken } from './storage.js';
 import { showAlert } from '../utils/toast.js';
@@ -58,6 +58,11 @@ export function extractApiErrorMessage(
 ) {
   if (!payload) return fallback;
 
+  // Soporte directo para el formato { message: "..." } del backend nuevo
+  if (typeof payload.message === 'string' && payload.message.trim()) {
+    return payload.message.trim();
+  }
+
   const details = payload.detail;
   if (typeof details === 'string' && details.trim()) return details.trim();
 
@@ -77,7 +82,7 @@ export function extractApiErrorMessage(
     if (lines.length) return lines.join(' | ');
   }
 
-  const extraErrors = payload.errors;
+  const extraErrors = payload.errors || payload.details;
   if (Array.isArray(extraErrors) && extraErrors.length) {
     return extraErrors
       .map((item) => (typeof item === 'string' ? item : JSON.stringify(item)))
@@ -113,46 +118,6 @@ export async function fetchJsonSilent(path, opts = {}) {
   if (currentToken) headers['Authorization'] = `Bearer ${currentToken}`;
   if (opts.json) headers['Content-Type'] = 'application/json';
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      opts.timeoutMs || API_TIMEOUT_MS || 15000
-    );
-
-    const res = await fetch(`${API}${path}`, {
-      ...opts,
-      headers,
-      signal: opts.signal || controller.signal,
-      credentials: 'include',
-      mode: 'cors'
-    });
-    clearTimeout(timeout);
-
-    const text = await res.text();
-    let data = null;
-    try {
-      data = text ? JSON.parse(text) : null;
-    } catch {
-      data = null;
-    }
-
-    return { ok: res.ok, status: res.status, data };
-  } catch (err) {
-    return { ok: false, status: 0, data: null, error: err };
-  }
-}
-
-export async function api(path, opts = {}) {
-  if (!path.startsWith('/')) {
-    throw new Error('Path inválido: debe comenzar con /');
-  }
-
-  const headers = { ...(opts.headers || {}) };
-  const requestToken = currentToken;
-  if (requestToken) headers['Authorization'] = `Bearer ${requestToken}`;
-  if (opts.json) headers['Content-Type'] = 'application/json';
-
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),
@@ -165,9 +130,57 @@ export async function api(path, opts = {}) {
       headers,
       signal: opts.signal || controller.signal,
       credentials: 'include',
-      mode: 'cors'
+      mode: 'cors',
     });
+
+    const text = await res.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
+    }
+
+    return { ok: res.ok, status: res.status, data };
+  } catch (err) {
+    return { ok: false, status: 0, data: null, error: err };
+  } finally {
     clearTimeout(timeout);
+  }
+}
+
+export async function api(path, opts = {}) {
+  if (!path.startsWith('/')) {
+    throw new Error('Path inválido: debe comenzar con /');
+  }
+
+  const headers = { ...(opts.headers || {}) };
+  const requestToken = currentToken;
+  if (requestToken) headers['Authorization'] = `Bearer ${requestToken}`;
+
+  let body = opts.body;
+  if (opts.json || (body && typeof body === 'object' && !(body instanceof FormData))) {
+    headers['Content-Type'] = 'application/json';
+    if (typeof body === 'object') {
+      body = JSON.stringify(body);
+    }
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    opts.timeoutMs || API_TIMEOUT_MS || 15000
+  );
+
+  try {
+    const res = await fetch(`${API}${path}`, {
+      ...opts,
+      body,
+      headers,
+      signal: opts.signal || controller.signal,
+      credentials: 'include',
+      mode: 'cors',
+    });
 
     if (res.status === 401) {
       if (requestToken && requestToken !== currentToken) {
@@ -214,7 +227,6 @@ export async function api(path, opts = {}) {
 
     return data;
   } catch (error) {
-    clearTimeout(timeout);
     if (error.name === 'AbortError') {
       const timeoutErr = new Error(
         'Tiempo de espera agotado al conectar con el servidor'
@@ -231,5 +243,7 @@ export async function api(path, opts = {}) {
     }
     showAlert(error.message, 'error');
     throw error;
+  } finally {
+    clearTimeout(timeout);
   }
 }

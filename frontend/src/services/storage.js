@@ -143,10 +143,13 @@ export function normalizeAppSettings(rawSettings = {}) {
 }
 
 export function loadStoredAppSettings() {
+  const rawMotion = safeStorageGet(localStorage, SETTINGS_REDUCE_MOTION_KEY);
   const stored = {
     defaultView: safeStorageGet(localStorage, SETTINGS_DEFAULT_VIEW_KEY),
     reduceMotion:
-      safeStorageGet(localStorage, SETTINGS_REDUCE_MOTION_KEY) === '1',
+      rawMotion !== null
+        ? rawMotion === '1'
+        : DEFAULT_APP_SETTINGS.reduceMotion,
     profileAvatar: safeStorageGet(localStorage, SETTINGS_PROFILE_AVATAR_KEY),
     accentColor: safeStorageGet(localStorage, SETTINGS_ACCENT_COLOR_KEY)
   };
@@ -154,6 +157,7 @@ export function loadStoredAppSettings() {
 }
 
 export function saveStoredAppSettings(settings) {
+  if (!settings || typeof settings !== 'object') return;
   safeStorageSet(
     localStorage,
     SETTINGS_DEFAULT_VIEW_KEY,
