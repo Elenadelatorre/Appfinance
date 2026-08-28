@@ -1,4 +1,4 @@
-// js/main.js
+// src/main.js
 import { state } from './state/state.js';
 import { START_VIEW_CONFIG } from './config/constants.js';
 import { $ } from './features/ui/dom.js';
@@ -19,7 +19,8 @@ import {
 import {
   loadAccounts,
   initAccountListeners,
-  openViewAccount
+  openViewAccount,
+  setAccountsNavigationCallback
 } from './features/accounts/accounts.js';
 import {
   saveTx,
@@ -73,12 +74,16 @@ export function loadViewContent(viewId) {
   if (viewId === 'dashboard') return void loadDashboardView();
   if (viewId === 'history') return void loadHistoryView();
   if (viewId === 'stats') return void loadBudgetsView();
-  if (viewId === 'reminders')
+  if (viewId === 'reminders') {
     return void loadReminders({ notifyAdvance: true });
+  }
   if (viewId !== 'config') return;
 
-  if (getApiToken() && !state.user) hasValidStoredSession();
-  else renderProfileIdentity();
+  if (getApiToken() && !state.user) {
+    hasValidStoredSession();
+  } else {
+    renderProfileIdentity();
+  }
 
   loadCategoryTree();
   loadAccounts()
@@ -122,7 +127,9 @@ export function switchView(viewId, title, ev) {
     appContainer.classList.toggle('auth-layout', viewId === 'login');
   }
 
-  $('viewTitle').textContent = title;
+  const titleEl = $('viewTitle');
+  if (titleEl) titleEl.textContent = title;
+
   state.currentViewId = viewId;
   applyViewChrome(viewId, ev);
   loadViewContent(viewId);
@@ -135,6 +142,22 @@ export function backToAccounts() {
   switchView(target.id, target.title);
 }
 globalThis.backToAccounts = backToAccounts;
+
+function initNavigationListeners() {
+  document.querySelectorAll('.tab-item[data-view]').forEach((tabBtn) => {
+    tabBtn.addEventListener('click', (ev) => {
+      const viewId = tabBtn.dataset.view;
+      const config = START_VIEW_CONFIG[viewId];
+      if (config) {
+        switchView(config.id, config.title, ev);
+      }
+    });
+  });
+
+  setAccountsNavigationCallback((viewId, title) => {
+    switchView(viewId, title);
+  });
+}
 
 function initModalListeners() {
   const btnAdd = $('btnAddAccount');
@@ -154,10 +177,11 @@ function initModalListeners() {
     viewTitle.addEventListener('click', goHomeFromTopBar);
   }
 
-  if (btnSettings)
+  if (btnSettings) {
     btnSettings.addEventListener('click', () =>
       switchView('config', 'Ajustes')
     );
+  }
   if (btnAdd) btnAdd.addEventListener('click', () => openCreateTxModal());
   if (btnFab) btnFab.addEventListener('click', () => openCreateTxModal());
 
@@ -176,6 +200,7 @@ function initModalListeners() {
 document.addEventListener('DOMContentLoaded', async () => {
   setSessionExpiredHandler(logout);
   attachModalOutsideClose();
+  initNavigationListeners();
   initModalListeners();
   initAccountListeners();
   initDashboardListeners();
@@ -222,6 +247,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 window.addEventListener('pagehide', flushRemoteSettingsSync);
+
 // Configurar el callback directo de transacciones
 setTransactionRefreshCallbacks({
   onRefresh: async () => {
