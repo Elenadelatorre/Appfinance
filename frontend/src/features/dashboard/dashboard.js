@@ -355,9 +355,13 @@ export async function loadHomeAccount(options = {}) {
         /ahorro|hucha/i.test(subtitle)
       );
     }
-    const balance = Number(principalAccount.current_balance || 0).toFixed(2);
-    if ($('homeAccountBalance'))
-      $('homeAccountBalance').textContent = `${balance}€`;
+    const rawBalance = Number(principalAccount.current_balance || 0);
+    const balanceEl = $('homeAccountBalance');
+    if (balanceEl) {
+      balanceEl.textContent = `${rawBalance.toFixed(2)}€`;
+      balanceEl.style.color =
+        rawBalance < 0 ? 'var(--danger)' : 'var(--success)';
+    }
 
     enableHomeCardNavigation(homeCard, principalAccId);
     syncHomeTransferButton(homeTransferBtn, principalAccount);
