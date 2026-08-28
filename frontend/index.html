@@ -14,24 +14,17 @@
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
     />
-    <!-- Seguridad -->
+
+    <!-- Seguridad y CSP -->
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https:; style-src 'self' 'unsafe-inline' https: http: data:; style-src-elem 'self' 'unsafe-inline' https: http: data:; img-src 'self' data: https:; font-src 'self' https: data:; connect-src 'self' http://localhost:8001 http://127.0.0.1:8001 https: http:"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https:; style-src 'self' 'unsafe-inline' https: http: data:; style-src-elem 'self' 'unsafe-inline' https: http: data:; img-src 'self' data: https: blob:; font-src 'self' https: data:; connect-src 'self' http://localhost:8001 http://127.0.0.1:8001 https://finance-app-api-pccd.onrender.com https: http:;"
     />
-    <!-- 
-      Finance API Base URL
-      Set to your production backend URL when deploying
-      Examples:
-        - Local dev: http://127.0.0.1:8001
-        - Render: https://finance-app-api.onrender.com
-        - Railway: https://your-api.up.railway.app
-      Can also be set via query param: ?api=https://your-api.com
-    -->
+
     <meta
       name="finance-api-base"
-      content="https://finance-app-api-pccd.onrender.com/"
+      content="https://finance-app-api-pccd.onrender.com"
     />
 
     <title>Finance App - Gestión Financiera Personal</title>
@@ -46,7 +39,6 @@
     <link rel="stylesheet" href="style.css" />
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
-    <!-- Estilos mínimos del modal (por si tu style.css no lo tiene aún) -->
     <style>
       .modal {
         display: none;
@@ -153,7 +145,6 @@
         background: #1e2d45;
       }
 
-      /* Opciones del select: fondo sólido oscuro para que el texto sea siempre visible */
       .select option {
         background: #172033;
         color: #f1f5f9;
@@ -167,7 +158,6 @@
         color: #ffffff;
       }
 
-      /* Placeholder visible */
       .input::placeholder,
       .textarea::placeholder {
         color: rgba(241, 245, 249, 0.35);
@@ -230,7 +220,6 @@
         color: #fee2e2;
       }
 
-      /* Para que los inputs se vean bien en iOS */
       input:not([type='checkbox']):not([type='radio']),
       select,
       textarea,
@@ -239,7 +228,6 @@
         appearance: none;
       }
 
-      /* Modal centrado en tablet / desktop */
       @media (min-width: 640px) {
         .modal {
           align-items: center;
@@ -279,7 +267,6 @@
       <main id="mainApp">
         <!-- LOGIN -->
         <section id="view-login" class="view fade-in" style="display: none">
-          <!-- Login Form -->
           <div id="loginFormContainer" class="balance-card login-card">
             <h2 class="login-title">
               <span class="login-title-mark" aria-hidden="true">
@@ -297,12 +284,14 @@
                 class="input"
                 placeholder="Email"
                 type="email"
+                autocomplete="username"
               />
               <input
                 id="loginPassword"
                 class="input"
                 placeholder="Contraseña"
                 type="password"
+                autocomplete="current-password"
               />
               <label for="loginRememberDevice" class="login-remember-row">
                 <input id="loginRememberDevice" type="checkbox" />
@@ -337,12 +326,14 @@
                 class="input"
                 placeholder="Email"
                 type="email"
+                autocomplete="username"
               />
               <input
                 id="registerPassword"
                 class="input"
                 placeholder="Contraseña (mín 6 caracteres)"
                 type="password"
+                autocomplete="new-password"
               />
               <button class="btn" id="btnRegister">Crear cuenta</button>
               <div class="auth-switch-copy">
@@ -352,7 +343,7 @@
           </div>
         </section>
 
-        <!-- HOME - Cuenta Principal -->
+        <!-- HOME -->
         <section id="view-home" class="view fade-in" style="display: none">
           <div class="home-welcome-row">
             <span class="home-date-chip" id="homeWelcomeDate"></span>
@@ -393,7 +384,7 @@
                   class="home-account-name"
                   style="margin: 0"
                 >
-                  Santander
+                  Cuenta
                 </h2>
                 <p id="homeAccountSubtitle" class="home-account-subtitle">
                   Principal
@@ -430,7 +421,7 @@
           <div class="tx-list" id="homeAccountTxList"></div>
         </section>
 
-        <!-- DASHBOARD - Resumen mensual -->
+        <!-- DASHBOARD -->
         <section id="view-dashboard" class="view fade-in" style="display: none">
           <div class="balance-card">
             <p class="dashboard-card-eyebrow">Resumen de gastos</p>
@@ -506,7 +497,7 @@
           </div>
         </section>
 
-        <!-- ACCOUNT DETAIL - Vista de una cuenta específica -->
+        <!-- ACCOUNT DETAIL -->
         <section
           id="view-account-detail"
           class="view fade-in"
@@ -535,7 +526,7 @@
               <div class="account-detail-actions">
                 <button
                   class="icon-btn account-detail-action"
-                  onclick="backToAccounts()"
+                  id="btnBackToAccounts"
                   title="Volver"
                   type="button"
                 >
@@ -777,27 +768,6 @@
             </div>
             <div class="history-results-actions">
               <button
-                id="historyCurrentMonthBtn"
-                type="button"
-                class="history-results-btn"
-              >
-                Mes actual
-              </button>
-              <button
-                id="historyPrevMonthBtn"
-                type="button"
-                class="history-results-btn"
-              >
-                Mes anterior
-              </button>
-              <button
-                id="historyNextMonthBtn"
-                type="button"
-                class="history-results-btn"
-              >
-                Mes siguiente
-              </button>
-              <button
                 id="historyResetRangeBtn"
                 type="button"
                 class="history-results-btn history-results-btn--range"
@@ -845,68 +815,11 @@
                     Guardar filtro
                   </button>
                   <button
-                    id="historyQuickSavePresetBtn"
-                    type="button"
-                    class="history-results-btn"
-                  >
-                    Guardar rápido
-                  </button>
-                  <button
-                    id="historyDeletePresetBtn"
-                    type="button"
-                    class="history-results-btn"
-                  >
-                    Borrar filtro
-                  </button>
-                  <button
-                    id="historyRenamePresetBtn"
-                    type="button"
-                    class="history-results-btn"
-                  >
-                    Renombrar filtro
-                  </button>
-                  <button
-                    id="historyDuplicatePresetBtn"
-                    type="button"
-                    class="history-results-btn"
-                  >
-                    Duplicar filtro
-                  </button>
-                  <button
                     id="historyToggleFavoritePresetBtn"
                     type="button"
                     class="history-results-btn"
                   >
                     Marcar favorito
-                  </button>
-                  <button
-                    id="historyExportPresetBtn"
-                    type="button"
-                    class="history-results-btn history-results-btn--export"
-                  >
-                    Exportar preset
-                  </button>
-                  <button
-                    id="historyCopyFilterBtn"
-                    type="button"
-                    class="history-results-btn"
-                  >
-                    Copiar filtro
-                  </button>
-                  <button
-                    id="historyPasteFilterBtn"
-                    type="button"
-                    class="history-results-btn"
-                  >
-                    Pegar filtro
-                  </button>
-                  <button
-                    id="historyUndoPasteBtn"
-                    type="button"
-                    class="history-results-btn"
-                    style="display: none"
-                  >
-                    Deshacer pegado
                   </button>
                 </div>
                 <div class="history-more-options-group">
@@ -926,13 +839,6 @@
                     class="history-results-btn"
                   >
                     Limpiar selección
-                  </button>
-                  <button
-                    id="historyExportSelectionBtn"
-                    type="button"
-                    class="history-results-btn history-results-btn--export"
-                  >
-                    Exportar selección
                   </button>
                   <button
                     id="historyExportCsvBtn"
@@ -967,7 +873,7 @@
           <div class="tx-list" id="txListFull"></div>
         </section>
 
-        <!-- STATS (placeholder por ahora) -->
+        <!-- STATS -->
         <section id="view-stats" class="view fade-in" style="display: none">
           <div class="section-header">
             <div class="section-head-block">
@@ -1131,7 +1037,6 @@
                     autocomplete="current-password"
                     autocapitalize="off"
                     spellcheck="false"
-                    aria-describedby="profileCapsLockHint profilePasswordHint"
                   />
                   <input
                     id="profileNextPassword"
@@ -1142,7 +1047,6 @@
                     autocomplete="new-password"
                     autocapitalize="off"
                     spellcheck="false"
-                    aria-describedby="profilePasswordStrength profileCapsLockHint profilePasswordHint"
                   />
                   <input
                     id="profileConfirmPassword"
@@ -1153,7 +1057,6 @@
                     autocomplete="new-password"
                     autocapitalize="off"
                     spellcheck="false"
-                    aria-describedby="profileCapsLockHint profilePasswordHint"
                   />
                   <label class="settings-toggle" style="margin-top: 8px">
                     <input id="profileShowPasswords" type="checkbox" />
@@ -1410,6 +1313,7 @@
                 <button
                   class="btn primary"
                   id="btnSync"
+                  type="button"
                   style="margin-top: 16px"
                 >
                   <i class="ph ph-arrows-clockwise"></i> Recargar categorías
@@ -1729,7 +1633,8 @@
                 </p>
                 <button
                   class="btn danger"
-                  onclick="resetUserData()"
+                  id="btnResetUserData"
+                  type="button"
                   style="margin-top: 8px"
                 >
                   <i class="ph ph-trash"></i> Borrar todo y reiniciar
@@ -1867,7 +1772,7 @@
         <button
           type="button"
           class="tab-brand"
-          onclick="switchView('home', 'Inicio', event)"
+          id="btnBrandNav"
           title="Ir a Inicio"
         >
           <span aria-hidden="true">💰</span>
@@ -1879,55 +1784,29 @@
           type="button"
           data-view="home"
           aria-current="page"
-          onclick="switchView('home', 'Inicio', event)"
         >
           <i class="ph ph-house"></i><span>Inicio</span>
         </button>
 
-        <button
-          class="tab-item"
-          type="button"
-          data-view="accounts"
-          onclick="switchView('accounts', 'Cuentas', event)"
-        >
+        <button class="tab-item" type="button" data-view="accounts">
           <i class="ph ph-wallet"></i><span>Cuentas</span>
         </button>
 
-        <button
-          class="tab-item"
-          type="button"
-          data-view="dashboard"
-          onclick="switchView('dashboard', 'Resumen', event)"
-        >
+        <button class="tab-item" type="button" data-view="dashboard">
           <i class="ph ph-chart-line"></i><span>Resumen</span>
         </button>
 
-        <button
-          class="tab-item"
-          type="button"
-          data-view="history"
-          onclick="switchView('history', 'Historial', event)"
-        >
+        <button class="tab-item" type="button" data-view="history">
           <i class="ph ph-clock-counter-clockwise"></i><span>Historial</span>
         </button>
 
         <div class="tab-fab-space"></div>
 
-        <button
-          class="tab-item"
-          type="button"
-          data-view="stats"
-          onclick="switchView('stats', 'Presupuestos', event)"
-        >
+        <button class="tab-item" type="button" data-view="stats">
           <i class="ph ph-coins"></i><span>Presupuestos</span>
         </button>
 
-        <button
-          class="tab-item"
-          type="button"
-          data-view="reminders"
-          onclick="switchView('reminders', 'Recordatorios', event)"
-        >
+        <button class="tab-item" type="button" data-view="reminders">
           <i class="ph ph-bell-ringing"></i>
           <span>Recordatorios</span>
           <span id="remindersTabBadge" class="tab-badge" style="display: none"
@@ -1935,12 +1814,7 @@
           >
         </button>
 
-        <button
-          class="tab-item"
-          type="button"
-          data-view="config"
-          onclick="switchView('config', 'Ajustes', event)"
-        >
+        <button class="tab-item" type="button" data-view="config">
           <i class="ph ph-nut"></i><span>Ajustes</span>
         </button>
       </nav>
@@ -1952,7 +1826,13 @@
     </div>
 
     <!-- MODAL ADD TX -->
-    <div class="modal" id="modalAddTx" aria-hidden="true">
+    <div
+      class="modal"
+      id="modalAddTx"
+      role="dialog"
+      aria-modal="true"
+      aria-hidden="true"
+    >
       <div class="modal-content">
         <div class="modal-header">
           <div class="modal-header-row">
@@ -1966,7 +1846,7 @@
 
         <form id="txForm" onsubmit="return false;">
           <div class="form-grid">
-            <select id="txType" class="select" onchange="onTypeChange()">
+            <select id="txType" class="select">
               <option value="expense">Gasto</option>
               <option value="income">Ingreso</option>
             </select>
@@ -2010,13 +1890,7 @@
           </div>
 
           <div class="actions-row">
-            <button
-              class="btn"
-              type="button"
-              onclick="document.querySelector('.close-modal').click()"
-            >
-              Cancelar
-            </button>
+            <button class="btn close-modal" type="button">Cancelar</button>
             <button class="btn primary" type="button" id="btnSaveTx">
               <i class="ph ph-check"></i> Guardar
             </button>
@@ -2042,7 +1916,13 @@
     </div>
 
     <!-- MODAL ADD/EDIT ACCOUNT -->
-    <div class="modal" id="modalAddAccount" aria-hidden="true">
+    <div
+      class="modal"
+      id="modalAddAccount"
+      role="dialog"
+      aria-modal="true"
+      aria-hidden="true"
+    >
       <div class="modal-content">
         <div class="modal-header">
           <div class="modal-header-row">
@@ -2147,15 +2027,7 @@
           </div>
 
           <div class="actions-row">
-            <button
-              class="btn"
-              type="button"
-              onclick="
-                document.querySelector('#modalAddAccount .close-modal').click()
-              "
-            >
-              Cancelar
-            </button>
+            <button class="btn close-modal" type="button">Cancelar</button>
             <button class="btn primary" type="button" id="btnSaveAccount">
               <i class="ph ph-check"></i> Guardar
             </button>
@@ -2173,7 +2045,13 @@
     </div>
 
     <!-- MODAL TRANSFER -->
-    <div class="modal" id="modalTransfer" aria-hidden="true">
+    <div
+      class="modal"
+      id="modalTransfer"
+      role="dialog"
+      aria-modal="true"
+      aria-hidden="true"
+    >
       <div class="modal-content">
         <div class="modal-header">
           <div class="modal-header-row">
@@ -2234,15 +2112,7 @@
           </div>
 
           <div class="actions-row">
-            <button
-              class="btn"
-              type="button"
-              onclick="
-                document.querySelector('#modalTransfer .close-modal').click()
-              "
-            >
-              Cancelar
-            </button>
+            <button class="btn close-modal" type="button">Cancelar</button>
             <button
               class="btn primary"
               type="button"
