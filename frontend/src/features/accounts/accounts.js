@@ -11,7 +11,6 @@ import {
   renderVisualPreview
 } from '../../utils/visuals.js';
 import {
-  fetchAllTransactions,
   annotateTransactionsWithRunningBalances,
   sortTransactionsByMostRecent,
   renderTxItem,
@@ -100,7 +99,7 @@ export function getAccountBrand(account) {
       brand: 'trade-republic',
       icon: 'ph-chart-line-up',
       label: 'Trade Republic',
-      logoPath: '../media/unnamed (2).png'
+      logoPath: '/media/unnamed (2).png'
     };
   }
 
@@ -109,7 +108,7 @@ export function getAccountBrand(account) {
       brand: 'savings',
       icon: 'ph-piggy-bank',
       label: 'Ahorro',
-      logoPath: '../media/hucha.png'
+      logoPath: '/media/hucha.png'
     };
   }
 
@@ -118,7 +117,7 @@ export function getAccountBrand(account) {
       brand: 'santander',
       icon: 'ph-flame',
       label: 'Santander',
-      logoPath: '../media/santander(2).png'
+      logoPath: '/media/santander(2).png'
     };
   }
 
@@ -127,7 +126,7 @@ export function getAccountBrand(account) {
       brand: 'imagin',
       icon: 'ph-star-four',
       label: 'Imagin',
-      logoPath: '../media/unnamed (1).png'
+      logoPath: '/media/unnamed (1).png'
     };
   }
 
@@ -148,16 +147,16 @@ export function getAccountBadgeMarkup(account, sizeClass = '') {
   const styleAttr = styleParts.length ? ` style="${styleParts.join(';')}"` : '';
 
   if (brand.imageData) {
-    return `<span class="account-brand-badge account-brand-badge--custom account-brand-badge--image${sizeClassName}" data-brand="${brand.brand}" title="${brand.label}"${styleAttr}><img class="account-brand-logo" src="${brand.imageData}" alt="${brand.label}" loading="lazy" decoding="async" /></span>`;
+    return `<span class="account-brand-badge account-brand-badge--custom account-brand-badge--image${sizeClassName}" data-brand="${brand.brand}" title="${escapeHtml(brand.label)}"${styleAttr}><img class="account-brand-logo" src="${brand.imageData}" alt="${escapeHtml(brand.label)}" loading="lazy" decoding="async" /></span>`;
   }
   if (brand.logoPath) {
-    return `<span class="account-brand-badge account-brand-badge--logo${sizeClassName}" data-brand="${brand.brand}" title="${brand.label}"${styleAttr}><img class="account-brand-logo" src="${brand.logoPath}" alt="${brand.label}" loading="lazy" decoding="async" /></span>`;
+    return `<span class="account-brand-badge account-brand-badge--logo${sizeClassName}" data-brand="${brand.brand}" title="${escapeHtml(brand.label)}"${styleAttr}><img class="account-brand-logo" src="${brand.logoPath}" alt="${escapeHtml(brand.label)}" loading="lazy" decoding="async" /></span>`;
   }
   if (brand.brand === 'custom') {
-    return `<span class="account-brand-badge account-brand-badge--custom${sizeClassName}" data-brand="${brand.brand}" title="${brand.label}"${styleAttr}>${brand.icon}</span>`;
+    return `<span class="account-brand-badge account-brand-badge--custom${sizeClassName}" data-brand="${brand.brand}" title="${escapeHtml(brand.label)}"${styleAttr}>${escapeHtml(brand.icon)}</span>`;
   }
 
-  return `<span class="account-brand-badge${sizeClassName}" data-brand="${brand.brand}" title="${brand.label}"><i class="ph ${brand.icon}"></i></span>`;
+  return `<span class="account-brand-badge${sizeClassName}" data-brand="${brand.brand}" title="${escapeHtml(brand.label)}"><i class="ph ${brand.icon}"></i></span>`;
 }
 
 export function applyAccountTheme(element, account) {
@@ -179,7 +178,7 @@ export function getSortedAccounts(accounts = []) {
 }
 
 export async function ensureAccountsLoaded() {
-  if (state.accounts.length > 0) return state.accounts;
+  if (state.accounts && state.accounts.length > 0) return state.accounts;
   const accounts = await api('/accounts');
   state.accounts = accounts || [];
   return state.accounts;
@@ -287,14 +286,17 @@ export async function loadAccounts() {
           ? 'account-card-balance-value account-card-balance-value--negative'
           : 'account-card-balance-value account-card-balance-value--positive';
 
+        const safeTitle = escapeHtml(mainName || acc.name || '');
+        const safeSubtitle = escapeHtml(subtitle);
+
         return `
           <div class="account-card" data-account-id="${acc.id}" draggable="true" style="margin-bottom: 12px; --account-accent: ${accent}; --account-surface: ${surface}; --account-border: ${border};">
             <div class="account-card-top">
               <div class="account-card-top-main">
                 ${getAccountBadgeMarkup(acc, 'account-brand-badge--small')}
                 <div class="account-card-copy">
-                  <h2 class="account-card-title">${mainName || acc.name}</h2>
-                  <p class="${subtitleClass}">${subtitle}</p>
+                  <h2 class="account-card-title">${safeTitle}</h2>
+                  <p class="${subtitleClass}">${safeSubtitle}</p>
                 </div>
               </div>
               <div class="account-card-actions">
@@ -316,7 +318,7 @@ export async function loadAccounts() {
               </div>
             </div>
             <div class="account-card-meta">
-              <span class="account-card-type">${typeLabel}</span>
+              <span class="account-card-type">${escapeHtml(typeLabel)}</span>
               <div class="account-card-balance">
                 <p class="account-card-balance-label">Saldo</p>
                 <p class="${balanceClass}">${balance}€</p>
@@ -330,8 +332,10 @@ export async function loadAccounts() {
     container.innerHTML = cardsHtml;
     attachAccountCardsInteractions(container);
   } catch (err) {
-    $('accountsList').innerHTML =
-      `<div class="muted">Error cargando cuentas: ${escapeHtml(err?.message || String(err))}</div>`;
+    const container = $('accountsList');
+    if (container) {
+      container.innerHTML = `<div class="muted">Error cargando cuentas: ${escapeHtml(err?.message || String(err))}</div>`;
+    }
   }
 }
 
@@ -406,10 +410,10 @@ export function openAddAccountModal() {
   const form = $('accountForm');
   if (form) {
     form.reset();
-    $('accountName').value = '';
+    if ($('accountName')) $('accountName').value = '';
     if ($('accountSubtitle')) $('accountSubtitle').value = 'Principal';
-    $('accountType').value = 'bank';
-    $('accountBalance').value = '0.00';
+    if ($('accountType')) $('accountType').value = 'bank';
+    if ($('accountBalance')) $('accountBalance').value = '0.00';
   }
   accountFormImageData = null;
   if ($('accountIcon')) $('accountIcon').value = '';
@@ -454,13 +458,16 @@ export async function openEditAccountModal(accountId) {
     const accountMainName = accountNameParts[0] || account.name || '';
     const accountSubtitle = accountNameParts.slice(1).join(' · ');
 
-    $('accountName').value = accountMainName;
+    if ($('accountName')) $('accountName').value = accountMainName;
     if ($('accountSubtitle')) $('accountSubtitle').value = accountSubtitle;
-    $('accountType').value = account.type || 'bank';
-    $('accountBalance').value = String(account.balance_inicial ?? 0);
-    $('accountIcon').value = account.icon || '';
-    $('accountBgColor').value = account.bg_color || '#eef2ff';
-    $('accountBorderColor').value = account.border_color || '#c7d2fe';
+    if ($('accountType')) $('accountType').value = account.type || 'bank';
+    if ($('accountBalance'))
+      $('accountBalance').value = String(account.balance_inicial ?? 0);
+    if ($('accountIcon')) $('accountIcon').value = account.icon || '';
+    if ($('accountBgColor'))
+      $('accountBgColor').value = account.bg_color || '#eef2ff';
+    if ($('accountBorderColor'))
+      $('accountBorderColor').value = account.border_color || '#c7d2fe';
     accountFormImageData = account.image_data || null;
     if ($('accountImageUrl')) {
       $('accountImageUrl').value =
@@ -510,14 +517,14 @@ export async function openEditAccountModal(accountId) {
 }
 
 export async function saveAccount() {
-  const name = ($('accountName').value || '').trim();
+  const name = ($('accountName')?.value || '').trim();
   const subtitle = ($('accountSubtitle')?.value || '').trim();
   const type = $('accountType')?.value || 'bank';
-  const balance = Number.parseFloat($('accountBalance').value || '0');
+  const balance = Number.parseFloat($('accountBalance')?.value || '0');
   const icon = ($('accountIcon')?.value || '').trim();
   const imageUrlInput = $('accountImageUrl')?.value || '';
-  const bg_color = $('accountBgColor')?.value || '#eef2ff';
-  const border_color = $('accountBorderColor')?.value || '#c7d2fe';
+  const rawBgColor = $('accountBgColor')?.value || '#eef2ff';
+  const rawBorderColor = $('accountBorderColor')?.value || '#c7d2fe';
 
   if (!name) {
     showAlert('Introduce un nombre para la cuenta', 'error');
@@ -533,8 +540,8 @@ export async function saveAccount() {
       balance_inicial: balance,
       icon: icon || null,
       image_data: remoteImageUrl || accountFormImageData,
-      bg_color,
-      border_color
+      bg_color: normalizeColorValue(rawBgColor) || '#eef2ff',
+      border_color: normalizeColorValue(rawBorderColor) || '#c7d2fe'
     };
 
     if (state.editingAccountId) {
@@ -640,19 +647,23 @@ export async function openViewAccount(accountId) {
         credit: '💳 Tarjeta crédito'
       }[acc.type] || acc.type;
 
-    $('accountDetailType').textContent = typeLabel;
+    if ($('accountDetailType')) $('accountDetailType').textContent = typeLabel;
     const [detailName, detailSubtitle = 'Cuenta'] = String(acc.name || '')
       .split('·')
       .map((part) => part.trim())
       .filter(Boolean);
-    $('accountDetailName').textContent = detailName || acc.name;
-    $('accountDetailSubtitle').textContent = detailSubtitle;
-    $('accountDetailSubtitle').classList.toggle(
-      'account-subtitle-muted',
-      /ahorro|hucha/i.test(detailSubtitle)
-    );
+    if ($('accountDetailName'))
+      $('accountDetailName').textContent = detailName || acc.name;
+    if ($('accountDetailSubtitle')) {
+      $('accountDetailSubtitle').textContent = detailSubtitle;
+      $('accountDetailSubtitle').classList.toggle(
+        'account-subtitle-muted',
+        /ahorro|hucha/i.test(detailSubtitle)
+      );
+    }
     const balance = Number(acc.current_balance || 0).toFixed(2);
-    $('accountDetailBalance').textContent = `${balance}€`;
+    if ($('accountDetailBalance'))
+      $('accountDetailBalance').textContent = `${balance}€`;
     applyAccountTheme(detailCard, acc);
     const detailBadge = $('accountDetailBadge');
     if (detailBadge) detailBadge.innerHTML = getAccountBadgeMarkup(acc);
@@ -715,29 +726,18 @@ export async function openViewAccount(accountId) {
 
 async function loadAccountTransactions(accountId) {
   try {
-    let accountName = null;
-    const cachedAccount = (state.accounts || []).find(
-      (acc) => String(acc.id) === String(accountId)
+    // Consulta directa y eficiente al backend por account_id
+    const filtered = await api(
+      `/transactions?account_id=${encodeURIComponent(accountId)}&limit=1000`
     );
-    if (cachedAccount) {
-      accountName = cachedAccount.name || null;
-    }
-
-    const list = await fetchAllTransactions();
-    const filtered = list.filter((t) => {
-      const acc_id = t.account_id || null;
-      if (!acc_id) return false;
-      return acc_id === accountId || (accountName && acc_id === accountName);
-    });
-
     const txList = $('accountTxList');
     if (!txList) return;
 
     state.currentAccountTransactions = annotateTransactionsWithRunningBalances(
-      sortTransactionsByMostRecent(filtered)
+      sortTransactionsByMostRecent(filtered || [])
     );
 
-    if (filtered.length === 0) {
+    if (!filtered || filtered.length === 0) {
       txList.innerHTML = `
         <div class="list-empty-state">
           <span class="list-empty-state__icon"><i class="ph ph-wallet"></i></span>
@@ -760,8 +760,10 @@ async function loadAccountTransactions(accountId) {
     });
   } catch (err) {
     state.currentAccountTransactions = [];
-    $('accountTxList').innerHTML =
-      `<div class="muted">Error cargando transacciones: ${escapeHtml(err?.message || String(err))}</div>`;
+    const txList = $('accountTxList');
+    if (txList) {
+      txList.innerHTML = `<div class="muted">Error cargando transacciones: ${escapeHtml(err?.message || String(err))}</div>`;
+    }
   }
 }
 
