@@ -5,7 +5,8 @@ export const API_STORAGE_KEY = 'financeApp.api.baseUrl';
 export const DEFAULT_LOCAL_API = 'http://127.0.0.1:8000';
 export const API_TIMEOUT_MS = 15000;
 
-// 2. PAGINACIÓN Y LÍMITES:
+// 2. CICLO Y LÍMITES FINANCIEROS:
+export const BILLING_CYCLE_START_DAY = 26;
 export const TRANSACTIONS_PAGE_SIZE = 500;
 export const HISTORY_PAGE_SIZE = 30;
 export const HISTORY_PASTE_UNDO_LIMIT = 3;
@@ -27,7 +28,7 @@ export const SETTINGS_OPEN_PANEL_KEY = 'financeApp.settings.openPanel';
 export const SETTINGS_PROFILE_AVATAR_KEY = 'financeApp.settings.profileAvatar';
 export const SETTINGS_ACCENT_COLOR_KEY = 'financeApp.settings.accentColor';
 
-// 4. CONFIGURACIÓN DE LA APLICACIÓN y TEMAS:
+// 4. CONFIGURACIÓN DE LA APLICACIÓN Y TEMAS:
 export const DEFAULT_APP_SETTINGS = Object.freeze({
   defaultView: 'home',
   reduceMotion: false,
@@ -64,11 +65,11 @@ export const START_VIEW_CONFIG = Object.freeze({
   config: { id: 'config', title: 'Ajustes' }
 });
 
-export const REMINDER_TYPE_LABELS = {
+export const REMINDER_TYPE_LABELS = Object.freeze({
   insurance: 'Seguro',
   subscription: 'Suscripción',
   other: 'Otro'
-};
+});
 
 export const REMINDER_RECURRENCE_LABELS = Object.freeze({
   none: 'Sin repetición',
@@ -76,7 +77,7 @@ export const REMINDER_RECURRENCE_LABELS = Object.freeze({
   yearly: 'Cada año'
 });
 
-// 6. ICONOS DE CATEGORÍAS Y MAPEO DE EMOJIS:
+// 5. ICONOS DE CATEGORÍAS Y MAPEO DE EMOJIS:
 export const LEGACY_ICON_MAP = Object.freeze({
   payment: '💳',
   payments: '💳',
@@ -135,106 +136,146 @@ export const CATEGORY_NAME_ICON_MAP = Object.freeze([
   [/vario|otro/i, '🧩']
 ]);
 
-export const CATEGORY_ICON_SET = new Set([
-  '💼',
-  '✨',
-  '🎁',
-  '📈',
-  '🏷️',
-  '🏠',
-  '💡',
-  '🍎',
-  '🍽️',
-  '☕',
-  '🎨',
-  '🎬',
-  '✈️',
-  '🧘',
-  '🛍️',
-  '🚗',
-  '⛽',
-  '🚌',
-  '🥂',
-  '📱',
-  '🤝',
-  '📊',
-  '🏦',
-  '🔁',
-  '🛡️',
-  '🧩',
-  '💳',
-  '💰',
-  '👛',
-  '🛠️',
-  '🔧',
-  '🧾',
-  '🧠',
-  '📚',
-  '🎓',
-  '🏥',
-  '💊',
-  '🦷',
-  '🐾',
-  '👶',
-  '🧒',
-  '🎮',
-  '🎵',
-  '📷',
-  '🧳',
-  '🚆',
-  '🚕',
-  '🅿️',
-  '🛣️',
-  '🏍️',
-  '🚲',
-  '🏋️',
-  '⚽',
-  '📦',
-  '🏪',
-  '🧹',
-  '🪑',
-  '🪴',
-  '🌐',
-  '☎️',
-  '📶',
-  '🔒',
-  '🧯',
-  '⚖️',
-  '🛒',
-  '💸',
-  '💱',
-  '🪙',
-  '📅',
-  '⏰',
-  '📌',
-  '✅'
-]);
+export const CATEGORY_ICON_SET = Object.freeze(
+  new Set([
+    '💼',
+    '✨',
+    '🎁',
+    '📈',
+    '🏷️',
+    '🏠',
+    '💡',
+    '🍎',
+    '🍽️',
+    '☕',
+    '🎨',
+    '🎬',
+    '✈️',
+    '🧘',
+    '🛍️',
+    '🚗',
+    '⛽',
+    '🚌',
+    '🥂',
+    '📱',
+    '🤝',
+    '📊',
+    '🏦',
+    '🔁',
+    '🛡️',
+    '🧩',
+    '💳',
+    '💰',
+    '👛',
+    '🛠️',
+    '🔧',
+    '🧾',
+    '🧠',
+    '📚',
+    '🎓',
+    '🏥',
+    '💊',
+    '🦷',
+    '🐾',
+    '👶',
+    '🧒',
+    '🎮',
+    '🎵',
+    '📷',
+    '🧳',
+    '🚆',
+    '🚕',
+    '🅿️',
+    '🛣️',
+    '🏍️',
+    '🚲',
+    '🏋️',
+    '⚽',
+    '📦',
+    '🏪',
+    '🧹',
+    '🪑',
+    '🪴',
+    '🌐',
+    '☎️',
+    '📶',
+    '🔒',
+    '🧯',
+    '⚖️',
+    '🛒',
+    '💸',
+    '💱',
+    '🪙',
+    '📅',
+    '⏰',
+    '📌',
+    '✅'
+  ])
+);
 
 export const CATEGORY_ICON_GROUPS = Object.freeze([
-  {
+  Object.freeze({
     label: 'Ingresos y dinero',
-    icons: ['💼', '✨', '🎁', '📈', '💰', '💸', '💱', '🪙', '💳', '👛', '🏦']
-  },
-  {
+    icons: Object.freeze([
+      '💼',
+      '✨',
+      '🎁',
+      '📈',
+      '💰',
+      '💸',
+      '💱',
+      '🪙',
+      '💳',
+      '👛',
+      '🏦'
+    ])
+  }),
+  Object.freeze({
     label: 'Hogar y servicios',
-    icons: ['🏠', '💡', '🏪', '🧹', '🪑', '🪴', '🧾', '📦']
-  },
-  {
+    icons: Object.freeze(['🏠', '💡', '🏪', '🧹', '🪑', '🪴', '🧾', '📦'])
+  }),
+  Object.freeze({
     label: 'Comida y ocio',
-    icons: ['🛒', '🍎', '🍽️', '☕', '🥂', '🎨', '🎬', '🎮', '🎵', '📷']
-  },
-  {
+    icons: Object.freeze([
+      '🛒',
+      '🍎',
+      '🍽️',
+      '☕',
+      '🥂',
+      '🎨',
+      '🎬',
+      '🎮',
+      '🎵',
+      '📷'
+    ])
+  }),
+  Object.freeze({
     label: 'Salud y bienestar',
-    icons: ['🧘', '🏥', '💊', '🦷', '🏋️', '⚽', '🐾']
-  },
-  {
+    icons: Object.freeze(['🧘', '🏥', '💊', '🦷', '🏋️', '⚽', '🐾'])
+  }),
+  Object.freeze({
     label: 'Transporte y viajes',
-    icons: ['🚗', '⛽', '🚌', '🚆', '🚕', '🏍️', '🚲', '✈️', '🧳', '🅿️', '🛣️']
-  },
-  { label: 'Digital y suscripciones', icons: ['📱', '🌐', '☎️', '📶', '🔒'] },
-  {
+    icons: Object.freeze([
+      '🚗',
+      '⛽',
+      '🚌',
+      '🚆',
+      '🚕',
+      '🏍️',
+      '🚲',
+      '✈️',
+      '🧳',
+      '🅿️',
+      '🛣️'
+    ])
+  }),
+  Object.freeze({
+    label: 'Digital y suscripciones',
+    icons: Object.freeze(['📱', '🌐', '☎️', '📶', '🔒'])
+  }),
+  Object.freeze({
     label: 'Gestión y otros',
-    icons: [
+    icons: Object.freeze([
       '🤝',
       '🔁',
       '🛡️',
@@ -250,8 +291,8 @@ export const CATEGORY_ICON_GROUPS = Object.freeze([
       '📚',
       '🎓',
       '🏷️'
-    ]
-  }
+    ])
+  })
 ]);
 
 export const CATEGORY_ICON_COLOR_MAP = Object.freeze({
