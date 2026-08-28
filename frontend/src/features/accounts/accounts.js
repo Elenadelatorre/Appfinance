@@ -3,7 +3,7 @@ import { state } from '../../state/state.js';
 import { api } from '../../services/api.js';
 import { $, escapeHtml, clearFileInput } from '../ui/dom.js';
 import { showAlert } from '../../utils/toast.js';
-import { openModal, closeModal } from '../ui/modals.js';
+import { openModal, closeModal } from '../ui/modal.js';
 import {
   normalizeColorValue,
   normalizeRemoteImageUrl,
@@ -25,7 +25,7 @@ export function setAccountsNavigationCallback(callback) {
 }
 
 export function getAccountAccent(account) {
-  const customAccent = normalizeColorValue(account?.bg_color);
+  const customAccent = normalizeColorValue(account?.color || account?.bg_color);
   if (customAccent) return customAccent;
 
   const name = String(account?.name || '').toLowerCase();
@@ -42,10 +42,8 @@ export function getAccountAccent(account) {
 }
 
 export function getAccountSurface(account) {
-  const customAccent = normalizeColorValue(account?.bg_color);
-  if (customAccent) {
-    return `color-mix(in srgb, ${customAccent} 18%, white)`;
-  }
+  const customBg = normalizeColorValue(account?.bg_color);
+  if (customBg) return customBg;
 
   const name = String(account?.name || '').toLowerCase();
   const type = String(account?.type || '').toLowerCase();
@@ -159,11 +157,30 @@ export function getAccountBadgeMarkup(account, sizeClass = '') {
   return `<span class="account-brand-badge${sizeClassName}" data-brand="${brand.brand}" title="${escapeHtml(brand.label)}"><i class="ph ${brand.icon}"></i></span>`;
 }
 
-export function applyAccountTheme(element, account) {
-  if (!element) return;
-  element.style.setProperty('--account-accent', getAccountAccent(account));
-  element.style.setProperty('--account-surface', getAccountSurface(account));
-  element.style.setProperty('--account-border', getAccountBorder(account));
+export function applyAccountTheme(cardElement, account = {}) {
+  if (!cardElement) return;
+
+  const bgColor = account.bg_color || account.color || '';
+  const borderColor = account.border_color || '';
+  const accentColor = account.color || account.bg_color || '#6366f1';
+
+  if (bgColor) {
+    cardElement.style.setProperty('--account-surface', bgColor);
+    cardElement.style.background = bgColor;
+  } else {
+    cardElement.style.removeProperty('--account-surface');
+    cardElement.style.background = '';
+  }
+
+  if (borderColor) {
+    cardElement.style.setProperty('--account-border', borderColor);
+    cardElement.style.borderColor = borderColor;
+  } else {
+    cardElement.style.removeProperty('--account-border');
+    cardElement.style.borderColor = '';
+  }
+
+  cardElement.style.setProperty('--account-accent', accentColor);
 }
 
 export function getSortedAccounts(accounts = []) {
@@ -289,8 +306,11 @@ export async function loadAccounts() {
         const safeTitle = escapeHtml(mainName || acc.name || '');
         const safeSubtitle = escapeHtml(subtitle);
 
+        const customBg = acc.bg_color ? `background: ${acc.bg_color};` : '';
+        const customBorder = acc.border_color ? `border-color: ${acc.border_color};` : '';
+
         return `
-          <div class="account-card" data-account-id="${acc.id}" draggable="true" style="margin-bottom: 12px; --account-accent: ${accent}; --account-surface: ${surface}; --account-border: ${border};">
+          <div class="account-card" data-account-id="${acc.id}" draggable="true" style="margin-bottom: 12px; ${customBg} ${customBorder} --account-accent: ${accent}; --account-surface: ${surface}; --account-border: ${border};">
             <div class="account-card-top">
               <div class="account-card-top-main">
                 ${getAccountBadgeMarkup(acc, 'account-brand-badge--small')}
@@ -661,9 +681,13 @@ export async function openViewAccount(accountId) {
         /ahorro|hucha/i.test(detailSubtitle)
       );
     }
-    const balance = Number(acc.current_balance || 0).toFixed(2);
-    if ($('accountDetailBalance'))
-      $('accountDetailBalance').textContent = `${balance}€`;
+    const rawBalance = Number(acc.current_balance || 0);
+    const detailBalanceEl = $('accountDetailBalance');
+    if (detailBalanceEl) {
+      detailBalanceEl.textContent = `${rawBalance.toFixed(2)}€`;
+      detailBalanceEl.style.color = rawBalance < 0 ? 'var(--danger)' : 'var(--success)';
+    }
+
     applyAccountTheme(detailCard, acc);
     const detailBadge = $('accountDetailBadge');
     if (detailBadge) detailBadge.innerHTML = getAccountBadgeMarkup(acc);
@@ -726,7 +750,6 @@ export async function openViewAccount(accountId) {
 
 async function loadAccountTransactions(accountId) {
   try {
-    // Consulta directa y eficiente al backend por account_id
     const filtered = await api(
       `/transactions?account_id=${encodeURIComponent(accountId)}&limit=1000`
     );
