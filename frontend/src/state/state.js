@@ -3,6 +3,7 @@ import {
   DEFAULT_APP_SETTINGS,
   BUDGET_FILTER_STORAGE_KEY
 } from '../config/constants.js';
+import { loadStoredAppSettings } from '../services/storage.js';
 
 function getInitialBudgetFilter() {
   try {
@@ -56,7 +57,7 @@ export const state = {
 
   // Usuario y preferencias
   user: null,
-  settings: { ...DEFAULT_APP_SETTINGS }
+  settings: loadStoredAppSettings()
 };
 
 export function resetAppState() {
@@ -91,4 +92,11 @@ export function resetAppState() {
   state.historyPendingCategoryId = '';
   state.user = null;
   state.settings = { ...DEFAULT_APP_SETTINGS };
+
+  if (
+    globalThis.historySelectedTxIds &&
+    typeof globalThis.historySelectedTxIds.clear === 'function'
+  ) {
+    globalThis.historySelectedTxIds.clear();
+  }
 }
