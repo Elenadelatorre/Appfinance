@@ -1,4 +1,4 @@
-// js/utils/visuals.js
+// src/utils/visuals.js
 import {
   LEGACY_ICON_MAP,
   CATEGORY_NAME_ICON_MAP,
@@ -6,9 +6,22 @@ import {
 } from '../config/constants.js';
 import { $, escapeHtml } from '../features/ui/dom.js';
 
-export function normalizeColorValue(value, fallback) {
+export function normalizeColorValue(value, fallback = '#94a3b8') {
   const input = String(value || '').trim();
-  return input || fallback;
+  if (!input) return fallback;
+
+  if (/^#[0-9a-f]{3}$/i.test(input)) {
+    const r = input[1];
+    const g = input[2];
+    const b = input[3];
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+
+  if (/^#[0-9a-f]{6}$/i.test(input)) {
+    return input.toLowerCase();
+  }
+
+  return input;
 }
 
 export function inferIconFromCategoryName(categoryName, fallbackIcon = '🧾') {
@@ -114,9 +127,15 @@ export function hasCustomCategoryVisual(category) {
 
 export function buildCategoryVisualStyle(visual, includeColorToken = true) {
   const styles = [];
-  if (includeColorToken) styles.push(`--cat-color:${visual.color}`);
-  if (visual?.bgColor) styles.push(`background:${visual.bgColor}`);
-  if (visual?.borderColor) styles.push(`border-color:${visual.borderColor}`);
+  if (includeColorToken && visual?.color) {
+    styles.push(`--cat-color:${escapeHtml(visual.color)}`);
+  }
+  if (visual?.bgColor) {
+    styles.push(`background:${escapeHtml(visual.bgColor)}`);
+  }
+  if (visual?.borderColor) {
+    styles.push(`border-color:${escapeHtml(visual.borderColor)}`);
+  }
   return styles.join(';');
 }
 
@@ -125,9 +144,9 @@ export function renderCategoryVisualContent(
   imageClass = 'visual-token-image'
 ) {
   if (visual?.imageData) {
-    return `<img class="${imageClass}" src="${escapeHtml(visual.imageData)}" alt="${escapeHtml(visual.name)}" loading="lazy" decoding="async" />`;
+    return `<img class="${escapeHtml(imageClass)}" src="${escapeHtml(visual.imageData)}" alt="${escapeHtml(visual.name)}" loading="lazy" decoding="async" />`;
   }
-  return `<span>${escapeHtml(visual.icon)}</span>`;
+  return `<span>${escapeHtml(visual?.icon || '🧾')}</span>`;
 }
 
 export function buildVisualPreviewMarkup(imageData, icon, fallbackIcon = '🧾') {
