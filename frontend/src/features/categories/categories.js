@@ -465,73 +465,87 @@ export function renderCategoryManager() {
 }
 
 export function updateCategoriesForType() {
-  const typeSelect = $('txType');
-  const catSelect = $('txCategory');
-  const subcatSelect = $('txSubcategory');
-  if (!catSelect) return;
+  const type = $('txType')?.value || 'expense';
+  const categoryMap = {
+    expense: ['Gastos', 'Ahorro e Inversión'],
+    income: ['Ingresos', 'Ahorro e Inversión']
+  };
 
-  const currentType = typeSelect?.value || 'expense';
-  const sectionKey = currentType === 'income' ? 'income' : 'expense';
-  const section = (state.tree || []).find((s) => s.section === sectionKey);
+  const allowedSections = categoryMap[type] || [];
+  const flatCats = [];
 
-  // Obtener categorías y ordenarlas alfabéticamente por nombre
-  const categories = [...(section?.categories || [])].sort((a, b) =>
-    (a.name || '').localeCompare(b.name || '', 'es-ES', { sensitivity: 'base' })
+  for (const section of state.tree || []) {
+    const sectionName = section.section || '';
+    if (
+      allowedSections.some(
+        (allowed) => allowed.toLowerCase() === sectionName.toLowerCase()
+      )
+    ) {
+      for (const cat of section.categories || []) {
+        flatCats.push(cat);
+      }
+    }
+  }
+
+  // Si no hubiera coincidencia por nombre de sección, cargar todas como fallback seguro
+  const sourceCats =
+    flatCats.length > 0
+      ? flatCats
+      : (state.tree || []).flatMap((s) => s.categories || []);
+
+  // Ordenar alfabéticamente por nombre
+  const sortedCats = [...sourceCats].sort((a, b) =>
+    String(a.name || '').localeCompare(String(b.name || ''), 'es-ES', {
+      sensitivity: 'base'
+    })
   );
 
-  catSelect.innerHTML = '<option value="">Selecciona categoría</option>';
+  const catSel = $('txCategory');
+  if (catSel) {
+    catSel.innerHTML =
+      `<option value="">Seleccionar Categoría</option>` +
+      sortedCats.map((c) => buildCategoryOption(c)).join('');
+    catSel.value = '';
+  }
 
-  categories.forEach((cat) => {
-    const catId = String(cat.id || cat._id || '');
-    const opt = document.createElement('option');
-    opt.value = catId;
-    opt.textContent = `${cat.icon ? cat.icon + ' ' : ''}${cat.name}`;
-    catSelect.appendChild(opt);
-  });
-
-  if (subcatSelect) {
-    subcatSelect.innerHTML =
-      '<option value="">(Opcional) Subcategoría</option>';
-    subcatSelect.disabled = true;
+  const subSel = $('txSubcategory');
+  if (subSel) {
+    subSel.innerHTML = `<option value="">(Opcional) Subcategoría</option>`;
+    subSel.disabled = true;
   }
 }
 
 export function onCategoryChange() {
-  const catSelect = $('txCategory');
-  const subcatSelect = $('txSubcategory');
-  if (!catSelect || !subcatSelect) return;
+  const catId = $('txCategory')?.value;
+  const subSel = $('txSubcategory');
+  if (!subSel) return;
 
-  const selectedCatId = catSelect.value;
-  if (!selectedCatId) {
-    subcatSelect.innerHTML =
-      '<option value="">(Opcional) Subcategoría</option>';
-    subcatSelect.disabled = true;
+  if (!catId) {
+    subSel.innerHTML = `<option value="">(Opcional) Subcategoría</option>`;
+    subSel.disabled = true;
     return;
   }
 
-  const category = state.catsById?.get(selectedCatId);
+  const parent = state.catsById.get(catId);
+  const subs = parent?.subcategories || [];
 
-  // Obtener subcategorías y ordenarlas alfabéticamente
-  const subcategories = [...(category?.subcategories || [])].sort((a, b) =>
-    (a.name || '').localeCompare(b.name || '', 'es-ES', { sensitivity: 'base' })
+  if (!subs.length) {
+    subSel.innerHTML = `<option value="">(Opcional) Subcategoría</option>`;
+    subSel.disabled = true;
+    return;
+  }
+
+  // Ordenar subcategorías alfabéticamente por nombre
+  const sortedSubs = [...subs].sort((a, b) =>
+    String(a.name || '').localeCompare(String(b.name || ''), 'es-ES', {
+      sensitivity: 'base'
+    })
   );
 
-  if (!subcategories.length) {
-    subcatSelect.innerHTML = '<option value="">(Sin subcategorías)</option>';
-    subcatSelect.disabled = true;
-    return;
-  }
-
-  subcatSelect.innerHTML = '<option value="">(Opcional) Subcategoría</option>';
-  subcategories.forEach((sub) => {
-    const subId = String(sub.id || sub._id || '');
-    const opt = document.createElement('option');
-    opt.value = subId;
-    opt.textContent = `${sub.icon ? sub.icon + ' ' : ''}${sub.name}`;
-    subcatSelect.appendChild(opt);
-  });
-
-  subcatSelect.disabled = false;
+  subSel.disabled = false;
+  subSel.innerHTML =
+    `<option value="">(Opcional) Subcategoría</option>` +
+    sortedSubs.map((sc) => buildSubcategoryOption(sc, parent)).join('');
 }
 
 export async function loadCategoryTree() {
@@ -840,6 +854,7 @@ export function initCategoryListeners() {
   const categoryIconPicker = $('categoryIconPicker');
   const categoriesTree = $('categoriesTree');
   const catSel = $('txCategory');
+  const typeSel = $('txType');
 
   if (btnNewCategory)
     btnNewCategory.addEventListener('click', openNewCategoryForm);
@@ -996,4 +1011,5 @@ export function initCategoryListeners() {
   }
 
   if (catSel) catSel.addEventListener('change', onCategoryChange);
+  if (typeSel) typeSel.addEventListener('change', updateCategoriesForType);
 }
