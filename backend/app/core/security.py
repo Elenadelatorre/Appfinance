@@ -1,4 +1,5 @@
 # backend/app/core/security.py
+import hashlib
 import logging
 import os
 from datetime import datetime, timedelta, timezone
@@ -20,7 +21,9 @@ if not SECRET_KEY or SECRET_KEY.startswith("dev-key"):
     )
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_DAYS = int(os.getenv("ACCESS_TOKEN_EXPIRE_DAYS", "30"))
+ACCESS_TOKEN_EXPIRE_MINUTES = int(
+    os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", str(60 * 24 * 7))
+)  # 7 días por defecto
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
@@ -28,84 +31,90 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 # --- FUNCIONES DE CONTRASEÑA ---
 
 
-def _normalize_bcrypt_secret(p: str) -> str:
-    """Normaliza contraseñas para bcrypt (máximo 72 bytes)."""
-    b = p.encode("utf-8")
-    if len(b) <= 72:
-        return p
-    return b[:72].decode("utf-8", errors="ignore")
+def _prepare_password(password: str) -> bytes:
+    """
+    Prepara la contraseña para bcrypt de forma segura.
+    Si supera los 72 bytes, aplica SHA-256 en hex digest para evitar truncados arbitrarios de UTF-8.
+    """
+    if not password or not isinstance(password, str):
+        raise ValueError("Contraseña vacía o no válida.")
+
+    encoded = password.encode("utf-8")
+    if len(encoded) > 72:
+        return hashlib.sha256(encoded).hexdigest().encode("utf-8")
+    return encoded
 
 
-def hash_password(p: str) -> str:
-    """Hashea la contraseña con bcrypt directo."""
-    if not p or not isinstance(p, str):
-        raise ValueError("Contraseña inválida")
-    normalized = _normalize_bcrypt_secret(p).encode("utf-8")
+def hash_password(password: str) -> str:
+    """Genera el hash seguro de la contraseña usando bcrypt."""
     try:
-        hashed = bcrypt.hashpw(normalized, bcrypt.gensalt())
-        return hashed.decode("utf-8")
+        pw_bytes = _prepare_password(password)
+        salt = bcrypt.gensalt(rounds=12)
+        return bcrypt.hashpw(pw_bytes, salt).decode("utf-8")
     except Exception as e:
-        logger.exception("Error hashing password")
-        raise ValueError("Error al procesar la contraseña") from e
+        logger.exception("Error al hashear la contraseña.")
+        raise ValueError("No se pudo procesar la contraseña.") from e
 
 
-def verify_password(p: str, hashed: str) -> bool:
-    """Verifica si la contraseña coincide con el hash."""
-    if not p or not isinstance(p, str):
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Compara la contraseña en texto plano contra el hash almacenado."""
+    if not plain_password or not hashed_password or not isinstance(plain_password, str):
         return False
-    normalized = _normalize_bcrypt_secret(p).encode("utf-8")
     try:
-        return bcrypt.checkpw(normalized, hashed.encode("utf-8"))
+        pw_bytes = _prepare_password(plain_password)
+        return bcrypt.checkpw(pw_bytes, hashed_password.encode("utf-8"))
     except Exception as e:
-        logger.error("Error verificando contraseña: %s", e)
+        logger.error("Error al verificar la contraseña: %s", e)
         return False
 
 
 # --- FUNCIONES DE TOKEN (JWT) ---
 
 
-def create_access_token(sub: str) -> str:
-    """Crea un token de acceso JWT para un ID de usuario específico."""
-    if not sub:
-        raise ValueError("Field 'sub' cannot be empty")
-    expire = datetime.now(timezone.utc) + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
+def create_access_token(user_id: str, expires_delta: Optional[timedelta] = None) -> str:
+    """Genera un JWT firmado con el ID de usuario en el claim 'sub'."""
+    if not user_id:
+        raise ValueError("El identificador de usuario ('sub') no puede estar vacío.")
+
+    now = datetime.now(timezone.utc)
+    expire = now + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+
     payload = {
-        "sub": str(sub),
-        "exp": expire,
-        "iat": datetime.now(timezone.utc),
+        "sub": str(user_id),
+        "iat": int(now.timestamp()),
+        "exp": int(expire.timestamp()),
     }
-    try:
-        return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-    except Exception as e:
-        logger.error("Error al crear token: %s", e)
-        raise HTTPException(status_code=500, detail="Error creando token")
+
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def get_current_user_id(token: str = Depends(oauth2_scheme)) -> str:
-    """Dependencia para proteger rutas: extrae el ID del usuario del token."""
+def get_current_user_id(token: Optional[str] = Depends(oauth2_scheme)) -> str:
+    """Dependencia obligatoria para endpoints autenticados."""
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No autenticado",
+            detail="No autenticado.",
             headers={"WWW-Authenticate": "Bearer"},
         )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        sub = payload.get("sub")
-        if not sub:
-            raise ValueError("Token sin campo sub")
-        return sub
-    except (JWTError, ValueError) as e:
-        logger.warning("Token inválido: %s", e)
+        user_id: Optional[str] = payload.get("sub")
+        if not user_id:
+            raise ValueError("Token sin 'sub'")
+        return user_id
+    except (JWTError, ValueError) as exc:
+        logger.debug("Fallo de validación de token: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido o expirado",
+            detail="Token de acceso inválido o expirado.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
 
-def get_current_user_id_optional(token: str = Depends(oauth2_scheme)) -> Optional[str]:
-    """Devuelve el ID del usuario si el token es válido o None si no hay sesión."""
+def get_current_user_id_optional(
+    token: Optional[str] = Depends(oauth2_scheme),
+) -> Optional[str]:
+    """Dependencia opcional: extrae el ID si el token existe y es válido, o devuelve None."""
     if not token:
         return None
     try:
