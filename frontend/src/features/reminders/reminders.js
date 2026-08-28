@@ -1,4 +1,4 @@
-// js/features/reminders/reminders.js
+// src/features/reminders/reminders.js
 import { state } from '../../state/state.js';
 import { api, getApiToken } from '../../services/api.js';
 import {
@@ -59,7 +59,7 @@ export function isReminderOverdue(reminder) {
 }
 
 export function getReminderById(reminderId) {
-  return state.reminders.find(
+  return (state.reminders || []).find(
     (item) => reminderIdOf(item) === String(reminderId)
   );
 }
@@ -78,7 +78,10 @@ export function renderReminderFilterControls() {
   if (!filters) return;
   filters.querySelectorAll('[data-reminder-filter]').forEach((button) => {
     const mode = button.dataset.reminderFilter || 'all';
-    button.classList.toggle('is-active', mode === state.reminderFilter);
+    button.classList.toggle(
+      'is-active',
+      mode === (state.reminderFilter || 'all')
+    );
   });
 }
 
@@ -174,7 +177,10 @@ export function renderRemindersList() {
       const id = reminderIdOf(item);
       const completed = Boolean(item.is_completed);
       const overdue = isReminderOverdue(item);
-      const hasAmount = Number.isFinite(Number(item.amount));
+      const hasAmount =
+        Number.isFinite(Number(item.amount)) &&
+        item.amount !== null &&
+        item.amount !== '';
       const amountText = hasAmount
         ? `${Number(item.amount).toFixed(2)}€`
         : null;
@@ -263,12 +269,22 @@ export function loadReminderInForm(reminderId) {
   const note = $('reminderNote');
   const completed = $('reminderCompleted');
   const saveBtn = $('btnSaveReminder');
+  const reminderEditorCard = $('reminderEditorCard');
+  const btnToggleReminderForm = $('btnToggleReminderForm');
+
+  if (reminderEditorCard && reminderEditorCard.style.display === 'none') {
+    reminderEditorCard.style.display = '';
+    if (btnToggleReminderForm) {
+      btnToggleReminderForm.innerHTML = '<i class="ph ph-minus"></i> Cerrar';
+    }
+  }
 
   if (title) title.value = String(reminder.title || '');
   if (amount) {
-    amount.value = Number.isFinite(Number(reminder.amount))
-      ? Number(reminder.amount).toFixed(2)
-      : '';
+    amount.value =
+      Number.isFinite(Number(reminder.amount)) && reminder.amount !== null
+        ? Number(reminder.amount).toFixed(2)
+        : '';
   }
   if (dueDate) dueDate.value = reminderDueInputValue(reminder.due_date);
   if (type) type.value = reminder.type || 'other';
@@ -278,7 +294,13 @@ export function loadReminderInForm(reminderId) {
   if (completed) completed.checked = Boolean(reminder.is_completed);
   if (saveBtn)
     saveBtn.innerHTML = '<i class="ph ph-check"></i> Guardar cambios';
-  if (title) title.focus();
+  if (title) {
+    title.focus();
+    reminderEditorCard?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest'
+    });
+  }
 }
 
 export function buildReminderPayloadFromForm() {
@@ -356,14 +378,14 @@ export async function saveReminderFromSettings() {
     if (editingReminderId) {
       await api(`/reminders/${editingReminderId}`, {
         method: 'PATCH',
-        json: payload,
+        json: true,
         body: JSON.stringify(payload)
       });
       showAlert('Recordatorio actualizado', 'success');
     } else {
       await api('/reminders', {
         method: 'POST',
-        json: payload,
+        json: true,
         body: JSON.stringify(payload)
       });
       showAlert('Recordatorio guardado', 'success');
@@ -383,7 +405,7 @@ export async function toggleReminderStatus(reminderId) {
     const payload = { is_completed: !reminder.is_completed };
     await api(`/reminders/${reminderId}`, {
       method: 'PATCH',
-      json: payload,
+      json: true,
       body: JSON.stringify(payload)
     });
     await loadReminders();
@@ -421,6 +443,9 @@ export function initReminderListeners() {
   const remindersList = $('remindersList');
   const btnToggleReminderForm = $('btnToggleReminderForm');
   const reminderEditorCard = $('reminderEditorCard');
+  const reminderTitle = $('reminderTitle');
+  const reminderAmount = $('reminderAmount');
+  const reminderDueDate = $('reminderDueDate');
 
   if (btnToggleReminderForm && reminderEditorCard) {
     btnToggleReminderForm.addEventListener('click', () => {
@@ -441,6 +466,13 @@ export function initReminderListeners() {
       resetReminderForm(true)
     );
   }
+
+  const handleEnterKey = (e) => {
+    if (e.key === 'Enter') saveReminderFromSettings();
+  };
+  reminderTitle?.addEventListener('keydown', handleEnterKey);
+  reminderAmount?.addEventListener('keydown', handleEnterKey);
+  reminderDueDate?.addEventListener('keydown', handleEnterKey);
 
   if (reminderFilters) {
     reminderFilters.addEventListener('click', (event) => {
