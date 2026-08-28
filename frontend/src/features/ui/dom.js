@@ -1,4 +1,4 @@
-// src/ui/dom.js (o src/utils/dom.js)
+// src/ui/dom.js 
 
 export const $ = (id) =>
   typeof id === 'string' ? document.getElementById(id) : id;
