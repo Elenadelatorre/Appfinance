@@ -1,4 +1,4 @@
-// js/features/categories/categories.js
+// src/features/categories/categories.js
 import { state } from '../../state/state.js';
 import { api } from '../../services/api.js';
 import { $, escapeHtml, clearFileInput, setValueIfElement } from '../ui/dom.js';
@@ -90,8 +90,9 @@ export function dedupeCategoryTree(rawTree = []) {
 
 export function buildCategoryOption(category) {
   const visual = getCategoryVisual(category);
+  const catId = String(category?.id || category?._id || '');
   const label = escapeHtml(visual.icon + ' ' + visual.name);
-  return `<option value="${category._id}">${label}</option>`;
+  return `<option value="${escapeHtml(catId)}">${label}</option>`;
 }
 
 export function buildSubcategoryOption(category, parentCategory = null) {
@@ -107,12 +108,13 @@ export function buildSubcategoryOption(category, parentCategory = null) {
         ...getCategoryVisual(category, fallbackIcon, fallbackColor),
         icon: fallbackIcon
       };
+  const catId = String(category?.id || category?._id || '');
   const label = escapeHtml(visual.icon + ' ' + visual.name);
-  return `<option value="${category._id}">${label}</option>`;
+  return `<option value="${escapeHtml(catId)}">${label}</option>`;
 }
 
 export function sortCategoriesByOrder(items = []) {
-  return [...items].sort((a, b) => {
+  return [...(items || [])].sort((a, b) => {
     const aOrder = Number.isInteger(a?.order)
       ? a.order
       : Number.MAX_SAFE_INTEGER;
@@ -130,7 +132,7 @@ export function getSectionOptions() {
   return (state.tree || [])
     .map(
       (section) =>
-        `<option value="${section.section_id}">${escapeHtml(section.section)}</option>`
+        `<option value="${escapeHtml(section.section_id)}">${escapeHtml(section.section)}</option>`
     )
     .join('');
 }
@@ -146,11 +148,11 @@ export function getParentCategoryOptions(selectedParentId = '') {
   return [
     '<option value="">Sin padre (categoría principal)</option>',
     ...parents.map((category) => {
+      const catId = String(category?.id || category?._id || '');
       const visual = getCategoryVisual(category);
-      const selected =
-        String(selectedParentId) === String(category._id) ? ' selected' : '';
+      const selected = String(selectedParentId) === catId ? ' selected' : '';
       const label = escapeHtml(visual.icon + ' ' + category.name);
-      return `<option value="${category._id}"${selected}>${label}</option>`;
+      return `<option value="${escapeHtml(catId)}"${selected}>${label}</option>`;
     })
   ].join('');
 }
@@ -374,16 +376,18 @@ export function renderCategoryManager() {
     .map((section) => {
       const categories = sortCategoriesByOrder(section.categories || [])
         .map((category) => {
+          const catId = String(category._id || category.id || '');
           const visual = getCategoryVisual(category);
           const subs = sortCategoriesByOrder(category.subcategories || [])
             .map((subcategory) => {
+              const subId = String(subcategory._id || subcategory.id || '');
               const subVisual = getCategoryVisual(
                 subcategory,
                 '•',
                 visual.color
               );
               return `
-                <div class="tree-subcat tree-row tree-row--draggable" draggable="true" data-id="${subcategory._id}" data-kind="subcategory" data-drag-group="parent:${category._id}">
+                <div class="tree-subcat tree-row tree-row--draggable" draggable="true" data-id="${escapeHtml(subId)}" data-kind="subcategory" data-drag-group="parent:${escapeHtml(catId)}">
                   <div class="tree-row-main">
                     <span class="tree-drag-handle" aria-hidden="true" title="Arrastrar para ordenar">
                       <i class="ph ph-dots-six-vertical"></i>
@@ -392,16 +396,16 @@ export function renderCategoryManager() {
                     <span>${escapeHtml(subcategory.name)}</span>
                   </div>
                   <div class="tree-row-actions">
-                    <button class="mini-icon-btn" data-action="move-category-up" data-id="${subcategory._id}" type="button" title="Subir subcategoría">
+                    <button class="mini-icon-btn" data-action="move-category-up" data-id="${escapeHtml(subId)}" type="button" title="Subir subcategoría">
                       <i class="ph ph-arrow-up"></i>
                     </button>
-                    <button class="mini-icon-btn" data-action="move-category-down" data-id="${subcategory._id}" type="button" title="Bajar subcategoría">
+                    <button class="mini-icon-btn" data-action="move-category-down" data-id="${escapeHtml(subId)}" type="button" title="Bajar subcategoría">
                       <i class="ph ph-arrow-down"></i>
                     </button>
-                    <button class="mini-icon-btn" data-action="edit-category" data-id="${subcategory._id}" type="button" title="Editar subcategoría">
+                    <button class="mini-icon-btn" data-action="edit-category" data-id="${escapeHtml(subId)}" type="button" title="Editar subcategoría">
                       <i class="ph ph-pencil-simple"></i>
                     </button>
-                    <button class="mini-icon-btn danger" data-action="delete-category" data-id="${subcategory._id}" type="button" title="Eliminar subcategoría">
+                    <button class="mini-icon-btn danger" data-action="delete-category" data-id="${escapeHtml(subId)}" type="button" title="Eliminar subcategoría">
                       <i class="ph ph-trash"></i>
                     </button>
                   </div>
@@ -411,7 +415,7 @@ export function renderCategoryManager() {
             .join('');
 
           return `
-            <div class="tree-cat-card tree-row tree-row--draggable" draggable="true" data-id="${category._id}" data-kind="category" data-drag-group="section:${section.section_id}">
+            <div class="tree-cat-card tree-row tree-row--draggable" draggable="true" data-id="${escapeHtml(catId)}" data-kind="category" data-drag-group="section:${escapeHtml(section.section_id)}">
               <div class="tree-cat-header">
                 <div class="tree-row-main">
                   <span class="tree-drag-handle" aria-hidden="true" title="Arrastrar para ordenar">
@@ -424,19 +428,19 @@ export function renderCategoryManager() {
                   </div>
                 </div>
                 <div class="tree-row-actions">
-                  <button class="mini-icon-btn" data-action="move-category-up" data-id="${category._id}" type="button" title="Subir categoría">
+                  <button class="mini-icon-btn" data-action="move-category-up" data-id="${escapeHtml(catId)}" type="button" title="Subir categoría">
                     <i class="ph ph-arrow-up"></i>
                   </button>
-                  <button class="mini-icon-btn" data-action="move-category-down" data-id="${category._id}" type="button" title="Bajar categoría">
+                  <button class="mini-icon-btn" data-action="move-category-down" data-id="${escapeHtml(catId)}" type="button" title="Bajar categoría">
                     <i class="ph ph-arrow-down"></i>
                   </button>
-                  <button class="mini-icon-btn" data-action="add-subcategory" data-id="${category._id}" type="button" title="Añadir subcategoría">
+                  <button class="mini-icon-btn" data-action="add-subcategory" data-id="${escapeHtml(catId)}" type="button" title="Añadir subcategoría">
                     <i class="ph ph-plus"></i>
                   </button>
-                  <button class="mini-icon-btn" data-action="edit-category" data-id="${category._id}" type="button" title="Editar categoría">
+                  <button class="mini-icon-btn" data-action="edit-category" data-id="${escapeHtml(catId)}" type="button" title="Editar categoría">
                     <i class="ph ph-pencil-simple"></i>
                   </button>
-                  <button class="mini-icon-btn danger" data-action="delete-category" data-id="${category._id}" type="button" title="Eliminar categoría">
+                  <button class="mini-icon-btn danger" data-action="delete-category" data-id="${escapeHtml(catId)}" type="button" title="Eliminar categoría">
                     <i class="ph ph-trash"></i>
                   </button>
                 </div>
@@ -470,7 +474,7 @@ export function updateCategoriesForType() {
   const allowedSections = categoryMap[type] || [];
   const flatCats = [];
 
-  for (const section of state.tree) {
+  for (const section of state.tree || []) {
     if (allowedSections.includes(section.section)) {
       for (const cat of section.categories || []) {
         flatCats.push(cat);
@@ -520,15 +524,23 @@ export function onCategoryChange() {
 }
 
 export async function loadCategoryTree() {
-  const tree = await api('/categories/tree');
+  const rawTree = await api('/categories/tree');
+  const tree = Array.isArray(rawTree) ? rawTree : [];
   state.tree = dedupeCategoryTree(tree);
 
   state.catsById = new Map();
-  for (const section of tree) {
+  for (const section of state.tree) {
     for (const cat of section.categories || []) {
-      state.catsById.set(cat._id, cat);
+      const parentId = String(cat._id || cat.id || '');
+      if (parentId) state.catsById.set(parentId, cat);
+      if (cat._id) state.catsById.set(String(cat._id), cat);
+      if (cat.id) state.catsById.set(String(cat.id), cat);
+
       for (const sc of cat.subcategories || []) {
-        state.catsById.set(sc._id, sc);
+        const subId = String(sc._id || sc.id || '');
+        if (subId) state.catsById.set(subId, sc);
+        if (sc._id) state.catsById.set(String(sc._id), sc);
+        if (sc.id) state.catsById.set(String(sc.id), sc);
       }
     }
   }
@@ -544,7 +556,12 @@ export async function loadCategoryTree() {
 }
 
 export async function ensureCategoriesLoaded() {
-  if (state.tree.length > 0 && state.catsById.size > 0) return;
+  if (
+    Array.isArray(state.tree) &&
+    state.tree.length > 0 &&
+    state.catsById?.size > 0
+  )
+    return;
   await loadCategoryTree();
 }
 
@@ -643,7 +660,7 @@ function getCategorySiblingsInfo(categoryId) {
   for (const section of state.tree || []) {
     const categories = sortCategoriesByOrder(section.categories || []);
     const categoryIndex = categories.findIndex(
-      (item) => String(item?._id || '') === id
+      (item) => String(item?._id || item?.id || '') === id
     );
     if (categoryIndex >= 0) {
       return { siblings: categories, index: categoryIndex };
@@ -652,7 +669,7 @@ function getCategorySiblingsInfo(categoryId) {
     for (const category of categories) {
       const subcategories = sortCategoriesByOrder(category.subcategories || []);
       const subIndex = subcategories.findIndex(
-        (item) => String(item?._id || '') === id
+        (item) => String(item?._id || item?.id || '') === id
       );
       if (subIndex >= 0) {
         return { siblings: subcategories, index: subIndex };
@@ -669,7 +686,7 @@ function getCategorySiblingContext(categoryId) {
   for (const section of state.tree || []) {
     const categories = sortCategoriesByOrder(section.categories || []);
     const categoryIndex = categories.findIndex(
-      (item) => String(item?._id || '') === id
+      (item) => String(item?._id || item?.id || '') === id
     );
     if (categoryIndex >= 0) {
       return {
@@ -683,14 +700,14 @@ function getCategorySiblingContext(categoryId) {
     for (const category of categories) {
       const subcategories = sortCategoriesByOrder(category.subcategories || []);
       const subIndex = subcategories.findIndex(
-        (item) => String(item?._id || '') === id
+        (item) => String(item?._id || item?.id || '') === id
       );
       if (subIndex >= 0) {
         return {
           siblings: subcategories,
           index: subIndex,
           kind: 'subcategory',
-          group: `parent:${category._id}`
+          group: `parent:${category._id || category.id}`
         };
       }
     }
@@ -700,7 +717,7 @@ function getCategorySiblingContext(categoryId) {
 
 async function persistCategorySiblingOrder(siblings = []) {
   const updates = siblings.map((item, index) => {
-    const itemId = String(item?._id || '');
+    const itemId = String(item?._id || item?.id || '');
     return api(`/categories/${itemId}`, {
       method: 'PATCH',
       json: true,
@@ -769,13 +786,13 @@ async function moveCategoryItemByDrop(draggedId, targetId, placement) {
 
   const reordered = [...draggedContext.siblings];
   const draggedIndex = reordered.findIndex(
-    (item) => String(item?._id || '') === String(draggedId)
+    (item) => String(item?._id || item?.id || '') === String(draggedId)
   );
   if (draggedIndex < 0) return;
 
   const [draggedItem] = reordered.splice(draggedIndex, 1);
   const targetIndex = reordered.findIndex(
-    (item) => String(item?._id || '') === String(targetId)
+    (item) => String(item?._id || item?.id || '') === String(targetId)
   );
   if (targetIndex < 0) return;
 
@@ -823,7 +840,7 @@ export function initCategoryListeners() {
     categoryParent.addEventListener('change', () => {
       syncCategoryFormState();
     });
-  if (categoryName)
+  if (categoryName) {
     categoryName.addEventListener('blur', () => {
       const iconInput = $('categoryFormIcon');
       if (iconInput && !iconInput.value.trim() && !categoryFormImageData) {
@@ -831,6 +848,10 @@ export function initCategoryListeners() {
         syncCategoryIconSelection();
       }
     });
+    categoryName.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') saveCategoryForm();
+    });
+  }
   if (categoryIcon)
     categoryIcon.addEventListener('input', syncCategoryFormState);
   if (categoryBgColor)
