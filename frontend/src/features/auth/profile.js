@@ -7,7 +7,7 @@ import {
   START_VIEW_CONFIG,
   SETTINGS_OPEN_PANEL_KEY
 } from '../../config/constants.js';
-import { $ } from '../ui/dom.js';
+import { $, escapeHtml } from '../ui/dom.js';
 import { showAlert } from '../../utils/toast.js';
 import {
   normalizeAppSettings,
@@ -207,7 +207,7 @@ export function renderProfileAvatarChoices() {
     const active = choice === selected ? ' is-active' : '';
     const icon = choice === 'auto' ? getFallbackInitial() : choice;
     const label = choice === 'auto' ? 'Auto' : choice;
-    return `<button type="button" class="avatar-choice-btn${active}" data-avatar-choice="${choice}" title="${label}">${icon}</button>`;
+    return `<button type="button" class="avatar-choice-btn${active}" data-avatar-choice="${escapeHtml(choice)}" title="${escapeHtml(label)}">${escapeHtml(icon)}</button>`;
   }).join('');
 }
 
@@ -366,7 +366,9 @@ export async function changePasswordFromProfile() {
     }
     if (!res.ok) {
       const data = await res.json().catch(() => null);
-      throw new Error(data?.detail || 'No se pudo cambiar la contraseña');
+      throw new Error(
+        data?.message || data?.detail || 'No se pudo cambiar la contraseña'
+      );
     }
     clearProfilePasswordForm();
     showAlert('Contraseña actualizada con éxito', 'info');
@@ -464,7 +466,6 @@ export function initProfileListeners() {
     );
   }
 
-  // Detección de Bloq Mayús y envío con Enter
   const passwordInputs = [
     profileCurrentPassword,
     profileNextPassword,
