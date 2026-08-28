@@ -3,7 +3,7 @@ import { state } from '../../state/state.js';
 import { api } from '../../services/api.js';
 import { $, escapeHtml, clearFileInput } from '../ui/dom.js';
 import { showAlert } from '../../utils/toast.js';
-import { openModal, closeModal } from '../ui/modals.js';
+import { openModal, closeModal } from '../ui/modal.js';
 import {
   normalizeColorValue,
   normalizeRemoteImageUrl,
@@ -25,57 +25,37 @@ export function setAccountsNavigationCallback(callback) {
 }
 
 export function getAccountAccent(account) {
-  const customAccent = normalizeColorValue(account?.color || account?.bg_color);
+  const customAccent = normalizeColorValue(account?.bg_color || account?.color);
   if (customAccent) return customAccent;
 
   const name = String(account?.name || '').toLowerCase();
   const type = String(account?.type || '').toLowerCase();
 
-  if (name.includes('trade republic')) return '#86efac';
-  if (name.includes('hucha') || name.includes('ahorro')) return '#ec4899';
-  if (name.includes('santander')) return '#fecaca';
-  if (name.includes('imagin')) return '#93c5fd';
-  if (type === 'credit') return '#c4b5fd';
-  if (type === 'cash') return '#fde68a';
+  if (name.includes('trade republic')) return '#111827';
+  if (name.includes('hucha') || name.includes('ahorro')) return '#db2777';
+  if (name.includes('santander')) return '#dc2626';
+  if (name.includes('imagin')) return '#2563eb';
+  if (type === 'credit') return '#7c3aed';
+  if (type === 'cash') return '#d97706';
 
-  return 'rgba(255, 255, 255, 0.78)';
+  return '#4f46e5';
 }
 
 export function getAccountSurface(account) {
-  const customBg = normalizeColorValue(account?.bg_color);
-  if (customBg) return customBg;
-
-  const name = String(account?.name || '').toLowerCase();
-  const type = String(account?.type || '').toLowerCase();
-
-  if (name.includes('trade republic')) return 'rgba(17, 24, 39, 0.06)';
-  if (name.includes('hucha') || name.includes('ahorro'))
-    return 'rgba(236, 72, 153, 0.12)';
-  if (name.includes('santander')) return 'rgba(254, 202, 202, 0.16)';
-  if (name.includes('imagin')) return 'rgba(96, 165, 250, 0.12)';
-  if (type === 'credit') return 'rgba(167, 139, 250, 0.12)';
-  if (type === 'cash') return 'rgba(251, 191, 36, 0.12)';
-
-  return 'rgba(203, 213, 225, 0.12)';
+  return getAccountAccent(account);
 }
 
 export function getAccountBorder(account) {
   const customBorder = normalizeColorValue(account?.border_color);
   if (customBorder) return customBorder;
-
-  const name = String(account?.name || '').toLowerCase();
-
-  if (name.includes('trade republic')) return '#111111';
-  if (name.includes('imagin')) return '#60a5fa';
-  if (name.includes('santander')) return '#fecaca';
-
-  return 'color-mix(in srgb, var(--account-accent) 44%, white)';
+  const accent = getAccountAccent(account);
+  return `color-mix(in srgb, ${accent} 70%, white)`;
 }
 
 export function getAccountBrand(account) {
   const customIcon = String(account?.icon || '').trim();
   const customImage = String(account?.image_data || '').trim();
-  const customAccent = normalizeColorValue(account?.bg_color);
+  const customAccent = normalizeColorValue(account?.bg_color || account?.color);
   const customBorder = normalizeColorValue(account?.border_color);
 
   if (customIcon || customImage) {
@@ -160,27 +140,15 @@ export function getAccountBadgeMarkup(account, sizeClass = '') {
 export function applyAccountTheme(cardElement, account = {}) {
   if (!cardElement) return;
 
-  const bgColor = account.bg_color || account.color || '';
-  const borderColor = account.border_color || '';
-  const accentColor = account.color || account.bg_color || '#6366f1';
+  const accent = getAccountAccent(account);
+  const border = getAccountBorder(account);
 
-  if (bgColor) {
-    cardElement.style.setProperty('--account-surface', bgColor);
-    cardElement.style.background = bgColor;
-  } else {
-    cardElement.style.removeProperty('--account-surface');
-    cardElement.style.background = '';
-  }
-
-  if (borderColor) {
-    cardElement.style.setProperty('--account-border', borderColor);
-    cardElement.style.borderColor = borderColor;
-  } else {
-    cardElement.style.removeProperty('--account-border');
-    cardElement.style.borderColor = '';
-  }
-
-  cardElement.style.setProperty('--account-accent', accentColor);
+  cardElement.style.setProperty('--account-accent', accent);
+  cardElement.style.setProperty('--account-border', border);
+  // Degradado sofisticado que conserva el color vivo y garantiza texto blanco legible
+  cardElement.style.background = `linear-gradient(145deg, ${accent} 0%, color-mix(in srgb, ${accent} 78%, #0f172a) 100%)`;
+  cardElement.style.borderColor = border;
+  cardElement.style.color = '#ffffff';
 }
 
 export function getSortedAccounts(accounts = []) {
@@ -293,7 +261,6 @@ export async function loadAccounts() {
           .map((part) => part.trim())
           .filter(Boolean);
         const accent = getAccountAccent(acc);
-        const surface = getAccountSurface(acc);
         const border = getAccountBorder(acc);
         const isNegativeBalance = Number(acc.current_balance || 0) < 0;
         const subtitleClass = /ahorro|hucha/i.test(subtitle)
@@ -306,19 +273,19 @@ export async function loadAccounts() {
         const safeTitle = escapeHtml(mainName || acc.name || '');
         const safeSubtitle = escapeHtml(subtitle);
 
-        const customBg = acc.bg_color ? `background: ${acc.bg_color};` : '';
-        const customBorder = acc.border_color
-          ? `border-color: ${acc.border_color};`
-          : '';
+        // Estilo de tarjeta con fondo suave pero tinte nítido
+        const cardBgStyle = `background: linear-gradient(135deg, color-mix(in srgb, ${accent} 14%, #ffffff) 0%, #ffffff 100%);`;
+        const cardBorderStyle = `border: 1.5px solid color-mix(in srgb, ${accent} 40%, rgba(148, 163, 184, 0.3));`;
+        const cardGlow = `box-shadow: 0 8px 24px color-mix(in srgb, ${accent} 14%, rgba(15, 23, 42, 0.04));`;
 
         return `
-          <div class="account-card" data-account-id="${acc.id}" draggable="true" style="margin-bottom: 12px; ${customBg} ${customBorder} --account-accent: ${accent}; --account-surface: ${surface}; --account-border: ${border};">
+          <div class="account-card" data-account-id="${acc.id}" draggable="true" style="margin-bottom: 12px; ${cardBgStyle} ${cardBorderStyle} ${cardGlow} --account-accent: ${accent};">
             <div class="account-card-top">
               <div class="account-card-top-main">
                 ${getAccountBadgeMarkup(acc, 'account-brand-badge--small')}
                 <div class="account-card-copy">
-                  <h2 class="account-card-title">${safeTitle}</h2>
-                  <p class="${subtitleClass}">${safeSubtitle}</p>
+                  <h2 class="account-card-title" style="color: #0f172a;">${safeTitle}</h2>
+                  <p class="${subtitleClass}" style="color: color-mix(in srgb, ${accent} 80%, #0f172a);">${safeSubtitle}</p>
                 </div>
               </div>
               <div class="account-card-actions">
@@ -340,10 +307,10 @@ export async function loadAccounts() {
               </div>
             </div>
             <div class="account-card-meta">
-              <span class="account-card-type">${escapeHtml(typeLabel)}</span>
-              <div class="account-card-balance">
-                <p class="account-card-balance-label">Saldo</p>
-                <p class="${balanceClass}">${balance}€</p>
+              <span class="account-card-type" style="background: color-mix(in srgb, ${accent} 16%, white); color: #0f172a;">${escapeHtml(typeLabel)}</span>
+              <div class="account-card-balance" style="background: rgba(255, 255, 255, 0.95); padding: 6px 14px; border-radius: 12px; border: 1px solid rgba(148, 163, 184, 0.22); box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                <p class="account-card-balance-label" style="margin: 0; color: #64748b; font-weight: 800;">Saldo</p>
+                <p class="${balanceClass}" style="margin: 0; font-size: 17px; font-weight: 800;">${balance}€</p>
               </div>
             </div>
           </div>
@@ -545,7 +512,7 @@ export async function saveAccount() {
   const balance = Number.parseFloat($('accountBalance')?.value || '0');
   const icon = ($('accountIcon')?.value || '').trim();
   const imageUrlInput = $('accountImageUrl')?.value || '';
-  const rawBgColor = $('accountBgColor')?.value || '#eef2ff';
+  const rawBgColor = $('accountBgColor')?.value || '#4f46e5';
   const rawBorderColor = $('accountBorderColor')?.value || '#c7d2fe';
 
   if (!name) {
@@ -562,7 +529,7 @@ export async function saveAccount() {
       balance_inicial: balance,
       icon: icon || null,
       image_data: remoteImageUrl || accountFormImageData,
-      bg_color: normalizeColorValue(rawBgColor) || '#eef2ff',
+      bg_color: normalizeColorValue(rawBgColor) || '#4f46e5',
       border_color: normalizeColorValue(rawBorderColor) || '#c7d2fe'
     };
 
