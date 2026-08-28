@@ -2,22 +2,41 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
-from typing import Literal, Optional
+from datetime import datetime, timezone
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from ..services.finance import get_billing_cycle_period
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
 
 # Tipos definidos
 TxType = Literal["income", "expense"]
 AccType = Literal["cash", "bank", "credit"]
+UserDefaultView = Literal[
+    "home", "dashboard", "history", "stats", "accounts", "reminders"
+]
+ReminderType = Literal["insurance", "subscription", "other"]
+ReminderRecurrence = Literal["none", "monthly", "yearly"]
+AutomationCadence = Literal["monthly", "yearly"]
+RuleMatchMode = Literal["contains", "starts_with", "equals"]
 
 
 def _validate_password_strength(v: str) -> str:
     if len(v) < 6:
-        raise ValueError("Contraseña debe tener al menos 6 caracteres")
+        raise ValueError("La contraseña debe tener al menos 6 caracteres.")
     return v
+
+
+def _validate_hex_color(v: Optional[str]) -> Optional[str]:
+    if v is None:
+        return None
+    cleaned = v.strip()
+    if not re.fullmatch(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})", cleaned):
+        raise ValueError("Formato de color hexadecimal inválido (ej. #4F46E5 o #FFF).")
+    return cleaned.lower()
 
 
 # --- USUARIOS ---
@@ -31,7 +50,7 @@ class UserCreate(BaseModel):
 
     @field_validator("password")
     @classmethod
-    def validate_password(cls, v):
+    def validate_password(cls, v: str) -> str:
         return _validate_password_strength(v)
 
 
@@ -50,13 +69,8 @@ class ChangePasswordRequest(BaseModel):
 
     @field_validator("new_password")
     @classmethod
-    def validate_new_password(cls, v):
+    def validate_new_password(cls, v: str) -> str:
         return _validate_password_strength(v)
-
-
-UserDefaultView = Literal[
-    "home", "dashboard", "history", "stats", "accounts", "reminders"
-]
 
 
 class UserSettingsUpdate(BaseModel):
@@ -67,7 +81,7 @@ class UserSettingsUpdate(BaseModel):
 
     @field_validator("profile_avatar")
     @classmethod
-    def validate_profile_avatar(cls, v):
+    def validate_profile_avatar(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
         allowed = {"auto", "🙂", "😎", "🧠", "💼", "💸", "🚀"}
@@ -77,12 +91,8 @@ class UserSettingsUpdate(BaseModel):
 
     @field_validator("accent_color")
     @classmethod
-    def validate_accent_color(cls, v):
-        if v is None:
-            return v
-        if not re.fullmatch(r"#[0-9a-fA-F]{6}", v):
-            raise ValueError("Color de acento no permitido")
-        return v.lower()
+    def validate_accent_color(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_hex_color(v)
 
 
 # --- CUENTAS ---
@@ -93,25 +103,35 @@ class AccountCreate(BaseModel):
         ..., min_length=1, max_length=50, description="Nombre de la cuenta"
     )
     type: AccType = Field(default="bank", description="Tipo de cuenta")
-    balance_inicial: float = Field(default=0.0, ge=0, description="Saldo inicial")
+    balance_inicial: float = Field(default=0.0, description="Saldo inicial")
     icon: Optional[str] = Field(default=None, max_length=8)
     image_data: Optional[str] = Field(default=None)
     bg_color: Optional[str] = Field(default=None)
     border_color: Optional[str] = Field(default=None)
+
+    @field_validator("bg_color", "border_color")
+    @classmethod
+    def validate_colors(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_hex_color(v)
 
 
 class AccountUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=50)
     type: Optional[AccType] = Field(default=None)
-    balance_inicial: Optional[float] = Field(default=None, ge=0)
+    balance_inicial: Optional[float] = Field(default=None)
     icon: Optional[str] = Field(default=None, max_length=8)
     image_data: Optional[str] = Field(default=None)
     bg_color: Optional[str] = Field(default=None)
     border_color: Optional[str] = Field(default=None)
 
+    @field_validator("bg_color", "border_color")
+    @classmethod
+    def validate_colors(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_hex_color(v)
+
 
 class AccountReorder(BaseModel):
-    account_ids: list[str] = Field(min_length=1)
+    account_ids: List[str] = Field(min_length=1)
 
 
 class TransferCreate(BaseModel):
@@ -119,7 +139,7 @@ class TransferCreate(BaseModel):
     destination_account_id: str
     amount: float = Field(gt=0)
     description: Optional[str] = "Transferencia entre cuentas"
-    date: datetime = Field(default_factory=datetime.now)
+    date: datetime = Field(default_factory=_utc_now)
 
 
 # --- CATEGORÍAS Y SECCIONES ---
@@ -134,6 +154,11 @@ class CategoryCreate(BaseModel):
     parent_id: Optional[str] = None
     order: int = 0
 
+    @field_validator("color", "bg_color", "border_color")
+    @classmethod
+    def validate_colors(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_hex_color(v)
+
 
 class CategoryUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=60)
@@ -146,6 +171,11 @@ class CategoryUpdate(BaseModel):
     parent_id: Optional[str] = None
     order: Optional[int] = None
 
+    @field_validator("color", "bg_color", "border_color")
+    @classmethod
+    def validate_colors(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_hex_color(v)
+
 
 # --- TRANSACCIONES ---
 class TransactionCreate(BaseModel):
@@ -155,24 +185,28 @@ class TransactionCreate(BaseModel):
     account_id: Optional[str] = None
     subcategory_id: Optional[str] = None
     note: Optional[str] = None
-    date: datetime = Field(default_factory=datetime.now)
+    date: datetime = Field(default_factory=_utc_now)
+
+
+class TransactionUpdate(BaseModel):
+    amount: Optional[float] = Field(default=None, gt=0)
+    type: Optional[TxType] = None
+    category_id: Optional[str] = None
+    subcategory_id: Optional[str] = None
+    account_id: Optional[str] = None
+    note: Optional[str] = None
+    date: Optional[datetime] = None
 
 
 # --- PRESUPUESTOS ---
 class BudgetCreate(BaseModel):
     category_id: str
     limit_amount: float = Field(gt=0)
-    month: int = Field(
-        default_factory=lambda: get_billing_cycle_period()[0], ge=1, le=12
-    )
-    year: int = Field(default_factory=lambda: get_billing_cycle_period()[1], ge=2024)
+    month: int = Field(default_factory=lambda: _utc_now().month, ge=1, le=12)
+    year: int = Field(default_factory=lambda: _utc_now().year, ge=2020, le=2100)
 
 
 # --- RECORDATORIOS ---
-ReminderType = Literal["insurance", "subscription", "other"]
-ReminderRecurrence = Literal["none", "monthly", "yearly"]
-
-
 class ReminderCreate(BaseModel):
     title: str = Field(min_length=1, max_length=80)
     due_date: datetime
@@ -196,10 +230,6 @@ class ReminderUpdate(BaseModel):
 
 
 # --- AUTOMATIZACIONES ---
-AutomationCadence = Literal["monthly", "yearly"]
-RuleMatchMode = Literal["contains", "starts_with", "equals"]
-
-
 class RecurringTemplateCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     type: TxType
