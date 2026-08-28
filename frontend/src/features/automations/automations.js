@@ -284,8 +284,13 @@ export async function loadRecurringTemplates() {
     renderRecurringTemplates();
     return;
   }
-  if (!res.ok)
-    throw new Error(res.data?.detail || 'No se pudieron cargar recurrentes');
+  if (!res.ok) {
+    throw new Error(
+      res.data?.message ||
+        res.data?.detail ||
+        'No se pudieron cargar recurrentes'
+    );
+  }
 
   state.recurringTemplates = Array.isArray(res.data) ? res.data : [];
   renderRecurringTemplates();
@@ -306,8 +311,11 @@ export async function loadAutomationRules() {
     renderAutomationRules();
     return;
   }
-  if (!res.ok)
-    throw new Error(res.data?.detail || 'No se pudieron cargar reglas');
+  if (!res.ok) {
+    throw new Error(
+      res.data?.message || res.data?.detail || 'No se pudieron cargar reglas'
+    );
+  }
 
   state.automationRules = Array.isArray(res.data) ? res.data : [];
   renderAutomationRules();
@@ -329,8 +337,11 @@ export async function loadForecast() {
     renderForecastSummary();
     return;
   }
-  if (!res.ok)
-    throw new Error(res.data?.detail || 'No se pudo cargar la proyección');
+  if (!res.ok) {
+    throw new Error(
+      res.data?.message || res.data?.detail || 'No se pudo cargar la proyección'
+    );
+  }
 
   state.forecast = res.data;
   renderForecastSummary();
@@ -380,10 +391,10 @@ export function getRecurringPayloadFromForm() {
     day_of_month: Number.parseInt($('recurringDay')?.value || '1', 10),
     month_of_year: Number.parseInt($('recurringMonth')?.value || '1', 10),
     start_date: $('recurringStart')?.value
-      ? new Date($('recurringStart').value + 'T12:00:00').toISOString()
+      ? new Date($('recurringStart').value + 'T00:00:00Z').toISOString()
       : null,
     end_date: $('recurringEnd')?.value
-      ? new Date($('recurringEnd').value + 'T12:00:00').toISOString()
+      ? new Date($('recurringEnd').value + 'T23:59:59Z').toISOString()
       : null,
     is_active: Boolean($('recurringActive')?.checked)
   };
@@ -397,7 +408,7 @@ export async function saveRecurringTemplate() {
     !Number.isFinite(payload.amount) ||
     payload.amount <= 0
   ) {
-    showAlert('Completa nombre, categoría e importe', 'error');
+    showAlert('Completa nombre, categoría e importe válido', 'error');
     return;
   }
 
@@ -519,7 +530,11 @@ export async function exportAllTransactionsCsv() {
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => null);
-    throw new Error(errorData?.detail || 'No se pudo exportar el archivo CSV');
+    throw new Error(
+      errorData?.message ||
+        errorData?.detail ||
+        'No se pudo exportar el archivo CSV'
+    );
   }
 
   const blob = await res.blob();
