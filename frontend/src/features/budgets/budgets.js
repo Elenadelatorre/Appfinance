@@ -229,7 +229,7 @@ export async function populateBudgetCategorySelect() {
       const visual = getCategoryVisual(category);
       const label = `${visual.icon} ${visual.name}`;
       return `<option value="${escapeHtml(catId)}">${escapeHtml(label)}</option>`;
-    })
+    }),
   ];
 
   select.innerHTML = options.join('');
@@ -259,15 +259,19 @@ export async function saveBudgetFromView() {
       ? new Date(summary.period_start)
       : new Date();
 
+    // Extraer mes y año UTC para coincidir con el ciclo del backend
+    const budgetMonth = cycleStart.getUTCMonth() + 1;
+    const budgetYear = cycleStart.getUTCFullYear();
+
     await api('/budgets', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      json: true,
       body: JSON.stringify({
         category_id: categoryId,
         limit_amount: Number(limitAmount.toFixed(2)),
-        month: cycleStart.getMonth() + 1,
-        year: cycleStart.getFullYear()
-      })
+        month: budgetMonth,
+        year: budgetYear,
+      }),
     });
 
     showAlert('Presupuesto guardado', 'info');
@@ -293,7 +297,7 @@ export async function loadBudgetsView() {
 
     const [summary, budgetsStatus] = await Promise.all([
       api('/summary/monthly'),
-      api('/budgets/check')
+      api('/budgets/check'),
     ]);
 
     if (cycleLabel) {
@@ -345,7 +349,7 @@ export async function loadBudgetsView() {
           ) || {
             budget_id: budgetId,
             category_id: categoryId,
-            limit
+            limit,
           };
           startEditBudget(selected);
         });
