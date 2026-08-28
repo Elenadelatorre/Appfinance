@@ -1,8 +1,16 @@
-// js/state/state.js
+// src/state/state.js
 import {
   DEFAULT_APP_SETTINGS,
   BUDGET_FILTER_STORAGE_KEY
 } from '../config/constants.js';
+
+function getInitialBudgetFilter() {
+  try {
+    return localStorage.getItem(BUDGET_FILTER_STORAGE_KEY) || 'all';
+  } catch {
+    return 'all';
+  }
+}
 
 export const state = {
   // Datos estructurales y colecciones
@@ -27,7 +35,7 @@ export const state = {
   dashboardUseCustomRange: false,
 
   // Estados de edición actuales
-  budgetStatusFilter: localStorage.getItem(BUDGET_FILTER_STORAGE_KEY) || 'all',
+  budgetStatusFilter: getInitialBudgetFilter(),
   editingBudgetId: null,
   editingAccountId: null,
   editingCategoryId: null,
@@ -50,3 +58,37 @@ export const state = {
   user: null,
   settings: { ...DEFAULT_APP_SETTINGS }
 };
+
+export function resetAppState() {
+  state.tree = [];
+  state.catsById = new Map();
+  state.accounts = [];
+  state.recurringTemplates = [];
+  state.automationRules = [];
+  state.forecast = null;
+  state.accountsDragLockUntil = 0;
+  state.accountDetailOriginViewId = 'accounts';
+  state.homeSpendSinceDate = null;
+  state.dashboardSelectedAccountId = null;
+  state.dashboardAccountSpendMode = 'all';
+  state.dashboardSummaryMode = 'full';
+  state.dashboardDateStart = '';
+  state.dashboardDateEnd = '';
+  state.dashboardUseCustomRange = false;
+  state.budgetStatusFilter = 'all';
+  state.editingBudgetId = null;
+  state.editingAccountId = null;
+  state.editingCategoryId = null;
+  state.currentAccountId = null;
+  state.currentAccountTransactions = [];
+  state.currentViewId = 'home';
+  state.reminders = [];
+  state.reminderFilter = 'all';
+  state.historyRangeStart = '';
+  state.historyRangeEnd = '';
+  state.historyRangeSource = '';
+  state.historyPendingAccountId = '';
+  state.historyPendingCategoryId = '';
+  state.user = null;
+  state.settings = { ...DEFAULT_APP_SETTINGS };
+}
