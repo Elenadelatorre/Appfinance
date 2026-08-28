@@ -3,7 +3,7 @@ import { state } from '../../state/state.js';
 import { api } from '../../services/api.js';
 import { $, escapeHtml, clearFileInput } from '../ui/dom.js';
 import { showAlert } from '../../utils/toast.js';
-import { openModal, closeModal } from '../ui/modal.js';
+import { openModal, closeModal } from '../ui/modals.js';
 import {
   normalizeColorValue,
   normalizeRemoteImageUrl,
@@ -307,7 +307,9 @@ export async function loadAccounts() {
         const safeSubtitle = escapeHtml(subtitle);
 
         const customBg = acc.bg_color ? `background: ${acc.bg_color};` : '';
-        const customBorder = acc.border_color ? `border-color: ${acc.border_color};` : '';
+        const customBorder = acc.border_color
+          ? `border-color: ${acc.border_color};`
+          : '';
 
         return `
           <div class="account-card" data-account-id="${acc.id}" draggable="true" style="margin-bottom: 12px; ${customBg} ${customBorder} --account-accent: ${accent}; --account-surface: ${surface}; --account-border: ${border};">
@@ -685,7 +687,8 @@ export async function openViewAccount(accountId) {
     const detailBalanceEl = $('accountDetailBalance');
     if (detailBalanceEl) {
       detailBalanceEl.textContent = `${rawBalance.toFixed(2)}€`;
-      detailBalanceEl.style.color = rawBalance < 0 ? 'var(--danger)' : 'var(--success)';
+      detailBalanceEl.style.color =
+        rawBalance < 0 ? 'var(--danger)' : 'var(--success)';
     }
 
     applyAccountTheme(detailCard, acc);
