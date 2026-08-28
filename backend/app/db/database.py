@@ -1,8 +1,9 @@
 # backend/app/db/database.py
 import logging
 import os
+from typing import Optional
 from dotenv import load_dotenv
-from motor.motor_asyncio import AsyncIOMotorClient
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo import ASCENDING, DESCENDING
 
 logger = logging.getLogger(__name__)
@@ -15,80 +16,102 @@ load_dotenv(override=True)
 MONGO_URL = (os.getenv("MONGO_URL") or "mongodb://localhost:27017").strip()
 DB_NAME = (os.getenv("DB_NAME") or "finance").strip()
 
-
-def ensure_db_in_uri(uri: str, db_name: str) -> str:
-    """Asegura que la URI de MongoDB apunte a la base de datos correcta."""
-    if uri.startswith("mongodb+srv://") or uri.startswith("mongodb://"):
-        after_scheme = uri.split("://", 1)[1]
-        if "/" in after_scheme:
-            host, path = after_scheme.split("/", 1)
-            if path.startswith("?"):
-                return f"{uri.split('://', 1)[0]}://{host}/{db_name}{path}"
-            return uri
-        return f"{uri}/{db_name}"
-    return uri
+client: Optional[AsyncIOMotorClient] = None
+db: Optional[AsyncIOMotorDatabase] = None
 
 
-MONGO_URL = ensure_db_in_uri(MONGO_URL, DB_NAME)
+def get_db() -> AsyncIOMotorDatabase:
+    """Devuelve la instancia activa de la base de datos."""
+    global db, client
+    if db is None:
+        client = AsyncIOMotorClient(MONGO_URL)
+        db = client[DB_NAME]
+    return db
 
-# Cliente singleton para reutilizar pool de conexiones
-client = AsyncIOMotorClient(MONGO_URL)
-db = client[DB_NAME]
+
+async def close_db_connection() -> None:
+    """Cierra la conexión con MongoDB al apagar el servidor."""
+    global client, db
+    if client is not None:
+        client.close()
+        logger.info("Conexión con MongoDB cerrada.")
+        client = None
+        db = None
 
 
 # -------------------------
 # HELPERS DE COLECCIONES
 # -------------------------
 def users_col():
-    return db["users"]
+    return get_db()["users"]
 
 
 def tx_col():
-    return db["transactions"]
+    return get_db()["transactions"]
 
 
 def accounts_col():
-    return db["accounts"]
+    return get_db()["accounts"]
 
 
 def budgets_col():
-    return db["budgets"]
+    return get_db()["budgets"]
 
 
 def goals_col():
-    return db["goals"]
+    return get_db()["goals"]
 
 
 def categories_col():
-    return db["categories"]
+    return get_db()["categories"]
 
 
 def cat_sections_col():
-    return db["category_sections"]
+    return get_db()["category_sections"]
 
 
 def reminders_col():
-    return db["reminders"]
+    return get_db()["reminders"]
 
 
 def recurring_templates_col():
-    return db["recurring_templates"]
+    return get_db()["recurring_templates"]
 
 
 def auto_rules_col():
-    return db["auto_rules"]
+    return get_db()["auto_rules"]
 
 
 # -------------------------
 # CONFIGURACIÓN DE ÍNDICES
 # -------------------------
-async def create_indexes():
+async def create_indexes() -> None:
     """Crea índices para optimizar las consultas del backend."""
     try:
+        # Usuarios
         await users_col().create_index("email", unique=True)
+
+        # Transacciones (filtrado por fecha, cuenta y categoría)
         await tx_col().create_index([("user_id", ASCENDING), ("date", DESCENDING)])
-        await budgets_col().create_index([("user_id", ASCENDING), ("month", ASCENDING)])
+        await tx_col().create_index([("account_id", ASCENDING), ("date", DESCENDING)])
+        await tx_col().create_index(
+            [("user_id", ASCENDING), ("category_id", ASCENDING), ("date", DESCENDING)]
+        )
+
+        # Cuentas
         await accounts_col().create_index("user_id")
+
+        # Presupuestos
+        await budgets_col().create_index(
+            [("user_id", ASCENDING), ("month", ASCENDING)], unique=True
+        )
+
+        # Metas de ahorro
+        await goals_col().create_index(
+            [("user_id", ASCENDING), ("target_date", ASCENDING)]
+        )
+
+        # Categorías y secciones
         await categories_col().create_index(
             [
                 ("user_id", ASCENDING),
@@ -96,6 +119,11 @@ async def create_indexes():
                 ("parent_id", ASCENDING),
             ]
         )
+        await cat_sections_col().create_index(
+            [("user_id", ASCENDING), ("order", ASCENDING)]
+        )
+
+        # Recordatorios, recurrentes y reglas
         await reminders_col().create_index(
             [("user_id", ASCENDING), ("due_date", ASCENDING)]
         )
@@ -105,6 +133,7 @@ async def create_indexes():
         await auto_rules_col().create_index(
             [("user_id", ASCENDING), ("is_active", ASCENDING), ("priority", ASCENDING)]
         )
+
         logger.info("✅ Índices de base de datos verificados/creados.")
     except Exception as e:
         logger.warning("⚠️ Error creando índices: %s", e)
