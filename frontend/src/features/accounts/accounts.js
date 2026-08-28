@@ -3,7 +3,7 @@ import { state } from '../../state/state.js';
 import { api } from '../../services/api.js';
 import { $, escapeHtml, clearFileInput } from '../ui/dom.js';
 import { showAlert } from '../../utils/toast.js';
-import { openModal, closeModal } from '../../utils/modal.js';
+import { openModal, closeModal } from '../../ui/modals.js';
 import {
   normalizeColorValue,
   normalizeRemoteImageUrl,
