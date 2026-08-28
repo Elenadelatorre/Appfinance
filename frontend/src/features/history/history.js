@@ -1,4 +1,4 @@
-// js/features/history/history.js
+// src/features/history/history.js
 import { state } from '../../state/state.js';
 import {
   HISTORY_PAGE_SIZE,
@@ -116,11 +116,12 @@ export function openHistoryForAccount(accountId) {
 }
 
 export function formatHistoryDayLabel(date) {
-  return new Intl.DateTimeFormat('es-ES', {
+  const label = new Intl.DateTimeFormat('es-ES', {
     weekday: 'long',
     day: 'numeric',
     month: 'short'
   }).format(date);
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 export function renderHistoryGroup(dateKey, transactions = []) {
@@ -421,7 +422,7 @@ export function renderHistoryPresetChips() {
     .map((name) => {
       const label =
         name === historyFavoritePresetName
-          ? `[Favorito] ${escapeHtml(name)}`
+          ? `★ ${escapeHtml(name)}`
           : escapeHtml(name);
       return `<button type="button" class="history-preset-chip" data-history-preset-chip="${escapeHtml(name)}">${label}</button>`;
     })
@@ -446,9 +447,7 @@ export function renderHistoryPresetSelect(selectedName = '') {
   orderedPresets.forEach((preset) => {
     const safeName = escapeHtml(preset.name);
     const label =
-      preset.name === historyFavoritePresetName
-        ? `[Favorito] ${safeName}`
-        : safeName;
+      preset.name === historyFavoritePresetName ? `★ ${safeName}` : safeName;
     options.push(`<option value="${safeName}">${label}</option>`);
   });
   select.innerHTML = options.join('');
@@ -543,12 +542,15 @@ export async function populateHistoryAccountFilter() {
   const accounts = await ensureAccountsLoaded();
   select.innerHTML = '<option value="all">Todas las cuentas</option>';
   accounts.forEach((account) => {
+    const accId = String(account.id || account._id || '');
     const option = document.createElement('option');
-    option.value = account.id;
+    option.value = accId;
     option.textContent = account.name;
     select.appendChild(option);
   });
-  select.value = accounts.some((account) => account.id === currentValue)
+  select.value = accounts.some(
+    (account) => String(account.id || account._id) === currentValue
+  )
     ? currentValue
     : 'all';
   state.historyPendingAccountId = '';
@@ -564,12 +566,14 @@ export async function populateHistoryCategoryFilter() {
   const options = ['<option value="all">Todas las categorías</option>'];
   for (const section of state.tree || []) {
     for (const category of section.categories || []) {
+      const catId = String(category._id || category.id || '');
       const visual = getCategoryVisual(category);
       const categoryLabel = `${visual.icon} ${visual.name}`;
       options.push(
-        `<option value="${category._id}">${escapeHtml(categoryLabel)}</option>`
+        `<option value="${escapeHtml(catId)}">${escapeHtml(categoryLabel)}</option>`
       );
       for (const subcategory of category.subcategories || []) {
+        const subId = String(subcategory._id || subcategory.id || '');
         const subVisual = hasCustomCategoryVisual(subcategory)
           ? getCategoryVisual(subcategory, visual.icon, visual.color)
           : {
@@ -578,7 +582,7 @@ export async function populateHistoryCategoryFilter() {
             };
         const subcategoryLabel = `↳ ${subVisual.icon} ${subcategory.name}`;
         options.push(
-          `<option value="${subcategory._id}">${escapeHtml(subcategoryLabel)}</option>`
+          `<option value="${escapeHtml(subId)}">${escapeHtml(subcategoryLabel)}</option>`
         );
       }
     }
@@ -595,8 +599,8 @@ export async function populateHistoryCategoryFilter() {
 
 export function matchesHistoryCategory(tx, selectedCategoryId) {
   if (selectedCategoryId === 'all') return true;
-  if (tx.category_id === selectedCategoryId) return true;
-  if (tx.subcategory_id === selectedCategoryId) return true;
+  if (String(tx.category_id || '') === selectedCategoryId) return true;
+  if (String(tx.subcategory_id || '') === selectedCategoryId) return true;
 
   const subcategory = tx.subcategory_id
     ? state.catsById.get(tx.subcategory_id)
@@ -610,8 +614,11 @@ export function matchesHistoryAccount(
   selectedAccountName = ''
 ) {
   if (selectedAccountId === 'all') return true;
-  const accountId = tx.account_id || '';
-  return accountId === selectedAccountId || accountId === selectedAccountName;
+  const accountRef = String(tx.account_id || '').trim();
+  return (
+    accountRef === selectedAccountId ||
+    (selectedAccountName && accountRef === selectedAccountName)
+  );
 }
 
 export function matchesHistorySearch(tx, searchTerm, accountLookup) {
@@ -745,7 +752,9 @@ export function updateHistoryResultsMeta(
 }
 
 export function pruneHistorySelection(transactions = []) {
-  const availableIds = new Set(transactions.map((tx) => String(tx._id || '')));
+  const availableIds = new Set(
+    transactions.map((tx) => String(tx._id || tx.id || ''))
+  );
   Array.from(historySelectedTxIds).forEach((id) => {
     if (!availableIds.has(id)) historySelectedTxIds.delete(id);
   });
@@ -753,7 +762,7 @@ export function pruneHistorySelection(transactions = []) {
 
 export function getSelectedHistoryTransactions() {
   return historyFilteredTxns.filter((tx) =>
-    historySelectedTxIds.has(String(tx._id))
+    historySelectedTxIds.has(String(tx._id || tx.id))
   );
 }
 
@@ -868,11 +877,12 @@ export async function loadHistoryView(options = {}) {
   const accounts = await ensureAccountsLoaded();
   const accountLookup = new Map();
   accounts.forEach((account) => {
-    accountLookup.set(String(account.id), account.name);
+    const accId = String(account.id || account._id || '');
+    accountLookup.set(accId, account.name);
     accountLookup.set(String(account.name), account.name);
   });
   const selectedAccount = accounts.find(
-    (account) => account.id === selectedAccountId
+    (account) => String(account.id || account._id) === selectedAccountId
   );
   const historyData = await fetchAllTransactions(
     rangeActive
@@ -1016,6 +1026,7 @@ export function initHistoryListeners() {
   const historyPresetSelect = $('historyPresetSelect');
   const historyPresetChips = $('historyPresetChips');
   const historySavePresetBtn = $('historySavePresetBtn');
+  const historyToggleFavoritePresetBtn = $('historyToggleFavoritePresetBtn');
   const historyClearFiltersBtn = $('historyClearFiltersBtn');
   const historyResetRangeBtn = $('historyResetRangeBtn');
   const historyBackDashboardBtn = $('historyBackDashboardBtn');
@@ -1107,8 +1118,101 @@ export function initHistoryListeners() {
     });
   }
 
+  if (historySavePresetBtn) {
+    historySavePresetBtn.addEventListener('click', () => {
+      const name = prompt('Nombre para guardar este filtro:');
+      if (!name || !name.trim()) return;
+      const cleanName = name.trim();
+      const current = getCurrentHistoryFiltersSnapshot();
+      const existingIdx = historyFilterPresets.findIndex(
+        (p) => p.name === cleanName
+      );
+      if (existingIdx >= 0) {
+        historyFilterPresets[existingIdx].filters = current;
+      } else {
+        historyFilterPresets.push({ name: cleanName, filters: current });
+      }
+      persistHistoryFilterPresets();
+      if (!historyRecentPresetNames.includes(cleanName)) {
+        historyRecentPresetNames.unshift(cleanName);
+        historyRecentPresetNames = historyRecentPresetNames.slice(0, 8);
+        persistHistoryRecentPresetNames();
+      }
+      renderHistoryPresetSelect(cleanName);
+      renderHistoryPresetChips();
+      showAlert('Filtro guardado', 'success');
+    });
+  }
+
+  if (historyPresetSelect) {
+    historyPresetSelect.addEventListener('change', () => {
+      const val = historyPresetSelect.value;
+      if (!val) return;
+      const preset = historyFilterPresets.find((p) => p.name === val);
+      if (preset?.filters) {
+        applyHistoryFiltersSnapshot(preset.filters);
+        if (!historyRecentPresetNames.includes(val)) {
+          historyRecentPresetNames.unshift(val);
+          historyRecentPresetNames = historyRecentPresetNames.slice(0, 8);
+          persistHistoryRecentPresetNames();
+        }
+        renderHistoryPresetChips();
+        syncHistoryFavoritePresetButton();
+        loadHistoryView();
+      }
+    });
+  }
+
+  if (historyPresetChips) {
+    historyPresetChips.addEventListener('click', (event) => {
+      const chip = event.target.closest('[data-history-preset-chip]');
+      if (!chip) return;
+      const val = chip.dataset.historyPresetChip;
+      const preset = historyFilterPresets.find((p) => p.name === val);
+      if (preset?.filters) {
+        applyHistoryFiltersSnapshot(preset.filters);
+        renderHistoryPresetSelect(val);
+        loadHistoryView();
+      }
+    });
+  }
+
+  if (historyToggleFavoritePresetBtn) {
+    historyToggleFavoritePresetBtn.addEventListener('click', () => {
+      const selectedName = String(historyPresetSelect?.value || '').trim();
+      if (!selectedName) return;
+      if (historyFavoritePresetName === selectedName) {
+        historyFavoritePresetName = '';
+      } else {
+        historyFavoritePresetName = selectedName;
+      }
+      persistHistoryFavoritePresetName();
+      renderHistoryPresetSelect(selectedName);
+      renderHistoryPresetChips();
+      syncHistoryFavoritePresetButton();
+    });
+  }
+
   if (txListFull) {
     txListFull.addEventListener('click', (event) => {
+      const clearBtn = event.target.closest('[data-history-empty-clear]');
+      if (clearBtn) {
+        resetHistoryFilters();
+        return;
+      }
+
+      const resetRangeEmptyBtn = event.target.closest(
+        '[data-history-reset-range]'
+      );
+      if (resetRangeEmptyBtn) {
+        state.historyRangeStart = '';
+        state.historyRangeEnd = '';
+        state.historyRangeSource = '';
+        syncHistoryRangeUi();
+        loadHistoryView();
+        return;
+      }
+
       const selector = event.target.closest('.tx-select, .tx-select-input');
       if (selector) return;
 
