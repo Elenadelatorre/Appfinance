@@ -2,18 +2,17 @@
 import { state } from '../../state/state.js';
 import {
   HISTORY_PAGE_SIZE,
-  HISTORY_PASTE_UNDO_LIMIT,
   HISTORY_FETCH_PAGE_BLOCK,
   HISTORY_PRESETS_STORAGE_KEY,
   HISTORY_PRESET_RECENTS_STORAGE_KEY,
   HISTORY_LAST_STATE_STORAGE_KEY,
-  HISTORY_FAVORITE_PRESET_STORAGE_KEY
+  HISTORY_FAVORITE_PRESET_STORAGE_KEY,
 } from '../../config/constants.js';
 import { $, escapeHtml, renderListEmptyState } from '../ui/dom.js';
 import { showAlert } from '../../utils/toast.js';
 import {
   getCategoryVisual,
-  hasCustomCategoryVisual
+  hasCustomCategoryVisual,
 } from '../../utils/visuals.js';
 import { ensureCategoriesLoaded } from '../categories/categories.js';
 import { ensureAccountsLoaded } from '../accounts/accounts.js';
@@ -22,7 +21,7 @@ import {
   sortTransactionsByMostRecent,
   annotateTransactionsWithRunningBalances,
   renderTxItem,
-  openViewTx
+  openViewTx,
 } from '../transactions/transactions.js';
 import { exportHistoryToCSV } from './historyExport.js';
 
@@ -35,14 +34,13 @@ let historyVisibleCount = HISTORY_PAGE_SIZE;
 let historyFilterPresets = [];
 let historyRecentPresetNames = [];
 let historyFavoritePresetName = '';
-let historyPasteUndoStack = [];
 let historyFetchPages = HISTORY_FETCH_PAGE_BLOCK;
 let historyCanLoadMoreData = false;
 let historySearchTimer = null;
 
 export function getCurrentMonthValue() {
   const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 export function isHistoryRangeActive() {
@@ -50,15 +48,16 @@ export function isHistoryRangeActive() {
 }
 
 export function formatHistoryRangeLabel(startValue = '', endValue = '') {
-  const start = new Date(`${startValue}T12:00:00`);
-  const end = new Date(`${endValue}T12:00:00`);
+  const start = new Date(`${startValue}T00:00:00Z`);
+  const end = new Date(`${endValue}T00:00:00Z`);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
     return '';
   }
   const fmt = new Intl.DateTimeFormat('es-ES', {
     day: '2-digit',
     month: 'short',
-    year: 'numeric'
+    year: 'numeric',
+    timeZone: 'UTC',
   });
   return `${fmt.format(start)} - ${fmt.format(end)}`;
 }
@@ -119,13 +118,14 @@ export function formatHistoryDayLabel(date) {
   const label = new Intl.DateTimeFormat('es-ES', {
     weekday: 'long',
     day: 'numeric',
-    month: 'short'
+    month: 'short',
+    timeZone: 'UTC',
   }).format(date);
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 export function renderHistoryGroup(dateKey, transactions = []) {
-  const date = new Date(`${dateKey}T12:00:00`);
+  const date = new Date(`${dateKey}T00:00:00Z`);
   const total = transactions.reduce((sum, tx) => {
     const amount = Number(tx.amount || 0);
     return sum + (tx.type === 'expense' ? -amount : amount);
@@ -138,11 +138,11 @@ export function renderHistoryGroup(dateKey, transactions = []) {
   const isCollapsed = collapsedHistoryGroups.has(dateKey);
 
   return `
-    <section class="history-group${isCollapsed ? ' is-collapsed' : ''}" data-history-date="${dateKey}">
+    <section class="history-group${isCollapsed ? ' is-collapsed' : ''}" data-history-date="${escapeHtml(dateKey)}">
       <button
         type="button"
         class="history-group-header history-group-toggle"
-        data-history-toggle="${dateKey}"
+        data-history-toggle="${escapeHtml(dateKey)}"
         aria-expanded="${isCollapsed ? 'false' : 'true'}"
       >
         <div class="history-group-copy">
@@ -232,7 +232,7 @@ export function readHistoryFilterPresets() {
       .filter((item) => item && typeof item.name === 'string' && item.filters)
       .map((item) => ({
         name: String(item.name).trim(),
-        filters: item.filters
+        filters: item.filters,
       }))
       .filter((item) => item.name);
   } catch {
@@ -306,7 +306,7 @@ export function readHistoryLastState() {
       rangeStart: String(parsed.rangeStart || '').trim(),
       rangeEnd: String(parsed.rangeEnd || '').trim(),
       rangeSource: String(parsed.rangeSource || '').trim(),
-      selectedPresetName: String(parsed.selectedPresetName || '').trim()
+      selectedPresetName: String(parsed.selectedPresetName || '').trim(),
     };
   } catch {
     return null;
@@ -322,7 +322,7 @@ export function getCurrentHistoryFiltersSnapshot() {
     maxAmount: String($('historyMaxAmount')?.value || '').trim(),
     searchTerm: String($('historySearchInput')?.value || ''),
     rangeStart: state.historyRangeStart || '',
-    rangeEnd: state.historyRangeEnd || ''
+    rangeEnd: state.historyRangeEnd || '',
   };
 }
 
@@ -338,7 +338,7 @@ export function buildHistoryLastState() {
     ...snapshot,
     selectedMonth: $('historyMonth')?.value || getCurrentMonthValue(),
     rangeSource,
-    selectedPresetName: String($('historyPresetSelect')?.value || '').trim()
+    selectedPresetName: String($('historyPresetSelect')?.value || '').trim(),
   };
 }
 
@@ -578,7 +578,7 @@ export async function populateHistoryCategoryFilter() {
           ? getCategoryVisual(subcategory, visual.icon, visual.color)
           : {
               ...getCategoryVisual(subcategory, visual.icon, visual.color),
-              icon: visual.icon
+              icon: visual.icon,
             };
         const subcategoryLabel = `↳ ${subVisual.icon} ${subcategory.name}`;
         options.push(
@@ -634,7 +634,7 @@ export function matchesHistorySearch(tx, searchTerm, accountLookup) {
     subcategory?.name || '',
     accountLookup.get(String(tx.account_id || '')) || '',
     tx.type === 'expense' ? 'gasto' : 'ingreso',
-    Number(tx.amount || 0).toFixed(2)
+    Number(tx.amount || 0).toFixed(2),
   ]
     .join(' ')
     .toLocaleLowerCase('es-ES');
@@ -656,8 +656,8 @@ export function matchesHistoryFilters(tx, filters) {
   if (filters.rangeStart && filters.rangeEndExclusive) {
     if (date < filters.rangeStart || date >= filters.rangeEndExclusive)
       return false;
-  } else {
-    const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  } else if (filters.selectedMonth) {
+    const yearMonth = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
     if (yearMonth !== filters.selectedMonth) return false;
   }
 
@@ -724,13 +724,14 @@ export function updateHistoryResultsMeta(
     transactions.map((tx) => String(tx.subcategory_id || tx.category_id || ''))
   ).size;
   const monthDate = selectedMonth
-    ? new Date(`${selectedMonth}-01T12:00:00`)
+    ? new Date(`${selectedMonth}-01T00:00:00Z`)
     : null;
   let monthLabel =
     monthDate && !Number.isNaN(monthDate.getTime())
       ? monthDate.toLocaleDateString('es-ES', {
           month: 'long',
-          year: 'numeric'
+          year: 'numeric',
+          timeZone: 'UTC',
         })
       : 'este periodo';
 
@@ -812,7 +813,7 @@ export async function loadHistoryView(options = {}) {
 
   await Promise.all([
     populateHistoryAccountFilter(),
-    populateHistoryCategoryFilter()
+    populateHistoryCategoryFilter(),
   ]);
 
   if (categoryFilter && state.historyPendingCategoryId) {
@@ -837,13 +838,13 @@ export async function loadHistoryView(options = {}) {
   const selectedMonth = monthInput?.value || getCurrentMonthValue();
   const rangeActive = isHistoryRangeActive();
   const rangeStart = rangeActive
-    ? new Date(`${state.historyRangeStart}T00:00:00`)
+    ? new Date(`${state.historyRangeStart}T00:00:00Z`)
     : null;
   const rangeEndExclusive = rangeActive
-    ? new Date(`${state.historyRangeEnd}T00:00:00`)
+    ? new Date(`${state.historyRangeEnd}T00:00:00Z`)
     : null;
   if (rangeEndExclusive && !Number.isNaN(rangeEndExclusive.getTime())) {
-    rangeEndExclusive.setDate(rangeEndExclusive.getDate() + 1);
+    rangeEndExclusive.setUTCDate(rangeEndExclusive.getUTCDate() + 1);
   }
 
   const selectedType = getSelectedHistoryType();
@@ -884,12 +885,19 @@ export async function loadHistoryView(options = {}) {
   const selectedAccount = accounts.find(
     (account) => String(account.id || account._id) === selectedAccountId
   );
-  const historyData = await fetchAllTransactions(
-    rangeActive
-      ? { start_date: state.historyRangeStart, end_date: state.historyRangeEnd }
-      : { month: selectedMonth },
-    { maxPages: historyFetchPages, returnMeta: true }
-  );
+
+  const queryParams = rangeActive
+    ? { start_date: state.historyRangeStart, end_date: state.historyRangeEnd }
+    : { month: selectedMonth };
+
+  if (selectedAccountId !== 'all') {
+    queryParams.account_id = selectedAccountId;
+  }
+
+  const historyData = await fetchAllTransactions(queryParams, {
+    maxPages: historyFetchPages,
+    returnMeta: true,
+  });
   const allTransactions = historyData?.items || [];
   historyCanLoadMoreData = Boolean(historyData?.hasMore);
 
@@ -907,7 +915,7 @@ export async function loadHistoryView(options = {}) {
         ? minAmount
         : maxAmount,
     searchTerm,
-    accountLookup
+    accountLookup,
   };
 
   const filtered = annotateTransactionsWithRunningBalances(

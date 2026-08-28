@@ -33,9 +33,20 @@ export function exportHistoryToCSV(transactions = [], monthLabel = '') {
       ? state.catsById?.get(tx.subcategory_id)
       : null;
     const account = findAccountForTransaction(tx);
-    const date = tx.date
-      ? new Date(tx.date).toLocaleDateString('es-ES')
-      : '';
+
+    let dateStr = '';
+    if (tx.date) {
+      const d = new Date(tx.date);
+      if (!Number.isNaN(d.getTime())) {
+        dateStr = d.toLocaleDateString('es-ES', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          timeZone: 'UTC'
+        });
+      }
+    }
+
     const type = tx.type === 'expense' ? 'Gasto' : 'Ingreso';
     const catName = cat?.name || tx.category_id || '';
     const subName = sub?.name || '';
@@ -44,7 +55,7 @@ export function exportHistoryToCSV(transactions = [], monthLabel = '') {
     const amount = (tx.type === 'expense' ? -1 : 1) * Number(tx.amount || 0);
 
     return [
-      escapeCsvField(date),
+      escapeCsvField(dateStr),
       escapeCsvField(type),
       escapeCsvField(catName),
       escapeCsvField(subName),
