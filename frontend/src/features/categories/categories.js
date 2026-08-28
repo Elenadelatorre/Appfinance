@@ -257,7 +257,7 @@ export function resetCategoryForm(defaults = {}) {
 
   setValueIfElement(name, defaults.name || '');
   setValueIfElement(icon, defaults.icon || '');
-  setValueIfElement(color, defaults.color || '#4f46e5');
+  setValueIfElement(color, normalizeColorValue(defaults.color, '#4f46e5'));
   setValueIfElement(bgColor, normalizeColorValue(defaults.bg_color, '#eef2ff'));
   setValueIfElement(
     borderColor,
@@ -566,14 +566,19 @@ export async function ensureCategoriesLoaded() {
 }
 
 export async function saveCategoryForm() {
-  const name = $('categoryFormName')?.value?.trim() || '';
-  const icon = $('categoryFormIcon')?.value?.trim() || '';
-  const color = $('categoryFormColor')?.value || '#4f46e5';
+  const name = ($('categoryFormName')?.value || '').trim();
+  const icon = ($('categoryFormIcon')?.value || '').trim();
+  const rawColor = $('categoryFormColor')?.value || '#4f46e5';
   const bgInput = $('categoryFormBgColor');
-  const bg_color = bgInput?.value || '#eef2ff';
-  const border_color = $('categoryFormBorderColor')?.value || '#c7d2fe';
+  const rawBgColor = bgInput?.value || '#eef2ff';
+  const rawBorderColor = $('categoryFormBorderColor')?.value || '#c7d2fe';
   const section_id = $('categoryFormSection')?.value || '';
   const parent_id = $('categoryFormParent')?.value || null;
+
+  const color = normalizeColorValue(rawColor, '#4f46e5');
+  const bg_color = normalizeColorValue(rawBgColor, '#eef2ff');
+  const border_color = normalizeColorValue(rawBorderColor, '#c7d2fe');
+
   const inheritedBgColor = parent_id
     ? getParentCategoryBackground(parent_id, '')
     : bg_color;
@@ -601,10 +606,10 @@ export async function saveCategoryForm() {
   const payload = {
     name,
     icon: resolvedIcon,
-    color: resolvedColor,
+    color: normalizeColorValue(resolvedColor, '#4f46e5'),
     image_data: categoryFormImageData,
-    bg_color: resolvedBgColor,
-    border_color,
+    bg_color: normalizeColorValue(resolvedBgColor, '#eef2ff'),
+    border_color: normalizeColorValue(border_color, '#c7d2fe'),
     section_id,
     parent_id,
     order: 0
@@ -716,15 +721,21 @@ function getCategorySiblingContext(categoryId) {
 }
 
 async function persistCategorySiblingOrder(siblings = []) {
-  const updates = siblings.map((item, index) => {
-    const itemId = String(item?._id || item?.id || '');
-    return api(`/categories/${itemId}`, {
-      method: 'PATCH',
-      json: true,
-      body: JSON.stringify({ order: index })
-    });
-  });
-  await Promise.all(updates);
+  const updates = siblings
+    .map((item, index) => {
+      const itemId = String(item?._id || item?.id || '');
+      if (!itemId || item?.order === index) return null;
+      return api(`/categories/${itemId}`, {
+        method: 'PATCH',
+        json: true,
+        body: JSON.stringify({ order: index })
+      });
+    })
+    .filter(Boolean);
+
+  if (updates.length > 0) {
+    await Promise.all(updates);
+  }
 }
 
 export async function moveCategoryItem(categoryId, direction) {
