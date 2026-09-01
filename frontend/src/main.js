@@ -252,7 +252,11 @@ window.addEventListener('pagehide', flushRemoteSettingsSync);
 setTransactionRefreshCallbacks({
   onRefresh: async () => {
     await loadAccounts();
-    if (state.currentViewId) {
+
+    // Si el usuario está viendo el detalle de una cuenta concreta, refrescar esa cuenta
+    if (state.currentViewId === 'account-detail' && state.currentAccountId) {
+      await openViewAccount(state.currentAccountId);
+    } else if (state.currentViewId) {
       loadViewContent(state.currentViewId);
     }
   },
@@ -264,7 +268,9 @@ setTransactionRefreshCallbacks({
 // Escuchar evento global por si se dispara desde otros módulos
 window.addEventListener('finance:transactions-changed', async () => {
   await loadAccounts();
-  if (state.currentViewId) {
+  if (state.currentViewId === 'account-detail' && state.currentAccountId) {
+    await openViewAccount(state.currentAccountId);
+  } else if (state.currentViewId) {
     loadViewContent(state.currentViewId);
   }
 });

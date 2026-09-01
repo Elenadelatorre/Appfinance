@@ -98,7 +98,7 @@ export function buildTransactionIsoDate(dateValue) {
   const rawDate = String(dateValue).trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
     const now = new Date();
-    const timePart = now.toISOString().slice(11); // HH:mm:ss.sssZ
+    const timePart = now.toISOString().slice(11);
     return `${rawDate}T${timePart}`;
   }
 
@@ -596,6 +596,11 @@ export async function saveTx() {
     if (typeof refreshAppCallback === 'function') {
       await refreshAppCallback(account_id);
     }
+    window.dispatchEvent(
+      new CustomEvent('finance:transactions-changed', {
+        detail: { accountId: account_id }
+      })
+    );
   } catch (err) {
     showAlert('Error al guardar: ' + (err?.message || String(err)), 'error');
   }
@@ -613,6 +618,11 @@ export async function deleteTx(txId) {
     if (typeof refreshAppCallback === 'function') {
       await refreshAppCallback(currentAccountId);
     }
+    window.dispatchEvent(
+      new CustomEvent('finance:transactions-changed', {
+        detail: { accountId: currentAccountId }
+      })
+    );
   } catch (err) {
     showAlert('Error al eliminar: ' + (err?.message || String(err)), 'error');
   }
