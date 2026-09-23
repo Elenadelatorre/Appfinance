@@ -4,6 +4,7 @@ import { api } from '../../services/api.js';
 import { $, escapeHtml, clearFileInput } from '../ui/dom.js';
 import { showAlert } from '../../utils/toast.js';
 import { openModal, closeModal } from '../ui/modals.js';
+import { ensureCategoriesLoaded } from '../categories/categories.js';
 import {
   normalizeColorValue,
   normalizeRemoteImageUrl,
@@ -262,7 +263,6 @@ export async function loadAccounts() {
           .map((part) => part.trim())
           .filter(Boolean);
         const accent = getAccountAccent(acc);
-        const border = getAccountBorder(acc);
         const isNegativeBalance = Number(acc.current_balance || 0) < 0;
         const subtitleClass = /ahorro|hucha/i.test(subtitle)
           ? 'account-card-subtitle account-card-subtitle--muted'
