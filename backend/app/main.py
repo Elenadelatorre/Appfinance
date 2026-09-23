@@ -92,7 +92,8 @@ default_cors = (
 CORS_ORIGINS = [
     o.strip() for o in os.getenv("CORS_ORIGINS", default_cors).split(",") if o.strip()
 ]
-CORS_ORIGIN_REGEX = os.getenv("CORS_ORIGIN_REGEX", r"https://.*\.vercel\.app")
+# The frontend may use a Vercel preview or a custom HTTPS domain.
+CORS_ORIGIN_REGEX = os.getenv("CORS_ORIGIN_REGEX", r"https://.*")
 
 app.add_middleware(
     CORSMiddleware,
