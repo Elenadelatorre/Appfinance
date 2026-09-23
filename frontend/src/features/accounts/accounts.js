@@ -13,6 +13,7 @@ import {
 } from '../../utils/visuals.js';
 import {
   annotateTransactionsWithRunningBalances,
+  fetchAllTransactions,
   sortTransactionsByMostRecent,
   renderTxItem,
   openViewTx,
