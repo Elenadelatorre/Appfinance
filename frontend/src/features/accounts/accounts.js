@@ -726,11 +726,34 @@ async function loadAccountTransactions(accountId) {
     const spendDistribution = $('accountSpendDistribution');
     if (!txList) return;
 
-    const list = await fetchAllTransactions(
-      { account_id: accountId },
-      { maxPages: 3, maxRecords: 800 }
+    const cachedAccount = (state.accounts || []).find(
+      (acc) => String(acc.id) === String(accountId)
     );
-    const filtered = Array.isArray(list) ? list : [];
+    const accountName = cachedAccount?.name || null;
+
+    let filtered = [];
+    try {
+      const list = await fetchAllTransactions(
+        { account_id: accountId },
+        { maxPages: 3, maxRecords: 800 }
+      );
+      filtered = Array.isArray(list) ? list : [];
+    } catch {}
+
+    if (!filtered.length && accountName) {
+      const fallbackList = await fetchAllTransactions(
+        {},
+        { maxPages: 6, maxRecords: 2500 }
+      );
+      filtered = (Array.isArray(fallbackList) ? fallbackList : []).filter((t) => {
+        const accId = String(t?.account_id || '').trim();
+        return (
+          accId === String(accountId) ||
+          accId === String(accountName) ||
+          (accountName && accId === accountName)
+        );
+      });
+    }
 
     if (spendDistribution) {
       spendDistribution.innerHTML = buildAccountSpendDistributionCard(filtered, {
