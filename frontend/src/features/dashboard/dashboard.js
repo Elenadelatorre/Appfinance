@@ -19,7 +19,8 @@ import {
   renderTxItem,
   renderBreakdownItem,
   buildAccountSpendDistributionCard,
-  openViewTx
+  openViewTx,
+  matchesAccountReference
 } from '../transactions/transactions.js';
 import { openHistoryFromDashboardCategory } from '../history/history.js';
 
@@ -171,13 +172,8 @@ export function buildDashboardAccountSpendCard(
     });
   }
 
-  const targetAccId = String(selectedAccount.id || selectedAccount._id);
   const filteredTransactions = (transactions || []).filter((tx) => {
-    const accountRef = String(tx?.account_id || '').trim();
-    return (
-      accountRef === targetAccId ||
-      accountRef === String(selectedAccount.name || '')
-    );
+    return matchesAccountReference(selectedAccount, tx?.account_id || '');
   });
 
   return buildAccountSpendDistributionCard(filteredTransactions, {

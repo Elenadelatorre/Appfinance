@@ -21,6 +21,39 @@ let editingTxId = null;
 let refreshAppCallback = null;
 let openViewAccountCallback = null;
 
+export function normalizeAccountRef(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[·•–—_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+export function matchesAccountReference(account, accountRef) {
+  if (!account || !accountRef) return false;
+
+  const normalizedRef = normalizeAccountRef(accountRef);
+  if (!normalizedRef) return false;
+
+  const accountId = String(account?.id || account?._id || '').trim();
+  const accountName = String(account?.name || '').trim();
+  const variants = new Set(
+    [accountId, accountName, accountName.split(/[·•–—-]/)[0] || accountName]
+      .map(normalizeAccountRef)
+      .filter(Boolean)
+  );
+
+  return [...variants].some((variant) => {
+    if (variant === normalizedRef) return true;
+    return (
+      variant.startsWith(`${normalizedRef} `) ||
+      normalizedRef.startsWith(`${variant} `)
+    );
+  });
+}
+
 export function setTransactionRefreshCallbacks({
   onRefresh,
   onOpenViewAccount
@@ -34,10 +67,7 @@ export function findAccountForTransaction(tx) {
   if (!accountRef) return null;
   return (
     (state.accounts || []).find(
-      (account) =>
-        String(account?.id || '') === accountRef ||
-        String(account?._id || '') === accountRef ||
-        String(account?.name || '') === accountRef
+      (account) => matchesAccountReference(account, accountRef)
     ) || null
   );
 }

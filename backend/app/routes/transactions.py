@@ -184,7 +184,23 @@ async def list_transactions(
         )
 
     if account_id:
-        query["account_id"] = str(account_id).strip()
+        account_ref = str(account_id).strip()
+        account_refs = {account_ref}
+        try:
+            account = await accounts_col().find_one(
+                {"_id": _safe_oid(account_ref), "user_id": str(user_id)},
+                projection={"name": 1},
+            )
+        except HTTPException:
+            account = None
+
+        if account:
+            account_name = str(account.get("name") or "").strip()
+            if account_name:
+                account_refs.add(account_name)
+                account_refs.add(account_name.split("·", 1)[0].strip())
+
+        query["account_id"] = {"$in": sorted(ref for ref in account_refs if ref)}
 
     if start_date and end_date:
         try:

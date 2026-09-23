@@ -14,7 +14,8 @@ import {
   annotateTransactionsWithRunningBalances,
   sortTransactionsByMostRecent,
   renderTxItem,
-  openViewTx
+  openViewTx,
+  matchesAccountReference
 } from '../transactions/transactions.js';
 
 let accountFormImageData = null;
@@ -662,7 +663,7 @@ export async function openViewAccount(accountId) {
     const detailBadge = $('accountDetailBadge');
     if (detailBadge) detailBadge.innerHTML = getAccountBadgeMarkup(acc);
 
-    await loadAccountTransactions(accountId);
+    await loadAccountTransactions(accountId, acc);
 
     const btnDelete = $('btnDeleteAccountDetail');
     if (btnDelete) {
@@ -718,7 +719,7 @@ export async function openViewAccount(accountId) {
   }
 }
 
-async function loadAccountTransactions(accountId) {
+async function loadAccountTransactions(accountId, account = null) {
   try {
     await ensureCategoriesLoaded();
 
@@ -726,10 +727,13 @@ async function loadAccountTransactions(accountId) {
     const spendDistribution = $('accountSpendDistribution');
     if (!txList) return;
 
-    const cachedAccount = (state.accounts || []).find(
-      (acc) => String(acc.id) === String(accountId)
-    );
-    const accountName = cachedAccount?.name || null;
+    const resolvedAccount =
+      account ||
+      (state.accounts || []).find(
+        (acc) => String(acc.id || acc._id) === String(accountId)
+      ) ||
+      null;
+    const accountName = resolvedAccount?.name || null;
 
     let filtered = [];
     try {
@@ -740,27 +744,36 @@ async function loadAccountTransactions(accountId) {
       filtered = Array.isArray(list) ? list : [];
     } catch {}
 
-    if (!filtered.length && accountName) {
+    if (accountName) {
       const fallbackList = await fetchAllTransactions(
         {},
         { maxPages: 6, maxRecords: 2500 }
       );
-      filtered = (Array.isArray(fallbackList) ? fallbackList : []).filter((t) => {
-        const accId = String(t?.account_id || '').trim();
-        return (
-          accId === String(accountId) ||
-          accId === String(accountName) ||
-          (accountName && accId === accountName)
+      const allMatching = (Array.isArray(fallbackList) ? fallbackList : []).filter(
+        (t) =>
+          matchesAccountReference(resolvedAccount, t?.account_id || '')
+      );
+      const byTransactionId = new Map();
+      [...filtered, ...allMatching].forEach((transaction) => {
+        const transactionId = String(
+          transaction?._id ||
+            transaction?.id ||
+            `${transaction?.date}-${transaction?.amount}`
         );
+        byTransactionId.set(transactionId, transaction);
       });
+      filtered = [...byTransactionId.values()];
     }
 
     if (spendDistribution) {
-      spendDistribution.innerHTML = buildAccountSpendDistributionCard(filtered, {
-        title: 'Gasto por categoría',
-        caption: 'Esta cuenta',
-        emptyMessage: 'Esta cuenta aún no tiene gastos registrados.'
-      });
+      spendDistribution.innerHTML = buildAccountSpendDistributionCard(
+        filtered,
+        {
+          title: 'Gasto por categoría',
+          caption: 'Esta cuenta',
+          emptyMessage: 'Esta cuenta aún no tiene gastos registrados.'
+        }
+      );
     }
 
     state.currentAccountTransactions = annotateTransactionsWithRunningBalances(

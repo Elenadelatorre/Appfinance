@@ -975,7 +975,7 @@ function initSettingsAccordion() {
       panel.open = panel === panelToRestore;
     });
   }
-// Escucha el evento toggle nativo de las etiquetas <details>.
+  // Escucha el evento toggle nativo de las etiquetas <details>.
   panels.forEach((panel) => {
     panel.addEventListener('toggle', () => {
       if (panel.open) {
@@ -1163,7 +1163,7 @@ function renderRemindersList() {
     const bDue = reminderDueInputValue(b?.due_date) || '9999-12-31';
     return aDue.localeCompare(bDue);
   });
-// Estado vacío si no hay recordatorios que mostrar.
+  // Estado vacío si no hay recordatorios que mostrar.
   if (!reminders.length) {
     container.innerHTML = `
       <div class="list-empty-state">
@@ -1174,7 +1174,7 @@ function renderRemindersList() {
     `;
     return;
   }
-// Generación de tarjetas HTML dinámicas con sanitización XSS.
+  // Generación de tarjetas HTML dinámicas con sanitización XSS.
   container.innerHTML = reminders
     .map((item) => {
       const id = reminderIdOf(item);
@@ -8402,22 +8402,27 @@ async function loadAccountTransactions(accountId) {
         {},
         { maxPages: 6, maxRecords: 2500 }
       );
-      filtered = (Array.isArray(fallbackList) ? fallbackList : []).filter((t) => {
-        const accId = String(t?.account_id || '').trim();
-        return (
-          accId === String(accountId) ||
-          accId === String(accountName) ||
-          (accountName && accId === accountName)
-        );
-      });
+      filtered = (Array.isArray(fallbackList) ? fallbackList : []).filter(
+        (t) => {
+          const accId = String(t?.account_id || '').trim();
+          return (
+            accId === String(accountId) ||
+            accId === String(accountName) ||
+            (accountName && accId === accountName)
+          );
+        }
+      );
     }
 
     if (spendDistribution) {
-      spendDistribution.innerHTML = buildAccountSpendDistributionCard(filtered, {
-        title: 'Gasto por categoría',
-        caption: 'Esta cuenta',
-        emptyMessage: 'Esta cuenta aún no tiene gastos registrados.'
-      });
+      spendDistribution.innerHTML = buildAccountSpendDistributionCard(
+        filtered,
+        {
+          title: 'Gasto por categoría',
+          caption: 'Esta cuenta',
+          emptyMessage: 'Esta cuenta aún no tiene gastos registrados.'
+        }
+      );
     }
 
     state.currentAccountTransactions = annotateTransactionsWithRunningBalances(
