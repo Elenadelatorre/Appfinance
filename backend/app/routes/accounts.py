@@ -120,36 +120,35 @@ async def get_account(account_id: str, user_id: CurrentUserId):
             status_code=status.HTTP_404_NOT_FOUND, detail="Cuenta no encontrada."
         )
 
-    # Cálculo eficiente con pipeline de agregación en MongoDB
-        account_refs = {str(target_oid)}
-        account_name = str(account.get("name") or "").strip()
-        if account_name:
-            account_refs.add(account_name)
-            account_refs.add(account_name.split("·", 1)[0].strip())
+    account_refs = {str(target_oid)}
+    account_name = str(account.get("name") or "").strip()
+    if account_name:
+        account_refs.add(account_name)
+        account_refs.add(account_name.split("·", 1)[0].strip())
 
-        # Cálculo eficiente con pipeline de agregación de MongoDB
-        pipeline = [
-            {
-                "$match": {
-                    "user_id": str(user_id),
-                    "account_id": {"$in": sorted(ref for ref in account_refs if ref)},
-                }
-            },
-            {
-                "$group": {
-                    "_id": None,
-                    "net_change": {
-                        "$sum": {
-                            "$cond": [
-                                {"$eq": ["$type", "income"]},
-                                "$amount",
-                                {"$multiply": ["$amount", -1]},
-                            ]
-                        }
-                    },
-                }
-            },
-        ]
+    # Cálculo eficiente con pipeline de agregación de MongoDB
+    pipeline = [
+        {
+            "$match": {
+                "user_id": str(user_id),
+                "account_id": {"$in": sorted(ref for ref in account_refs if ref)},
+            }
+        },
+        {
+            "$group": {
+                "_id": None,
+                "net_change": {
+                    "$sum": {
+                        "$cond": [
+                            {"$eq": ["$type", "income"]},
+                            "$amount",
+                            {"$multiply": ["$amount", -1]},
+                        ]
+                    }
+                },
+            }
+        },
+    ]
     agg_result = await tx_col().aggregate(pipeline).to_list(length=1)
     net_change = agg_result[0]["net_change"] if agg_result else 0.0
     initial_balance = float(account.get("balance_inicial", 0.0))
