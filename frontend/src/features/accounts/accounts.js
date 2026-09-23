@@ -720,17 +720,31 @@ export async function openViewAccount(accountId) {
 
 async function loadAccountTransactions(accountId) {
   try {
-    const filtered = await api(
-      `/transactions?account_id=${encodeURIComponent(accountId)}&limit=1000`
-    );
+    await ensureCategoriesLoaded();
+
     const txList = $('accountTxList');
+    const spendDistribution = $('accountSpendDistribution');
     if (!txList) return;
 
+    const list = await fetchAllTransactions(
+      { account_id: accountId },
+      { maxPages: 3, maxRecords: 800 }
+    );
+    const filtered = Array.isArray(list) ? list : [];
+
+    if (spendDistribution) {
+      spendDistribution.innerHTML = buildAccountSpendDistributionCard(filtered, {
+        title: 'Gasto por categoría',
+        caption: 'Esta cuenta',
+        emptyMessage: 'Esta cuenta aún no tiene gastos registrados.'
+      });
+    }
+
     state.currentAccountTransactions = annotateTransactionsWithRunningBalances(
-      sortTransactionsByMostRecent(filtered || [])
+      sortTransactionsByMostRecent(filtered)
     );
 
-    if (!filtered || filtered.length === 0) {
+    if (filtered.length === 0) {
       txList.innerHTML = `
         <div class="list-empty-state">
           <span class="list-empty-state__icon"><i class="ph ph-wallet"></i></span>
