@@ -767,16 +767,51 @@ async function loadAccountTransactions(accountId, account = null) {
       filtered = [...byTransactionId.values()];
     }
 
-    if (spendDistribution) {
+    function renderAccountSpendCard() {
+      if (!spendDistribution) return;
+
+      let transactionsForSpend = filtered;
+      if (state.accountSpendSinceDate) {
+        const sinceTime = new Date(
+          `${state.accountSpendSinceDate}T00:00:00Z`
+        ).getTime();
+        transactionsForSpend = filtered.filter((tx) => {
+          const transactionTime = new Date(tx?.date).getTime();
+          return (
+            !Number.isNaN(transactionTime) && transactionTime >= sinceTime
+          );
+        });
+      }
+
+      const controlsHtml = `
+        <label class="account-spend-date-filter">
+          Desde
+          <input
+            type="date"
+            id="accountSpendSinceInput"
+            value="${state.accountSpendSinceDate || ''}"
+            aria-label="Mostrar gastos desde esta fecha"
+          />
+        </label>
+      `;
+
       spendDistribution.innerHTML = buildAccountSpendDistributionCard(
-        filtered,
+        transactionsForSpend,
         {
           title: 'Gasto por categoría',
           caption: 'Esta cuenta',
-          emptyMessage: 'Esta cuenta aún no tiene gastos registrados.'
+          emptyMessage: 'Esta cuenta aún no tiene gastos registrados.',
+          controlsHtml
         }
       );
+
+      $('accountSpendSinceInput')?.addEventListener('change', (event) => {
+        state.accountSpendSinceDate = event.target.value || null;
+        renderAccountSpendCard();
+      });
     }
+
+    renderAccountSpendCard();
 
     state.currentAccountTransactions = annotateTransactionsWithRunningBalances(
       sortTransactionsByMostRecent(filtered)

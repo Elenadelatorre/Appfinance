@@ -1584,6 +1584,40 @@ summary:focus-visible {
 
 }
 
+.account-spend-date-filter {
+
+  display: inline-flex;
+
+  align-items: center;
+
+  gap: 6px;
+
+  color: var(--text-muted);
+
+  font-size: 11px;
+
+  font-weight: 700;
+
+}
+
+.account-spend-date-filter input {
+
+  min-width: 132px;
+
+  padding: 4px 6px;
+
+  border: 1px solid var(--border-color);
+
+  border-radius: 6px;
+
+  color: var(--text-main);
+
+  background: var(--surface);
+
+  font: inherit;
+
+}
+
 
 
 .account-spend-select-wrap {

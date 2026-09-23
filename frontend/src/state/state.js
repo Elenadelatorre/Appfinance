@@ -26,6 +26,7 @@ export const state = {
   accountsDragLockUntil: 0,
   accountDetailOriginViewId: 'accounts',
   homeSpendSinceDate: null,
+  accountSpendSinceDate: null,
 
   // Configuración y filtros de Dashboard
   dashboardSelectedAccountId: null,
@@ -70,6 +71,7 @@ export function resetAppState() {
   state.accountsDragLockUntil = 0;
   state.accountDetailOriginViewId = 'accounts';
   state.homeSpendSinceDate = null;
+  state.accountSpendSinceDate = null;
   state.dashboardSelectedAccountId = null;
   state.dashboardAccountSpendMode = 'all';
   state.dashboardSummaryMode = 'full';
